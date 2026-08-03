@@ -35,7 +35,24 @@ enum TextInjector {
         let setResult = AXUIElementSetAttributeValue(
             element, kAXSelectedTextAttribute as CFString, text as CFTypeRef
         )
-        return setResult == .success
+        guard setResult == .success else { return false }
+
+        // Some apps (web content, Electron, canvas-based editors like Figma)
+        // report success without the write actually reaching the rendered UI.
+        // Read the field back and only trust it if our text is really there.
+        guard let after = stringValue(of: element), after.contains(text) else {
+            NSLog("Sayline: AX set reported success but text not found on readback — treating as failed")
+            return false
+        }
+        return true
+    }
+
+    private static func stringValue(of element: AXUIElement) -> String? {
+        var ref: AnyObject?
+        guard AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &ref) == .success else {
+            return nil
+        }
+        return ref as? String
     }
 
     // MARK: - Clipboard fallback
