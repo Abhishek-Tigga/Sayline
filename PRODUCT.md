@@ -53,6 +53,23 @@ and committed before moving on.
   tone.** Tone/audience adaptation (email vs Slack vs code) is intentionally
   left to the V2 "context-aware formatting" item rather than folded into
   the style picker, to avoid two overlapping mechanisms doing similar jobs.
+- **On-device transcription via WhisperKit (Argmax), not raw whisper.cpp.**
+  WhisperKit is a Swift-native package (MIT licensed, macOS 14+ — matches
+  our existing deployment target) that already solves C interop and model
+  bundling, so we don't hand-roll either. Uses the compressed large-v3
+  variant specifically (`large-v3-v20240930_626MB`) — Argmax's own
+  recommended max-accuracy pick, meaningfully smaller than the
+  device-auto-selected default. Still real Whisper, so we keep the
+  100+ language support that was the whole reason whisper.cpp was in the
+  running over Apple's closed SpeechAnalyzer.
+- **Local transcription is opt-in, never silently auto-downloaded.** New
+  users default to cloud (Groq) — no large download blocks the first
+  dictation before they've even seen the product work. But once a user
+  opts in via the toggle, the model download starts immediately in the
+  background (not lazily on first dictation), and any dictation attempted
+  before it's ready silently falls back to cloud rather than blocking —
+  opt-in is the consent gate, auto-download is the mechanism *after* that
+  gate, not a replacement for it.
 
 ## Cost model (as of 2026-08-04, Groq pricing)
 
@@ -83,13 +100,6 @@ conversation on 2026-08-04; re-derive if Groq's pricing changes materially.
 
 ## Deferred decisions (open, not urgent)
 
-- **On-device transcription: whisper.cpp vs Apple SpeechAnalyzer.**
-  whisper.cpp is more engineering work (C interop, model bundling) but
-  works on older macOS and is more capable (100+ languages, fine-tunable).
-  SpeechAnalyzer is far simpler to build but requires macOS 26+ and is a
-  closed model with unclear accuracy advantage over Whisper large-v3
-  specifically (benchmarks found beat smaller Whisper variants, not
-  large-v3). Leaning whisper.cpp for shippability, not yet committed.
 - **Monetization model.** Not decided. On-device transcription (once built)
   would make a generous free tier or one-time-purchase model viable, since
   marginal cost per user would approach zero for that path.

@@ -2,6 +2,7 @@ import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let dictationStyleDefaultsKey = "com.abhishektigga.sayline.dictationStyle"
+    private static let useLocalTranscriptionDefaultsKey = "com.abhishektigga.sayline.useLocalTranscription"
 
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
@@ -11,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var isCleaningUp = false
     @Published var lastTranscript: String?
     @Published var transcriptionError: String?
+    @Published var isLocalModelDownloading = false
+    @Published var isLocalModelReady = false
     @Published var dictationStyle: DictationStyle = {
         if let raw = UserDefaults.standard.string(forKey: AppDelegate.dictationStyleDefaultsKey),
            let style = DictationStyle(rawValue: raw) {
@@ -23,12 +26,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             indicatorWindow.updateStyle(dictationStyle)
         }
     }
+    @Published var useLocalTranscription: Bool = {
+        UserDefaults.standard.bool(forKey: AppDelegate.useLocalTranscriptionDefaultsKey)
+    }() {
+        didSet {
+            UserDefaults.standard.set(useLocalTranscription, forKey: Self.useLocalTranscriptionDefaultsKey)
+            if useLocalTranscription {
+                startLocalModelPreloadIfNeeded()
+            }
+        }
+    }
 
     private let hotkeyManager = HotkeyManager()
     private let audioRecorder = AudioRecorder()
-    private let transcriber = GroqTranscriber()
+    private let cloudTranscriber = GroqTranscriber()
+    private let localTranscriber = WhisperKitTranscriber()
     private let cleaner = TranscriptCleaner()
     private let indicatorWindow = FloatingIndicatorWindow()
+
+    /// Local only once it's actually ready — while it's still
+    /// downloading/loading, dictation silently keeps working via cloud
+    /// instead of blocking on a multi-minute first-time download.
+    private var activeTranscriber: Transcriber {
+        (useLocalTranscription && localTranscriber.isReady) ? localTranscriber : cloudTranscriber
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hotkeyManager.onHotkeyDown = { [weak self] in
@@ -56,6 +77,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         audioRecorder.requestMicPermission { [weak self] granted in
             self?.isMicAuthorized = granted
         }
+
+        if useLocalTranscription {
+            startLocalModelPreloadIfNeeded()
+        }
+    }
+
+    /// Kicks off the local model download/load in the background, decoupled
+    /// from any actual dictation attempt. Safe to call redundantly.
+    private func startLocalModelPreloadIfNeeded() {
+        guard !localTranscriber.isReady, !isLocalModelDownloading else { return }
+        isLocalModelDownloading = true
+        Task {
+            await localTranscriber.preload()
+            await MainActor.run {
+                self.isLocalModelDownloading = false
+                self.isLocalModelReady = self.localTranscriber.isReady
+            }
+        }
     }
 
     private func handleHotkeyUp() {
@@ -67,14 +106,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         lastRecordingPath = url.path
         let style = dictationStyle
+        let usingLocal = useLocalTranscription && localTranscriber.isReady
 
         isTranscribing = true
         transcriptionError = nil
         indicatorWindow.show(state: .transcribing)
         Task {
             do {
-                let rawText = try await transcriber.transcribe(fileURL: url)
-                NSLog("Sayline: raw transcript -> \(rawText)")
+                let rawText = try await activeTranscriber.transcribe(fileURL: url)
+                NSLog("Sayline: raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
                 await MainActor.run {
                     self.isTranscribing = false

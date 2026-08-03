@@ -22,7 +22,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] AI cleanup pass (strip filler words, fix grammar)
 - [x] Dictation style picker (Verbatim / Clean / Concise, cycle with Tab while dictating)
 - [x] Floating recording indicator
-- [ ] On-device transcription option (whisper.cpp)
+- [x] On-device transcription option (WhisperKit)
 - [ ] Settings: hotkey, mic, cloud/local toggle
 - [ ] Transcription history
 
@@ -39,6 +39,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - Swift + SwiftUI (menu bar app via `MenuBarExtra`)
 - AVFoundation for audio capture
 - Accessibility API (`AXUIElement`) for reading focus / inserting text
+- [WhisperKit](https://github.com/argmaxinc/argmax-oss-swift) (Argmax) for on-device transcription — opt-in, cloud (Groq) by default
 - [xcodegen](https://github.com/yonaskolb/XcodeGen) — the `.xcodeproj` is generated from [`project.yml`](project.yml), not committed, to keep the repo diff-friendly
 
 ## Setup

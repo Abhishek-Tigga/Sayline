@@ -3,12 +3,19 @@ options:
   bundleIdPrefix: com.abhishektigga
   deploymentTarget:
     macOS: "14.0"
+packages:
+  ArgmaxOSS:
+    url: https://github.com/argmaxinc/argmax-oss-swift.git
+    from: 0.9.0
 targets:
   Sayline:
     type: application
     platform: macOS
     sources:
       - Sources/Sayline
+    dependencies:
+      - package: ArgmaxOSS
+        product: WhisperKit
     info:
       path: Sources/Sayline/Info.plist
       properties:

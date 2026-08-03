@@ -19,7 +19,7 @@ enum TranscriptionError: LocalizedError {
 
 /// Sends recorded audio to Groq's OpenAI-compatible Whisper endpoint and
 /// returns the transcript text.
-final class GroqTranscriber {
+final class GroqTranscriber: Transcriber {
     private let endpoint = URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!
     private let model = "whisper-large-v3-turbo"
 
