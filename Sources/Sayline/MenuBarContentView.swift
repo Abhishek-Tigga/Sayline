@@ -24,6 +24,19 @@ struct MenuBarContentView: View {
                 }
             }
 
+            if !appDelegate.isMicAuthorized {
+                Text("Microphone permission needed")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+
+            if let path = appDelegate.lastRecordingPath {
+                Text("Last recording: \((path as NSString).lastPathComponent)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
             Divider()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)

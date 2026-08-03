@@ -13,7 +13,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 **V0 — prove the pipeline**
 - [x] Menu bar app shell
 - [x] Global hotkey (hold-to-talk)
-- [ ] Audio capture (AVAudioEngine)
+- [x] Audio capture (AVAudioEngine)
 - [ ] Cloud transcription (Groq Whisper API)
 - [ ] Text injection at cursor (clipboard + simulated paste)
 
