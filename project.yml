@@ -1,0 +1,25 @@
+name: Sayline
+options:
+  bundleIdPrefix: com.abhishektigga
+  deploymentTarget:
+    macOS: "14.0"
+targets:
+  Sayline:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/Sayline
+    info:
+      path: Sources/Sayline/Info.plist
+      properties:
+        LSUIElement: true
+        NSMicrophoneUsageDescription: "Sayline needs microphone access to transcribe your speech into text."
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.abhishektigga.sayline
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"

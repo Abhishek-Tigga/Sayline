@@ -1,0 +1,18 @@
+# Xcode
+DerivedData/
+*.xcodeproj/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
+
+# Secrets — never commit API keys
+.env
+Secrets.swift
+*.xcconfig.local
