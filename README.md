@@ -2,7 +2,7 @@
 
 A native macOS dictation tool: hold a hotkey, speak, get text inserted wherever your cursor is — in any app. Inspired by tools like Flow (formerly Whisper Flow).
 
-Built as a hands-on learning project and portfolio piece — commit history reflects the real build process, not a squashed final state.
+Built as a hands-on learning project and portfolio piece — commit history reflects the real build process, not a squashed final state. See [PRODUCT.md](PRODUCT.md) for the product direction and long-term vision, and [CHANGELOG.md](CHANGELOG.md) for a chronological log of changes.
 
 ## Status
 
