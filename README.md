@@ -14,7 +14,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Menu bar app shell
 - [x] Global hotkey (hold-to-talk)
 - [x] Audio capture (AVAudioEngine)
-- [ ] Cloud transcription (Groq Whisper API)
+- [x] Cloud transcription (Groq Whisper API)
 - [ ] Text injection at cursor (clipboard + simulated paste)
 
 **V1 — make it feel real**
@@ -48,3 +48,5 @@ Requires Xcode 15+ and [xcodegen](https://github.com/yonaskolb/XcodeGen) (`brew 
 xcodegen generate
 open Sayline.xcodeproj
 ```
+
+Transcription uses the [Groq](https://console.groq.com) Whisper API. Set a `GROQ_API_KEY` environment variable before running — in Xcode: **Edit Scheme → Run → Arguments → Environment Variables**. Never commit this key; it's read from the environment only.

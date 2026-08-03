@@ -37,6 +37,26 @@ struct MenuBarContentView: View {
                     .lineLimit(1)
             }
 
+            if appDelegate.isTranscribing {
+                Text("Transcribing…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let transcript = appDelegate.lastTranscript {
+                Divider()
+                Text("Last transcript:")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(transcript)
+                    .font(.caption)
+                    .lineLimit(4)
+            } else if let error = appDelegate.transcriptionError {
+                Divider()
+                Text("Transcription failed: \(error)")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .lineLimit(3)
+            }
+
             Divider()
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
