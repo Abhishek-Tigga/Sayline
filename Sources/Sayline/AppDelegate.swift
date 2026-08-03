@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.lastTranscript = text
                     self.isTranscribing = false
                     NSLog("Sayline: transcript -> \(text)")
-                    TextInjector.pasteAtCursor(text)
+                    TextInjector.insert(text)
                 }
             } catch {
                 await MainActor.run {

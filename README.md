@@ -18,7 +18,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Text injection at cursor (clipboard + simulated paste)
 
 **V1 — make it feel real**
-- [ ] Direct text insertion via Accessibility API (no clipboard)
+- [x] Direct text insertion via Accessibility API (no clipboard)
 - [ ] AI cleanup pass (strip filler words, fix grammar)
 - [ ] On-device transcription option (whisper.cpp)
 - [ ] Floating recording indicator
