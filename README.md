@@ -6,16 +6,16 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 
 ## Status
 
-🚧 V0 in progress. Currently: a bare menu bar shell with no dictation functionality yet.
+✅ V0 complete: hold Right Option, speak, text pastes at your cursor in any app. Onto V1.
 
 ## Roadmap
 
-**V0 — prove the pipeline**
+**V0 — prove the pipeline** ✅
 - [x] Menu bar app shell
 - [x] Global hotkey (hold-to-talk)
 - [x] Audio capture (AVAudioEngine)
 - [x] Cloud transcription (Groq Whisper API)
-- [ ] Text injection at cursor (clipboard + simulated paste)
+- [x] Text injection at cursor (clipboard + simulated paste)
 
 **V1 — make it feel real**
 - [ ] Direct text insertion via Accessibility API (no clipboard)
