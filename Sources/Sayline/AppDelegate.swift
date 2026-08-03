@@ -6,12 +6,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var isMicAuthorized = false
     @Published var lastRecordingPath: String?
     @Published var isTranscribing = false
+    @Published var isCleaningUp = false
     @Published var lastTranscript: String?
     @Published var transcriptionError: String?
 
     private let hotkeyManager = HotkeyManager()
     private let audioRecorder = AudioRecorder()
     private let transcriber = GroqTranscriber()
+    private let cleaner = TranscriptCleaner()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hotkeyManager.onHotkeyDown = { [weak self] in
@@ -39,14 +41,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         lastRecordingPath = url.path
 
         isTranscribing = true
+        transcriptionError = nil
         Task {
             do {
-                let text = try await transcriber.transcribe(fileURL: url)
+                let rawText = try await transcriber.transcribe(fileURL: url)
+                NSLog("Sayline: raw transcript -> \(rawText)")
+
                 await MainActor.run {
-                    self.lastTranscript = text
                     self.isTranscribing = false
-                    NSLog("Sayline: transcript -> \(text)")
-                    TextInjector.insert(text)
+                    self.isCleaningUp = true
+                }
+
+                var finalText = rawText
+                do {
+                    finalText = try await cleaner.clean(rawText)
+                    NSLog("Sayline: cleaned transcript -> \(finalText)")
+                } catch {
+                    NSLog("Sayline: cleanup failed, using raw transcript -> \(error.localizedDescription)")
+                }
+
+                await MainActor.run {
+                    self.isCleaningUp = false
+                    self.lastTranscript = finalText
+                    TextInjector.insert(finalText)
                 }
             } catch {
                 await MainActor.run {

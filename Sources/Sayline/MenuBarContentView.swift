@@ -41,6 +41,10 @@ struct MenuBarContentView: View {
                 Text("Transcribing…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if appDelegate.isCleaningUp {
+                Text("Cleaning up…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else if let transcript = appDelegate.lastTranscript {
                 Divider()
                 Text("Last transcript:")

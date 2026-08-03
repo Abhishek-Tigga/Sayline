@@ -19,7 +19,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 
 **V1 — make it feel real**
 - [x] Direct text insertion via Accessibility API (no clipboard)
-- [ ] AI cleanup pass (strip filler words, fix grammar)
+- [x] AI cleanup pass (strip filler words, fix grammar)
 - [ ] On-device transcription option (whisper.cpp)
 - [ ] Floating recording indicator
 - [ ] Settings: hotkey, mic, cloud/local toggle
