@@ -6,16 +6,12 @@ final class TranscriptCleaner {
     private let endpoint = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
     private let model = "llama-3.1-8b-instant"
 
-    private let systemPrompt = """
-    You clean up raw speech-to-text transcripts for dictation. Remove filler \
-    words (um, uh, like, you know), fix grammar, punctuation, and \
-    capitalization, and remove false starts or repeated words. Preserve the \
-    speaker's meaning, tone, and intent exactly — do not add information, do \
-    not answer questions, do not add commentary. Output ONLY the cleaned \
-    text, nothing else.
-    """
+    /// Returns the raw text unchanged for styles that skip the LLM entirely (.exact).
+    func clean(_ rawText: String, style: DictationStyle) async throws -> String {
+        guard let systemPrompt = style.systemPrompt else {
+            return rawText
+        }
 
-    func clean(_ rawText: String) async throws -> String {
         guard let apiKey = ProcessInfo.processInfo.environment["GROQ_API_KEY"], !apiKey.isEmpty else {
             throw TranscriptionError.missingAPIKey
         }

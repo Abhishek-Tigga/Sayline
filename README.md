@@ -20,8 +20,9 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 **V1 — make it feel real**
 - [x] Direct text insertion via Accessibility API (no clipboard)
 - [x] AI cleanup pass (strip filler words, fix grammar)
+- [x] Dictation style picker (Verbatim / Clean / Concise, cycle with Tab while dictating)
+- [x] Floating recording indicator
 - [ ] On-device transcription option (whisper.cpp)
-- [ ] Floating recording indicator
 - [ ] Settings: hotkey, mic, cloud/local toggle
 - [ ] Transcription history
 

@@ -1,10 +1,13 @@
 import Cocoa
 
 /// Watches for the Right Option key being held down/released, system-wide,
-/// via a low-level CGEventTap. Requires Accessibility permission to be granted
-/// before `start()` will succeed.
+/// via a low-level CGEventTap. Also catches Tab while Right Option is held
+/// as a "cycle dictation style" shortcut, swallowing that keystroke so it
+/// doesn't get typed into whatever app is focused. Requires Accessibility
+/// permission to be granted before `start()` will succeed.
 final class HotkeyManager {
     private static let rightOptionKeyCode: Int64 = 61 // kVK_RightOption
+    private static let cycleStyleKeyCode: Int64 = 48 // kVK_Tab
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -12,24 +15,25 @@ final class HotkeyManager {
 
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
+    var onCycleStyleRequested: (() -> Void)?
 
     @discardableResult
     func start() -> Bool {
         guard eventTap == nil else { return true }
 
         let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
+            | CGEventMask(1 << CGEventType.keyDown.rawValue)
         let selfPointer = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,
+            options: .defaultTap,
             eventsOfInterest: mask,
             callback: { _, type, event, refcon in
                 guard let refcon else { return Unmanaged.passUnretained(event) }
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
-                manager.handleFlagsChanged(event: event)
-                return Unmanaged.passUnretained(event)
+                return manager.handle(event: event, type: type)
             },
             userInfo: selfPointer
         ) else {
@@ -54,6 +58,24 @@ final class HotkeyManager {
         }
         eventTap = nil
         runLoopSource = nil
+    }
+
+    private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
+        switch type {
+        case .flagsChanged:
+            handleFlagsChanged(event: event)
+            return Unmanaged.passUnretained(event)
+        case .keyDown:
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            if isHotkeyActive && keyCode == Self.cycleStyleKeyCode {
+                NSLog("Sayline: style cycle requested")
+                onCycleStyleRequested?()
+                return nil // swallow Tab while dictating so it isn't typed
+            }
+            return Unmanaged.passUnretained(event)
+        default:
+            return Unmanaged.passUnretained(event)
+        }
     }
 
     private func handleFlagsChanged(event: CGEvent) {
