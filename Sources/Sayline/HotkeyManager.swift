@@ -73,6 +73,15 @@ final class HotkeyManager {
                 return nil // swallow Tab while dictating so it isn't typed
             }
             return Unmanaged.passUnretained(event)
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            // macOS can silently disable an active tap if it decides the
+            // callback isn't keeping up — without this, the hotkey goes
+            // dead with zero indication anything happened.
+            NSLog("Sayline: event tap was disabled by the system (\(type.rawValue)), re-enabling")
+            if let eventTap {
+                CGEvent.tapEnable(tap: eventTap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
         default:
             return Unmanaged.passUnretained(event)
         }

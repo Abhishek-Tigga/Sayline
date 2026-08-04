@@ -83,6 +83,16 @@ and committed before moving on.
   for now — it's the only one actually buildable without new
   infrastructure. Revisit the backend-proxy option when actually
   shipping/monetizing (see "Deferred decisions").
+- **Microphone: auto-follow system default, with a manual override —
+  not a full device-management UI.** Verified live that AVAudioEngine
+  already tracks whatever macOS considers the default input device
+  automatically (it picked up AirPods on the very next recording after
+  connecting them, zero code of ours involved), since we re-read the
+  input format fresh at the start of every recording rather than caching
+  it. The only real new work was the manual pin (Core Audio device
+  enumeration + `kAudioOutputUnitProperty_CurrentDevice`) for the case
+  where someone wants a specific mic regardless of system default (e.g.
+  a desk mic for quality, even with AirPods connected for calls).
 
 ## Cost model (as of 2026-08-04, Groq pricing)
 
@@ -113,14 +123,28 @@ conversation on 2026-08-04; re-derive if Groq's pricing changes materially.
 
 ## Known rough edge (expected until V2 code signing)
 
-Repeated macOS Keychain access prompts during dev testing are a real,
-understood symptom, not a bug to chase: our current "Sign to Run Locally"
-ad-hoc signing doesn't give the app a stable identity across rebuilds, so
-macOS can't reliably remember a Keychain access grant the way it would for
-a properly Developer-ID-signed app (like Whisper Flow). Mitigated
-`APIKeyProvider` to cache the resolved key in memory per launch (was
-re-reading Keychain twice per dictation, now once), but the underlying
-cause only goes away with real code signing — already on the V2 list.
+One Keychain prompt per fresh build/launch is real and understood, not a
+bug to chase: our current "Sign to Run Locally" ad-hoc signing doesn't
+give the app a stable identity across rebuilds, so macOS can't reliably
+remember a Keychain access grant the way it would for a properly
+Developer-ID-signed app (like Whisper Flow). Goes away entirely with real
+code signing — already on the V2 list.
+
+Two related bugs were found and fixed via live testing on top of that
+expected behavior, both worth remembering:
+- **`APIKeyProvider` caching flaw → retry storm.** The original cache
+  used a plain `String?`, which can't distinguish "never checked" from
+  "checked and got nothing" (e.g. a denied/interrupted prompt) — both
+  look like nil. One denied prompt meant the very next call (two happen
+  per dictation) retried from scratch, compounding into a real,
+  observed infinite prompt loop that made the app briefly unusable.
+  Fixed by tracking `hasResolved` separately from the cached value.
+- **CGEventTap can be silently disabled by the system.** macOS may
+  auto-disable an active event tap it decides isn't keeping up — with
+  zero indication to the app. `HotkeyManager` now listens for
+  `.tapDisabledByTimeout`/`.tapDisabledByUserInput` and immediately
+  re-enables the tap; without this, the hotkey can go dead mid-session
+  with no error, no crash, nothing in the logs to point at.
 
 ## Deferred decisions (open, not urgent)
 

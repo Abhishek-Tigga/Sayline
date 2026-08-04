@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let useLocalTranscriptionDefaultsKey = "com.abhishektigga.sayline.useLocalTranscription"
     private static let historyDefaultsKey = "com.abhishektigga.sayline.history"
     private static let maxHistoryEntries = 20
+    private static let preferredInputDeviceDefaultsKey = "com.abhishektigga.sayline.preferredInputDeviceUID"
 
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
@@ -18,6 +19,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var isLocalModelDownloading = false
     @Published var isLocalModelReady = false
     @Published private(set) var historyEntries: [HistoryEntry] = []
+    @Published var preferredInputDeviceUID: String? = UserDefaults.standard.string(forKey: AppDelegate.preferredInputDeviceDefaultsKey) {
+        didSet {
+            UserDefaults.standard.set(preferredInputDeviceUID, forKey: Self.preferredInputDeviceDefaultsKey)
+        }
+    }
     @Published var dictationStyle: DictationStyle = {
         if let raw = UserDefaults.standard.string(forKey: AppDelegate.dictationStyleDefaultsKey),
            let style = DictationStyle(rawValue: raw) {
@@ -78,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 guard let self else { return }
                 self.isRecording = true
                 self.transcriptionError = nil
-                self.audioRecorder.start()
+                self.audioRecorder.start(preferredDeviceUID: self.preferredInputDeviceUID)
                 self.indicatorWindow.show(state: .recording)
                 self.indicatorWindow.updateStyle(self.dictationStyle)
             }

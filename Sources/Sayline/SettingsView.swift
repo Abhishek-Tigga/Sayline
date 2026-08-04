@@ -50,6 +50,21 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Microphone") {
+                Picker("Input Device", selection: Binding(
+                    get: { appDelegate.preferredInputDeviceUID ?? "" },
+                    set: { appDelegate.preferredInputDeviceUID = $0.isEmpty ? nil : $0 }
+                )) {
+                    Text("Automatic (System Default)").tag("")
+                    ForEach(AudioDeviceLister.inputDevices()) { device in
+                        Text(device.name).tag(device.uid)
+                    }
+                }
+                Text("Automatic follows whatever macOS considers the default input — e.g. it switches to AirPods automatically when connected. Pin a specific device here to override that.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("General") {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { appDelegate.launchAtLogin },
