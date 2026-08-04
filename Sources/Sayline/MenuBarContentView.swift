@@ -30,17 +30,12 @@ struct MenuBarContentView: View {
                     .foregroundStyle(.orange)
             }
 
-            Divider()
-            Toggle("Use On-Device Transcription", isOn: $appDelegate.useLocalTranscription)
-                .font(.caption)
-            if appDelegate.isLocalModelDownloading {
-                Text("Downloading local model (one-time)… using cloud until it's ready.")
+            if appDelegate.useLocalTranscription {
+                Text(appDelegate.isLocalModelDownloading
+                     ? "On-device: downloading model…"
+                     : (appDelegate.isLocalModelReady ? "On-device: ready" : "On-device: on"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-            } else if appDelegate.useLocalTranscription && appDelegate.isLocalModelReady {
-                Text("Local model ready.")
-                    .font(.caption2)
-                    .foregroundStyle(.green)
             }
 
             if let path = appDelegate.lastRecordingPath {
@@ -75,6 +70,9 @@ struct MenuBarContentView: View {
             }
 
             Divider()
+            Button("Settings…") {
+                appDelegate.showSettings()
+            }
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }

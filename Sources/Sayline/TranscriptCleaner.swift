@@ -12,7 +12,7 @@ final class TranscriptCleaner {
             return rawText
         }
 
-        guard let apiKey = ProcessInfo.processInfo.environment["GROQ_API_KEY"], !apiKey.isEmpty else {
+        guard let apiKey = APIKeyProvider.groqAPIKey else {
             throw TranscriptionError.missingAPIKey
         }
 

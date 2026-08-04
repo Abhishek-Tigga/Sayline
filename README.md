@@ -23,7 +23,9 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Dictation style picker (Verbatim / Clean / Concise, cycle with Tab while dictating)
 - [x] Floating recording indicator
 - [x] On-device transcription option (WhisperKit)
-- [ ] Settings: hotkey, mic, cloud/local toggle
+- [x] Settings window: Groq API key (BYOK, Keychain-stored), cloud/local toggle, default dictation style, launch at login
+- [ ] Hotkey customization (currently hardcoded to Right Option)
+- [ ] Microphone selection
 - [ ] Transcription history
 
 **V2 — ready to ship**
@@ -51,4 +53,4 @@ xcodegen generate
 open Sayline.xcodeproj
 ```
 
-Transcription uses the [Groq](https://console.groq.com) Whisper API. Set a `GROQ_API_KEY` environment variable before running — in Xcode: **Edit Scheme → Run → Arguments → Environment Variables**. Never commit this key; it's read from the environment only.
+Transcription uses the [Groq](https://console.groq.com) Whisper API. Bring your own key (BYOK) via the app's Settings window (stored in the macOS Keychain) — or, for local development, set a `GROQ_API_KEY` environment variable instead (Xcode: **Edit Scheme → Run → Arguments → Environment Variables**). Never commit a key; it's never written to disk in plaintext.

@@ -70,6 +70,19 @@ and committed before moving on.
   before it's ready silently falls back to cloud rather than blocking —
   opt-in is the consent gate, auto-download is the mechanism *after* that
   gate, not a replacement for it.
+- **Cloud transcription is BYOK (bring your own key), not a shared
+  embedded key.** Considered three options: embedding our own key in the
+  shipped app (not viable — any shipped binary can be inspected, so an
+  embedded secret would get extracted and abused, a well-known attack on
+  this exact pattern); a backend proxy that holds the key server-side with
+  per-user metering (the actual "seamless, no setup" experience real
+  products use, but requires standing up a backend + auth + usage
+  tracking we don't have — a distinct future project, not settings-UI
+  scope); or BYOK (user brings their own free Groq key, entered in
+  Settings, stored in the macOS Keychain, never plaintext). Went with BYOK
+  for now — it's the only one actually buildable without new
+  infrastructure. Revisit the backend-proxy option when actually
+  shipping/monetizing (see "Deferred decisions").
 
 ## Cost model (as of 2026-08-04, Groq pricing)
 
@@ -103,6 +116,11 @@ conversation on 2026-08-04; re-derive if Groq's pricing changes materially.
 - **Monetization model.** Not decided. On-device transcription (once built)
   would make a generous free tier or one-time-purchase model viable, since
   marginal cost per user would approach zero for that path.
+- **Backend-proxied cloud key (replacing BYOK).** Would give the seamless
+  "no setup" experience real consumer products have, but needs a real
+  backend (server holding the Groq key, per-user auth, usage metering) we
+  don't have today. Natural to build alongside monetization/shipping
+  (V2), not before.
 
 ## Non-goals (for now)
 

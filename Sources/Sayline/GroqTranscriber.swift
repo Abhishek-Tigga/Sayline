@@ -8,7 +8,7 @@ enum TranscriptionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "GROQ_API_KEY environment variable not set"
+            return "No Groq API key set — add one in Settings"
         case .invalidResponse:
             return "Unexpected response from Groq"
         case .apiError(let message):
@@ -24,7 +24,7 @@ final class GroqTranscriber: Transcriber {
     private let model = "whisper-large-v3-turbo"
 
     func transcribe(fileURL: URL) async throws -> String {
-        guard let apiKey = ProcessInfo.processInfo.environment["GROQ_API_KEY"], !apiKey.isEmpty else {
+        guard let apiKey = APIKeyProvider.groqAPIKey else {
             throw TranscriptionError.missingAPIKey
         }
 

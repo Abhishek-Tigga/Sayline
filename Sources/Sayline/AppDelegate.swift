@@ -1,4 +1,5 @@
 import Cocoa
+import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let dictationStyleDefaultsKey = "com.abhishektigga.sayline.dictationStyle"
@@ -43,6 +44,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let localTranscriber = WhisperKitTranscriber()
     private let cleaner = TranscriptCleaner()
     private let indicatorWindow = FloatingIndicatorWindow()
+    private lazy var settingsWindowController = SettingsWindowController(appDelegate: self)
+
+    var launchAtLogin: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set {
+            do {
+                if newValue {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                NSLog("Sayline: failed to toggle launch at login -> \(error.localizedDescription)")
+            }
+        }
+    }
 
     /// Local only once it's actually ready — while it's still
     /// downloading/loading, dictation silently keeps working via cloud
@@ -145,6 +162,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 }
             }
         }
+    }
+
+    func showSettings() {
+        settingsWindowController.show()
     }
 
     func refreshAccessibilityStatus() {
