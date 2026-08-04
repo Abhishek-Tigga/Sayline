@@ -9,6 +9,7 @@ enum RecordingIndicatorState: Equatable {
 final class IndicatorViewModel: ObservableObject {
     @Published var state: RecordingIndicatorState = .recording
     @Published var style: DictationStyle = .clean
+    @Published var focusedAppInfo: FocusedAppInfo?
 }
 
 struct RecordingIndicatorView: View {
@@ -17,11 +18,32 @@ struct RecordingIndicatorView: View {
     var body: some View {
         VStack(spacing: 8) {
             if viewModel.state == .recording {
+                debugAppInfoBlock
                 styleRow
             }
             pill
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+    }
+
+    /// Temporary, deliberately visible while building context-aware
+    /// formatting — lets us verify detection live instead of guessing.
+    /// Will come out (or move somewhere less prominent) once the UI gets
+    /// a real pass later.
+    private var debugAppInfoBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            let info = viewModel.focusedAppInfo
+            Text("App: \(info?.name ?? "—")").lineLimit(1)
+            Text("Bundle: \(info?.bundleID ?? "—")").lineLimit(1)
+            Text("Window: \(info?.windowTitle ?? "—")").lineLimit(1)
+            Text("Context: \(info?.context.rawValue ?? "—")").bold()
+        }
+        .font(.system(size: 9, design: .monospaced))
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
     }
 
     private var styleRow: some View {

@@ -60,6 +60,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+    /// Captured once at hotkey-down (the moment dictation starts), used
+    /// both for the debug readout and for the cleanup context.
+    private var capturedFocusedAppInfo: FocusedAppInfo?
+
     private let hotkeyManager = HotkeyManager()
     private let audioRecorder = AudioRecorder()
     private let cloudTranscriber = GroqTranscriber()
@@ -98,9 +102,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 guard let self else { return }
                 self.isRecording = true
                 self.transcriptionError = nil
+                let appInfo = FocusedAppReader.current()
+                self.capturedFocusedAppInfo = appInfo
+                NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
                 self.audioRecorder.start(preferredDeviceUID: self.preferredInputDeviceUID)
                 self.indicatorWindow.show(state: .recording)
                 self.indicatorWindow.updateStyle(self.dictationStyle)
+                self.indicatorWindow.updateFocusedAppInfo(appInfo)
             }
         }
         hotkeyManager.onHotkeyUp = { [weak self] in
@@ -173,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         lastRecordingPath = url.path
         let style = dictationStyle
+        let context = capturedFocusedAppInfo?.context ?? .general
         let usingLocal = useLocalTranscription && localTranscriber.isReady
 
         isTranscribing = true
@@ -191,8 +200,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
                 var finalText = rawText
                 do {
-                    finalText = try await cleaner.clean(rawText, style: style)
-                    NSLog("Sayline: cleaned transcript (\(style.displayName)) -> \(finalText)")
+                    finalText = try await cleaner.clean(rawText, style: style, context: context)
+                    NSLog("Sayline: cleaned transcript (\(style.displayName), context: \(context.rawValue)) -> \(finalText)")
                 } catch {
                     NSLog("Sayline: cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }

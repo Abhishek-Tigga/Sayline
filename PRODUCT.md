@@ -103,6 +103,45 @@ and committed before moving on.
   Changing it is live — no tap recreation needed, since the tap already
   watches all flagsChanged events and just compares against whichever
   keycode is currently selected.
+- **Context-aware formatting is a separate axis from dictation style,
+  not a replacement for it.** Style (Verbatim/Clean/Concise) controls
+  fidelity; context (Email/Chat/Code/General) controls tone/register.
+  They combine — e.g. Clean + Email strips fillers *and* leans
+  professional. Detected from the focused app's bundle ID at the moment
+  the hotkey is pressed, using native `NSWorkspace` (app identity) and
+  the Accessibility API (window title) — deliberately not a third-party
+  library or `CGWindowListCopyWindowInfo`, since the latter needs Screen
+  Recording permission (heavier, scarier) instead of reusing the
+  Accessibility trust we already have for everything else.
+- **Code context always forces verbatim, overriding whatever style is
+  selected.** Rewriting text dictated into a code editor/terminal risks
+  silently corrupting something precise (a variable name, an exact
+  string) — a correctness risk, not a stylistic choice worth leaving to
+  the user's selected style.
+- **Bundle-ID detection has a real, confirmed ceiling — verified live,
+  not assumed:**
+  - Cannot distinguish different modes/tabs within one app. Tested
+    directly against Claude Desktop's Chat/Co-work vs Code tabs — same
+    bundle ID, same window title ("Claude") in both. Not fixable without
+    something both deeper and unreliable; not worth chasing for one app.
+  - Cannot see inside browser tabs by bundle ID alone, since every tab
+    shares the browser's bundle ID — but the *window title* often can.
+    Found via live testing that dictating into Gmail-in-Chrome fell to
+    `.general` even though the title clearly read "...Gmail - Google
+    Chrome...". Fixed by adding webmail title-signature matching
+    (Gmail/Outlook/Yahoo Mail/ProtonMail) specifically for known browser
+    bundle IDs, layered on top of the bundle-ID mapping. The more robust
+    version of this — querying the browser's actual current-tab URL via
+    AppleScript/Apple Events instead of string-matching a title — was
+    considered and deferred: more reliable, but needs its own
+    "Sayline wants to control Google Chrome" permission per browser.
+    Revisit if title-matching proves too fragile.
+- **The debug readout in the floating indicator (app name, bundle ID,
+  window title, resolved context) is intentionally visible right now,**
+  not polished away — the user explicitly wants to verify detection is
+  actually working before any UI pass, since a wrong-but-invisible
+  context would be worse than an ugly-but-verifiable one. Revisit
+  placement/visibility once the broader UI gets redesigned.
 
 ## Cost model (as of 2026-08-04, Groq pricing)
 

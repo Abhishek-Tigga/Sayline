@@ -29,12 +29,12 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Hotkey customization (any standard modifier key — Option/Command/Control/Shift, left or right, or Fn — takes effect live)
 
 **V2 — ready to ship**
-- [ ] Code signing, notarization, installer
+- [x] Context-aware formatting (Email/Chat/Code/General detected from the focused app; Code always stays verbatim regardless of style; browser tabs sniff the window title for known webmail apps since bundle ID alone can't see inside a browser)
+- [ ] Code signing, notarization, installer (blocked on Apple Developer Program enrollment — deferred to last)
 - [ ] Onboarding flow
-- [ ] Context-aware formatting
 - [ ] Voice commands
 - [ ] Auto-updates
-- [ ] Monetization
+- [ ] Monetization (also blocked on signing/distribution being in place)
 
 ## Tech stack
 

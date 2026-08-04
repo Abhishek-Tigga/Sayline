@@ -15,8 +15,8 @@ final class FloatingIndicatorWindow {
     private let panel: NSPanel
     private let viewModel = IndicatorViewModel()
 
-    private let width: CGFloat = 260
-    private let height: CGFloat = 116
+    private let width: CGFloat = 320
+    private let height: CGFloat = 190
     private let bottomMargin: CGFloat = 40
 
     init() {
@@ -51,6 +51,10 @@ final class FloatingIndicatorWindow {
     func updateStyle(_ style: DictationStyle) {
         viewModel.style = style
         NSLog("Sayline: indicator style -> \(style.displayName)")
+    }
+
+    func updateFocusedAppInfo(_ info: FocusedAppInfo) {
+        viewModel.focusedAppInfo = info
     }
 
     func hide() {
