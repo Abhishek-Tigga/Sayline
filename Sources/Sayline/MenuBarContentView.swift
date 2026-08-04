@@ -9,7 +9,7 @@ struct MenuBarContentView: View {
                 .font(.headline)
 
             if appDelegate.isAccessibilityTrusted {
-                Text(appDelegate.isRecording ? "Listening…" : "Hold Right ⌥ to talk")
+                Text(appDelegate.isRecording ? "Listening…" : "Hold \(appDelegate.hotkeyOption.shortSymbol) to talk")
                     .font(.caption)
                     .foregroundStyle(appDelegate.isRecording ? .red : .secondary)
             } else {

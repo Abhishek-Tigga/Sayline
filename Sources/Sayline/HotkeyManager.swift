@@ -1,13 +1,18 @@
 import Cocoa
 
-/// Watches for the Right Option key being held down/released, system-wide,
-/// via a low-level CGEventTap. Also catches Tab while Right Option is held
-/// as a "cycle dictation style" shortcut, swallowing that keystroke so it
-/// doesn't get typed into whatever app is focused. Requires Accessibility
-/// permission to be granted before `start()` will succeed.
+/// Watches for a chosen modifier key (see HotkeyOption) being held
+/// down/released, system-wide, via a low-level CGEventTap. Also catches
+/// Tab while the hotkey is held as a "cycle dictation style" shortcut,
+/// swallowing that keystroke so it doesn't get typed into whatever app is
+/// focused. Requires Accessibility permission to be granted before
+/// `start()` will succeed.
 final class HotkeyManager {
-    private static let rightOptionKeyCode: Int64 = 61 // kVK_RightOption
     private static let cycleStyleKeyCode: Int64 = 48 // kVK_Tab
+
+    /// Changeable at runtime — the tap watches all flagsChanged events
+    /// regardless of key, so switching which one we treat as "the
+    /// hotkey" doesn't require recreating the tap.
+    var hotkeyOption: HotkeyOption = .rightOption
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -46,7 +51,7 @@ final class HotkeyManager {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        NSLog("Sayline: hotkey listener started (hold Right Option)")
+        NSLog("Sayline: hotkey listener started (hold \(hotkeyOption.displayName))")
         return true
     }
 
@@ -89,9 +94,9 @@ final class HotkeyManager {
 
     private func handleFlagsChanged(event: CGEvent) {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        guard keyCode == Self.rightOptionKeyCode else { return }
+        guard keyCode == hotkeyOption.rawValue else { return }
 
-        let isPressed = event.flags.contains(.maskAlternate)
+        let isPressed = event.flags.contains(hotkeyOption.flagMask)
         if isPressed && !isHotkeyActive {
             isHotkeyActive = true
             NSLog("Sayline: hotkey DOWN")

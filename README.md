@@ -6,7 +6,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 
 ## Status
 
-✅ V0 complete: hold Right Option, speak, text pastes at your cursor in any app. Onto V1.
+✅ V1 complete: full dictation experience — cloud or on-device transcription, AI cleanup with selectable styles, customizable hotkey and mic, transcription history, BYOK settings. Onto V2 (shipping polish).
 
 ## Roadmap
 
@@ -17,7 +17,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Cloud transcription (Groq Whisper API)
 - [x] Text injection at cursor (clipboard + simulated paste)
 
-**V1 — make it feel real**
+**V1 — make it feel real** ✅
 - [x] Direct text insertion via Accessibility API (no clipboard)
 - [x] AI cleanup pass (strip filler words, fix grammar)
 - [x] Dictation style picker (Verbatim / Clean / Concise, cycle with Tab while dictating)
@@ -26,7 +26,7 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Settings window: Groq API key (BYOK, Keychain-stored), cloud/local toggle, default dictation style, launch at login
 - [x] Transcription history (last 20, separate window, copy-again button)
 - [x] Microphone selection (auto-follows system default incl. AirPods, with a manual override in Settings)
-- [ ] Hotkey customization (currently hardcoded to Right Option)
+- [x] Hotkey customization (any standard modifier key — Option/Command/Control/Shift, left or right, or Fn — takes effect live)
 
 **V2 — ready to ship**
 - [ ] Code signing, notarization, installer

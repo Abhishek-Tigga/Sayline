@@ -14,10 +14,10 @@ triggered by voice.
 
 Two explicit phases:
 
-1. **Phase 1 — Dictation** (current focus). Get the core dictation
-   experience genuinely good: fast, accurate, reliable across apps, feels
-   like a real product. Everything in the README roadmap (V0/V1/V2) belongs
-   to this phase.
+1. **Phase 1 — Dictation** (V1 complete as of 2026-08-04). Core dictation
+   experience: fast, accurate, reliable across apps, feels like a real
+   product. Everything in the README roadmap (V0/V1/V2) belongs to this
+   phase — V2 (shipping polish) is next.
 2. **Phase 2 — Agent layer**. Voice-triggered actions on top of the
    dictation foundation. Not started. Deliberately deferred until Phase 1
    is solid — see "Deferred decisions" below for what's already been
@@ -93,6 +93,16 @@ and committed before moving on.
   enumeration + `kAudioOutputUnitProperty_CurrentDevice`) for the case
   where someone wants a specific mic regardless of system default (e.g.
   a desk mic for quality, even with AirPods connected for calls).
+- **Hotkey customization scoped to modifier keys only, not arbitrary key
+  combos.** Detection relies on a clean `flagsChanged` down/up signal,
+  which modifier keys (Option/Command/Control/Shift, left or right, or
+  Fn) give naturally and regular keys don't. A full shortcut recorder
+  supporting arbitrary combos would be materially more work (chord
+  handling, conflict detection with system/app shortcuts) for a V1 item —
+  revisit only if a modifier key turns out not to be enough for someone.
+  Changing it is live — no tap recreation needed, since the tap already
+  watches all flagsChanged events and just compares against whichever
+  keycode is currently selected.
 
 ## Cost model (as of 2026-08-04, Groq pricing)
 

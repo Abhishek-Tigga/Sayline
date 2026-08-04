@@ -50,6 +50,17 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Hotkey") {
+                Picker("Hold to Talk", selection: $appDelegate.hotkeyOption) {
+                    ForEach(HotkeyOption.allCases, id: \.self) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                Text("Takes effect immediately, even mid-session.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Microphone") {
                 Picker("Input Device", selection: Binding(
                     get: { appDelegate.preferredInputDeviceUID ?? "" },

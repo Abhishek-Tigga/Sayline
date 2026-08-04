@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let historyDefaultsKey = "com.abhishektigga.sayline.history"
     private static let maxHistoryEntries = 20
     private static let preferredInputDeviceDefaultsKey = "com.abhishektigga.sayline.preferredInputDeviceUID"
+    private static let hotkeyOptionDefaultsKey = "com.abhishektigga.sayline.hotkeyOption"
 
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
@@ -22,6 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var preferredInputDeviceUID: String? = UserDefaults.standard.string(forKey: AppDelegate.preferredInputDeviceDefaultsKey) {
         didSet {
             UserDefaults.standard.set(preferredInputDeviceUID, forKey: Self.preferredInputDeviceDefaultsKey)
+        }
+    }
+    @Published var hotkeyOption: HotkeyOption = {
+        let raw = UserDefaults.standard.object(forKey: AppDelegate.hotkeyOptionDefaultsKey) as? Int64
+        if let raw, let option = HotkeyOption(rawValue: raw) {
+            return option
+        }
+        return .rightOption
+    }() {
+        didSet {
+            UserDefaults.standard.set(hotkeyOption.rawValue, forKey: Self.hotkeyOptionDefaultsKey)
+            hotkeyManager.hotkeyOption = hotkeyOption
         }
     }
     @Published var dictationStyle: DictationStyle = {
@@ -79,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        hotkeyManager.hotkeyOption = hotkeyOption
         hotkeyManager.onHotkeyDown = { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
