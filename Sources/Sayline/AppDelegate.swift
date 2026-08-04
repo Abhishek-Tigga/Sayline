@@ -64,11 +64,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// both for the debug readout and for the cleanup context.
     private var capturedFocusedAppInfo: FocusedAppInfo?
 
+    /// Per-hold, not a persistent toggle — reset false on every
+    /// hotkey-down, set true only if Space is pressed during that hold.
+    private var isAgentModeThisRecording = false
+
     private let hotkeyManager = HotkeyManager()
     private let audioRecorder = AudioRecorder()
     private let cloudTranscriber = GroqTranscriber()
     private let localTranscriber = WhisperKitTranscriber()
     private let cleaner = TranscriptCleaner()
+    private let agentRouter = AgentRouter()
     private let indicatorWindow = FloatingIndicatorWindow()
     private lazy var settingsWindowController = SettingsWindowController(appDelegate: self)
     private lazy var historyWindowController = HistoryWindowController(appDelegate: self)
@@ -102,6 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 guard let self else { return }
                 self.isRecording = true
                 self.transcriptionError = nil
+                self.isAgentModeThisRecording = false
                 let appInfo = FocusedAppReader.current()
                 self.capturedFocusedAppInfo = appInfo
                 NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
@@ -109,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 self.indicatorWindow.show(state: .recording)
                 self.indicatorWindow.updateStyle(self.dictationStyle)
                 self.indicatorWindow.updateFocusedAppInfo(appInfo)
+                self.indicatorWindow.updateAgentMode(false)
             }
         }
         hotkeyManager.onHotkeyUp = { [weak self] in
@@ -118,6 +125,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.dictationStyle = self.dictationStyle.next()
+            }
+        }
+        hotkeyManager.onAgentModeRequested = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isAgentModeThisRecording = true
+                self.indicatorWindow.updateAgentMode(true)
             }
         }
 
@@ -180,6 +194,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             return
         }
         lastRecordingPath = url.path
+
+        if isAgentModeThisRecording {
+            handleAgentModeHotkeyUp(url: url)
+            return
+        }
+
         let style = dictationStyle
         let context = capturedFocusedAppInfo?.context ?? .general
         let usingLocal = useLocalTranscription && localTranscriber.isReady
@@ -229,6 +249,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.transcriptionError = error.localizedDescription
                     self.indicatorWindow.hide()
                     NSLog("Sayline: transcription failed -> \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func handleAgentModeHotkeyUp(url: URL) {
+        isTranscribing = true
+        transcriptionError = nil
+        indicatorWindow.show(state: .transcribing)
+        Task {
+            do {
+                let transcript = try await activeTranscriber.transcribe(fileURL: url)
+                NSLog("Sayline: agent transcript -> \(transcript)")
+
+                await MainActor.run {
+                    self.isTranscribing = false
+                    self.indicatorWindow.show(state: .agentRouting)
+                }
+
+                let action = try await agentRouter.route(transcript)
+
+                await MainActor.run {
+                    self.indicatorWindow.hide()
+                    guard let action else {
+                        NSLog("Sayline: agent could not determine an action for \"\(transcript)\"")
+                        return
+                    }
+                    NSLog("Sayline: agent executing -> \(action)")
+                    AgentExecutor.execute(action)
+                }
+            } catch {
+                await MainActor.run {
+                    self.isTranscribing = false
+                    self.transcriptionError = error.localizedDescription
+                    self.indicatorWindow.hide()
+                    NSLog("Sayline: agent transcription/routing failed -> \(error.localizedDescription)")
                 }
             }
         }

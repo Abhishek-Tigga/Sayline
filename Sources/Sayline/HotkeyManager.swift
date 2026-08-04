@@ -8,6 +8,7 @@ import Cocoa
 /// `start()` will succeed.
 final class HotkeyManager {
     private static let cycleStyleKeyCode: Int64 = 48 // kVK_Tab
+    private static let agentModeKeyCode: Int64 = 49 // kVK_Space
 
     /// Changeable at runtime — the tap watches all flagsChanged events
     /// regardless of key, so switching which one we treat as "the
@@ -17,10 +18,19 @@ final class HotkeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isHotkeyActive = false
+    /// Guards against keyboard auto-repeat: holding Space sends many
+    /// rapid keyDown events, not just one, so without this we'd fire
+    /// onAgentModeRequested (and log) dozens of times per hold.
+    private var agentModeAlreadyRequestedThisHold = false
 
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
     var onCycleStyleRequested: (() -> Void)?
+    /// Fired when Space is pressed while the hotkey is held — flags the
+    /// *current* recording as an agent request rather than dictation.
+    /// Per-hold, not a persistent toggle: each new hold defaults back to
+    /// dictation unless Space is pressed again during that hold.
+    var onAgentModeRequested: (() -> Void)?
 
     @discardableResult
     func start() -> Bool {
@@ -77,6 +87,14 @@ final class HotkeyManager {
                 onCycleStyleRequested?()
                 return nil // swallow Tab while dictating so it isn't typed
             }
+            if isHotkeyActive && keyCode == Self.agentModeKeyCode {
+                if !agentModeAlreadyRequestedThisHold {
+                    agentModeAlreadyRequestedThisHold = true
+                    NSLog("Sayline: agent mode requested")
+                    onAgentModeRequested?()
+                }
+                return nil // swallow Space while dictating so it isn't typed
+            }
             return Unmanaged.passUnretained(event)
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             // macOS can silently disable an active tap if it decides the
@@ -99,6 +117,7 @@ final class HotkeyManager {
         let isPressed = event.flags.contains(hotkeyOption.flagMask)
         if isPressed && !isHotkeyActive {
             isHotkeyActive = true
+            agentModeAlreadyRequestedThisHold = false
             NSLog("Sayline: hotkey DOWN")
             onHotkeyDown?()
         } else if !isPressed && isHotkeyActive {

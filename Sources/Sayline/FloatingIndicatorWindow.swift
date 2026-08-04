@@ -57,6 +57,13 @@ final class FloatingIndicatorWindow {
         viewModel.focusedAppInfo = info
     }
 
+    func updateAgentMode(_ isAgentMode: Bool) {
+        viewModel.isAgentMode = isAgentMode
+        if isAgentMode {
+            NSLog("Sayline: agent mode flagged for this recording")
+        }
+    }
+
     func hide() {
         panel.orderOut(nil)
         NSLog("Sayline: indicator hidden")

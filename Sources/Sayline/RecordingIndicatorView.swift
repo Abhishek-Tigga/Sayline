@@ -4,12 +4,14 @@ enum RecordingIndicatorState: Equatable {
     case recording
     case transcribing
     case cleaningUp
+    case agentRouting
 }
 
 final class IndicatorViewModel: ObservableObject {
     @Published var state: RecordingIndicatorState = .recording
     @Published var style: DictationStyle = .clean
     @Published var focusedAppInfo: FocusedAppInfo?
+    @Published var isAgentMode: Bool = false
 }
 
 struct RecordingIndicatorView: View {
@@ -19,7 +21,9 @@ struct RecordingIndicatorView: View {
         VStack(spacing: 8) {
             if viewModel.state == .recording {
                 debugAppInfoBlock
-                styleRow
+                if !viewModel.isAgentMode {
+                    styleRow
+                }
             }
             pill
         }
@@ -37,6 +41,9 @@ struct RecordingIndicatorView: View {
             Text("Bundle: \(info?.bundleID ?? "—")").lineLimit(1)
             Text("Window: \(info?.windowTitle ?? "—")").lineLimit(1)
             Text("Context: \(info?.context.rawValue ?? "—")").bold()
+            if viewModel.isAgentMode {
+                Text("AGENT MODE").bold().foregroundStyle(.orange)
+            }
         }
         .font(.system(size: 9, design: .monospaced))
         .foregroundStyle(.secondary)
@@ -69,7 +76,7 @@ struct RecordingIndicatorView: View {
             icon
             Text(label)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(viewModel.isAgentMode ? .orange : .primary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -78,9 +85,10 @@ struct RecordingIndicatorView: View {
 
     private var label: String {
         switch viewModel.state {
-        case .recording: return "Listening…"
+        case .recording: return viewModel.isAgentMode ? "Agent: Listening…" : "Listening…"
         case .transcribing: return "Transcribing…"
         case .cleaningUp: return "Cleaning up…"
+        case .agentRouting: return "Agent: thinking…"
         }
     }
 
@@ -88,8 +96,8 @@ struct RecordingIndicatorView: View {
     private var icon: some View {
         switch viewModel.state {
         case .recording:
-            PulsingDot()
-        case .transcribing, .cleaningUp:
+            PulsingDot(color: viewModel.isAgentMode ? .orange : .red)
+        case .transcribing, .cleaningUp, .agentRouting:
             ProgressView()
                 .controlSize(.small)
         }
@@ -97,11 +105,12 @@ struct RecordingIndicatorView: View {
 }
 
 private struct PulsingDot: View {
+    var color: Color = .red
     @State private var isPulsing = false
 
     var body: some View {
         Circle()
-            .fill(.red)
+            .fill(color)
             .frame(width: 10, height: 10)
             .scaleEffect(isPulsing ? 1.3 : 0.85)
             .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isPulsing)
