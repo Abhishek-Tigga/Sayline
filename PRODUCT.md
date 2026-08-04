@@ -146,11 +146,37 @@ and committed before moving on.
   never mid-sentence, never improvised by the cleanup LLM.** A
   dictation only counts as a command ("scratch that"/"undo that" →
   undo, "new paragraph"/"new line" → insert a break) if the ENTIRE
-  recording is exactly that phrase. "Scratch that idea, let's go with
-  plan B" must never trigger anything — verified live, never did, not
-  even once across extensive testing. Commands bypass style and context
-  entirely, including Code context, since e.g. "new line" while
-  dictating into a terminal is a genuinely useful command there too.
+  recording is essentially just that phrase. "Scratch that idea, let's
+  go with plan B" must never trigger anything. Commands bypass style
+  and context entirely, including Code context, since e.g. "new line"
+  while dictating into a terminal is a genuinely useful command there
+  too.
+- **Matching is fuzzy (Jaro-Winkler) + a word-count guard, not exact
+  string equality — and the word-count guard exists because of a real
+  bug the similarity score alone missed.** Researched real precedent
+  first (Wispr Flow's own "Command Mode," Talon Voice's modal design)
+  before building — our whole-utterance approach matches established
+  practice, not a naive first attempt. Added Jaro-Winkler (the
+  recommended algorithm for short-string matching, not Levenshtein) to
+  tolerate transcription noise like "scratch dat" or "scratch it"
+  without an LLM call. But similarity alone wasn't sufficient: live
+  testing found "scratch that idea" scored 0.94 against "scratch
+  that" — Jaro-Winkler weighs shared prefixes heavily, so one extra
+  trailing word barely dents the score — and would have wrongly
+  triggered the command on real dictated content, exactly the failure
+  mode this whole feature exists to prevent. Fixed by requiring equal
+  word count alongside the similarity threshold: tolerates a *misheard*
+  word, never an *extra* one. Re-verified post-fix with the exact
+  failing phrase plus longer sentences containing command words —
+  none trigger the command anymore.
+- **Deliberately did not build mid-sentence self-correction handling**
+  (e.g. "let's meet Tuesday, wait no, Friday" → "Let's meet Friday"),
+  even though Wispr Flow markets exactly this. It's a real, different
+  feature from Command Mode — doing it safely needs much more carefully
+  scoped prompting than we have, and it's adjacent to the exact
+  cleanup-LLM data-loss bug found and fixed in the previous entry.
+  Revisit only with real intent to invest in getting it right, not as
+  a quick addition.
 - **Found and fixed a real, dangerous cleanup-prompt gap via live
   testing: the LLM would sometimes silently delete unrelated dictated
   content, not just clean it.** Two related failure modes, both from
