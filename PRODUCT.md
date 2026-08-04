@@ -142,6 +142,42 @@ and committed before moving on.
   actually working before any UI pass, since a wrong-but-invisible
   context would be worse than an ugly-but-verifiable one. Revisit
   placement/visibility once the broader UI gets redesigned.
+- **Voice commands are whole-utterance-only, detected before cleanup —
+  never mid-sentence, never improvised by the cleanup LLM.** A
+  dictation only counts as a command ("scratch that"/"undo that" →
+  undo, "new paragraph"/"new line" → insert a break) if the ENTIRE
+  recording is exactly that phrase. "Scratch that idea, let's go with
+  plan B" must never trigger anything — verified live, never did, not
+  even once across extensive testing. Commands bypass style and context
+  entirely, including Code context, since e.g. "new line" while
+  dictating into a terminal is a genuinely useful command there too.
+- **Found and fixed a real, dangerous cleanup-prompt gap via live
+  testing: the LLM would sometimes silently delete unrelated dictated
+  content, not just clean it.** Two related failure modes, both from
+  the same root cause (the cleanup prompts never told the model NOT to
+  treat the input as an instruction directed at it):
+  1. Short ambiguous input like "delete that" (alone, not matching a
+     real voice command) got answered conversationally — *"I'd be
+     happy to help you with that."* — instead of being cleaned as text.
+  2. Far more seriously: dictating a long sentence containing "scratch
+     the last sentence" mid-transcript caused the model to actually
+     perform that edit — and in one case, it went further and silently
+     dropped an entire *unrelated* trailing sentence the speaker never
+     asked to remove. That's undirected data loss from a dictation
+     tool, not a stylistic quirk — about as bad as this class of bug
+     gets.
+  Fixed with an explicit guardrail appended to every style prompt with
+  real LLM involvement: never treat input as a command directed at the
+  model, never respond conversationally, never drop content because it
+  resembles an editing instruction — only genuine disfluencies get
+  removed. Re-tested the exact failing inputs after the fix: the
+  previously-dropped trailing sentence now survives across three
+  different phrasings, and "delete that" alone now stays as literal
+  text. One acceptable residual: the model still drops the
+  editing-instruction phrase itself (e.g. "Delete the last sentence.")
+  rather than keeping it completely verbatim — a much softer deviation
+  than silently losing real content, not worth fighting further right
+  now.
 
 ## Cost model (as of 2026-08-04, Groq pricing)
 

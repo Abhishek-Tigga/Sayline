@@ -30,11 +30,11 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 
 **V2 — ready to ship**
 - [x] Context-aware formatting (Email/Chat/Code/General detected from the focused app; Code always stays verbatim regardless of style; browser tabs sniff the window title for known webmail apps since bundle ID alone can't see inside a browser)
-- [ ] Code signing, notarization, installer (blocked on Apple Developer Program enrollment — deferred to last)
-- [ ] Onboarding flow
-- [ ] Voice commands
+- [x] Voice commands ("scratch that"/"undo that" undoes the last insertion, "new paragraph"/"new line" insert breaks — whole-utterance-only detection, never triggered mid-sentence)
 - [ ] Auto-updates
-- [ ] Monetization (also blocked on signing/distribution being in place)
+- [ ] Onboarding flow (deferred to last)
+- [ ] Code signing, notarization, installer (blocked on Apple Developer Program enrollment — deferred to last)
+- [ ] Monetization (also blocked on signing/distribution being in place — deferred to last)
 
 ## Tech stack
 

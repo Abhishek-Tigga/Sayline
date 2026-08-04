@@ -192,6 +192,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 let rawText = try await activeTranscriber.transcribe(fileURL: url)
                 NSLog("Sayline: raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
+                if let command = VoiceCommand.detect(in: rawText) {
+                    NSLog("Sayline: voice command detected -> \(command)")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
+                        self.runCommand(command)
+                    }
+                    return
+                }
+
                 await MainActor.run {
                     self.isTranscribing = false
                     self.isCleaningUp = true
@@ -221,6 +231,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     NSLog("Sayline: transcription failed -> \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    private func runCommand(_ command: VoiceCommand) {
+        switch command {
+        case .scratchThat:
+            TextInjector.undo()
+        case .newParagraph:
+            TextInjector.insert("\n\n")
+        case .newLine:
+            TextInjector.insert("\n")
         }
     }
 

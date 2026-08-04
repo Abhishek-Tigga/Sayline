@@ -15,6 +15,16 @@ enum TextInjector {
         pasteViaClipboard(text)
     }
 
+    /// Simulates Cmd+Z. Used by the "scratch that" voice command. Reliable
+    /// when the last insertion went through the clipboard-paste fallback
+    /// (paste is almost universally undoable); less guaranteed for direct
+    /// AX-written text, since that bypasses the app's normal input
+    /// pipeline and may not always land on its undo stack — a known,
+    /// accepted limitation rather than something worth chasing further.
+    static func undo() {
+        simulateCommandKey(6) // kVK_ANSI_Z
+    }
+
     // MARK: - Direct AX insertion
 
     private static func insertViaAccessibility(_ text: String) -> Bool {
@@ -65,7 +75,7 @@ enum TextInjector {
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        simulateCommandV()
+        simulateCommandKey(vKeyCode)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             pasteboard.clearContents()
@@ -75,14 +85,14 @@ enum TextInjector {
         }
     }
 
-    private static func simulateCommandV() {
+    private static func simulateCommandKey(_ keyCode: CGKeyCode) {
         guard let source = CGEventSource(stateID: .hidSystemState) else { return }
 
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
         keyDown?.flags = .maskCommand
         keyDown?.post(tap: .cgSessionEventTap)
 
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
         keyUp?.flags = .maskCommand
         keyUp?.post(tap: .cgSessionEventTap)
     }
