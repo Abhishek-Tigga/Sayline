@@ -26,6 +26,7 @@ struct SettingsView: View {
                 HStack {
                     Button("Save Key") {
                         KeychainStore.save(apiKeyInput)
+                        APIKeyProvider.invalidateCache()
                         apiKeySaved = true
                     }
                     .disabled(apiKeyInput.isEmpty)

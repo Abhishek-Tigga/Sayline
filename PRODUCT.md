@@ -111,6 +111,17 @@ conversation on 2026-08-04; re-derive if Groq's pricing changes materially.
   calendar event or sending something is a real failure mode. Not solved
   yet — needs real design work when Phase 2 starts, not an afterthought.
 
+## Known rough edge (expected until V2 code signing)
+
+Repeated macOS Keychain access prompts during dev testing are a real,
+understood symptom, not a bug to chase: our current "Sign to Run Locally"
+ad-hoc signing doesn't give the app a stable identity across rebuilds, so
+macOS can't reliably remember a Keychain access grant the way it would for
+a properly Developer-ID-signed app (like Whisper Flow). Mitigated
+`APIKeyProvider` to cache the resolved key in memory per launch (was
+re-reading Keychain twice per dictation, now once), but the underlying
+cause only goes away with real code signing — already on the V2 list.
+
 ## Deferred decisions (open, not urgent)
 
 - **Monetization model.** Not decided. On-device transcription (once built)

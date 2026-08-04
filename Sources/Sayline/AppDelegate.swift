@@ -4,6 +4,8 @@ import ServiceManagement
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let dictationStyleDefaultsKey = "com.abhishektigga.sayline.dictationStyle"
     private static let useLocalTranscriptionDefaultsKey = "com.abhishektigga.sayline.useLocalTranscription"
+    private static let historyDefaultsKey = "com.abhishektigga.sayline.history"
+    private static let maxHistoryEntries = 20
 
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
@@ -15,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var transcriptionError: String?
     @Published var isLocalModelDownloading = false
     @Published var isLocalModelReady = false
+    @Published private(set) var historyEntries: [HistoryEntry] = []
     @Published var dictationStyle: DictationStyle = {
         if let raw = UserDefaults.standard.string(forKey: AppDelegate.dictationStyleDefaultsKey),
            let style = DictationStyle(rawValue: raw) {
@@ -45,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let cleaner = TranscriptCleaner()
     private let indicatorWindow = FloatingIndicatorWindow()
     private lazy var settingsWindowController = SettingsWindowController(appDelegate: self)
+    private lazy var historyWindowController = HistoryWindowController(appDelegate: self)
 
     var launchAtLogin: Bool {
         get { SMAppService.mainApp.status == .enabled }
@@ -98,6 +102,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         if useLocalTranscription {
             startLocalModelPreloadIfNeeded()
         }
+
+        loadHistory()
+    }
+
+    private func loadHistory() {
+        guard let data = UserDefaults.standard.data(forKey: Self.historyDefaultsKey) else { return }
+        historyEntries = (try? JSONDecoder().decode([HistoryEntry].self, from: data)) ?? []
+    }
+
+    private func saveHistory() {
+        guard let data = try? JSONEncoder().encode(historyEntries) else { return }
+        UserDefaults.standard.set(data, forKey: Self.historyDefaultsKey)
+    }
+
+    private func addHistoryEntry(text: String, style: DictationStyle, usedLocal: Bool) {
+        let entry = HistoryEntry(id: UUID(), timestamp: Date(), text: text, style: style, usedLocal: usedLocal)
+        historyEntries.insert(entry, at: 0)
+        if historyEntries.count > Self.maxHistoryEntries {
+            historyEntries.removeLast(historyEntries.count - Self.maxHistoryEntries)
+        }
+        saveHistory()
+    }
+
+    func clearHistory() {
+        historyEntries.removeAll()
+        saveHistory()
     }
 
     /// Kicks off the local model download/load in the background, decoupled
@@ -151,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.isCleaningUp = false
                     self.lastTranscript = finalText
                     self.indicatorWindow.hide()
+                    self.addHistoryEntry(text: finalText, style: style, usedLocal: usingLocal)
                     TextInjector.insert(finalText)
                 }
             } catch {
@@ -166,6 +197,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func showSettings() {
         settingsWindowController.show()
+    }
+
+    func showHistory() {
+        historyWindowController.show()
     }
 
     func refreshAccessibilityStatus() {

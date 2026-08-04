@@ -1,7 +1,7 @@
 import Foundation
 
 /// Controls how the AI cleanup pass treats a raw transcript before insertion.
-enum DictationStyle: String, CaseIterable, Equatable, Hashable {
+enum DictationStyle: String, CaseIterable, Equatable, Hashable, Codable {
     case verbatim
     case clean
     case concise

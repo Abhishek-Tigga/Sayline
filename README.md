@@ -24,9 +24,9 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Floating recording indicator
 - [x] On-device transcription option (WhisperKit)
 - [x] Settings window: Groq API key (BYOK, Keychain-stored), cloud/local toggle, default dictation style, launch at login
+- [x] Transcription history (last 20, separate window, copy-again button)
 - [ ] Hotkey customization (currently hardcoded to Right Option)
 - [ ] Microphone selection
-- [ ] Transcription history
 
 **V2 — ready to ship**
 - [ ] Code signing, notarization, installer

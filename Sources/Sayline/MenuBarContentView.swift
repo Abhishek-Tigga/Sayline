@@ -70,6 +70,9 @@ struct MenuBarContentView: View {
             }
 
             Divider()
+            Button("History…") {
+                appDelegate.showHistory()
+            }
             Button("Settings…") {
                 appDelegate.showSettings()
             }
