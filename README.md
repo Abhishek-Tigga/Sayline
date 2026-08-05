@@ -42,7 +42,8 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [x] Actions: open/close app, find file (folder fallback + nested subfolder support), open folder, open a System Settings pane, lock screen, volume control, Wi-Fi on/off, Dark Mode toggle, empty Trash, screenshot
 - [x] Multiple actions in one hold ("open Safari, then open Finder")
 - [x] Visible failure feedback (no more silent no-ops on a failed/no-match action)
-- [ ] "Sayline can answer questions" — everything above is fire-and-forget; answering things like "what's my battery at" needs the agent to speak/display a result back, which doesn't exist yet (see [BACKLOG.md](BACKLOG.md))
+- [x] "Sayline can answer questions" — battery, storage, memory, uptime, volume level, macOS version, now-playing (Music/Spotify), displayed on the pill, no TTS
+- [ ] List-shaped query answers (e.g. "biggest files in my Downloads folder") — needs its own UI beyond the single-line pill (see [BACKLOG.md](BACKLOG.md))
 - [ ] Email/calendar queries, browser automation (longer-term vision, not started — see [BACKLOG.md](BACKLOG.md))
 
 ## Tech stack

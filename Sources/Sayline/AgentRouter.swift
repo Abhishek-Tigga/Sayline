@@ -15,15 +15,17 @@ final class AgentRouter {
     private let model = "llama-3.3-70b-versatile"
 
     private let systemPrompt = """
-    You route spoken requests to macOS automation actions. The user is \
-    speaking a command, not dictating text to be typed. Pick the \
-    best matching tool(s) and fill in their parameters based on what \
-    they said — if the request names more than one distinct action \
-    (e.g. "open Safari, then open Finder"), call each tool needed, one \
-    per action, in the order they were said. If the request doesn't \
-    clearly match any available tool (for example it's about email, \
-    calendar, or anything else not covered), do not call any tool for \
-    that part — just reply normally.
+    You route spoken requests to macOS automation actions, or answer \
+    factual questions about the Mac's current state. The user is either \
+    issuing a command ("open Safari") or asking a question ("what's my \
+    battery at") — never dictating text to be typed. Pick the best \
+    matching tool(s) and fill in their parameters based on what they \
+    said — if the request names more than one distinct action or \
+    question (e.g. "open Safari, then what's my battery"), call each \
+    tool needed, one per item, in the order they were said. If the \
+    request doesn't clearly match any available tool (for example it's \
+    about email, calendar, or anything else not covered), do not call \
+    any tool for that part — just reply normally.
     """
 
     private let tools: [[String: Any]] = [
@@ -203,6 +205,24 @@ final class AgentRouter {
                 "parameters": ["type": "object", "properties": [:] as [String: Any]],
             ],
         ],
+        [
+            "type": "function",
+            "function": [
+                "name": "answer_system_query",
+                "description": "Answers a factual question about the Mac's current state — battery, storage space, memory usage, uptime, volume level, macOS version, or what's currently playing. Use this when the user is ASKING something, not asking for an action to be performed.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "query": [
+                            "type": "string",
+                            "enum": ["Battery", "Storage", "Memory", "Uptime", "VolumeLevel", "MacOSVersion", "NowPlaying"],
+                            "description": "Which fact to look up.",
+                        ]
+                    ],
+                    "required": ["query"],
+                ],
+            ],
+        ],
     ]
 
     func route(_ transcript: String) async throws -> [AgentAction] {
@@ -299,6 +319,10 @@ final class AgentRouter {
             return .emptyTrash
         case "take_screenshot":
             return .takeScreenshot
+        case "answer_system_query":
+            guard let queryRaw = arguments["query"] as? String,
+                  let query = AgentAction.SystemQuery(rawValue: queryRaw) else { return nil }
+            return .answerQuery(query)
         default:
             NSLog("Sayline: agent router returned unknown tool \(name)")
             return nil

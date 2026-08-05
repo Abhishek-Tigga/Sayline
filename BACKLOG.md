@@ -9,17 +9,37 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
-- **"Sayline can answer questions."** Everything agent mode does today is
-  fire-and-forget (do a thing, maybe show a brief failure pill). A real
-  chunk of what people will ask for is a *question*, not an action —
-  "what's my battery at," "what's playing," "how much storage do I have
-  left." Answering means the agent has to speak or display a result back,
-  which doesn't exist in any form yet. This is a distinct capability, not
-  another entry in the action-router's tool list — needs its own design
-  pass (how does an answer surface — the floating pill? something else?
-  does it get spoken via TTS?) before implementation starts.
+- **List-shaped query answers** (e.g. "what are the biggest files in my
+  Downloads folder"). Single-fact queries (battery, storage, memory,
+  uptime, volume, macOS version, now-playing) shipped 2026-08-05, all
+  displayed on the existing floating pill with a longer readable
+  duration than the failure-flash. A list of several files with sizes
+  doesn't fit one line the way a single fact does — needs either a hard
+  condensed format or the pill growing into a small multi-line surface
+  for this case specifically. Deliberately scoped separately from the
+  single-fact batch rather than guessed at alongside it.
 
 ## Agent actions considered and skipped (technical reasons, not scope)
+
+- **Wi-Fi network name query.** Tried via the `networksetup` CLI on the
+  assumption it would sidestep CoreWLAN's permission requirement — it
+  doesn't. macOS withholds the real SSID from any process, CLI or API,
+  without **Location Services** permission (a precise SSID can be used
+  to geolocate a device via Wi-Fi-to-location lookup services). Dropped
+  rather than added Location Services for it — a genuinely bad look for
+  an app whose whole pitch is dictation privacy, for a minor query.
+  Confirmed live: reported "Not connected to Wi-Fi" while actually
+  connected, which is the withholding behavior, not a real failure.
+- **"What's playing" for browser-sourced media** (e.g. YouTube in
+  Chrome). Now-playing currently only checks Music.app/Spotify by name
+  via AppleScript, which have a real, documented "current track" you can
+  query. Browsers don't expose anything equivalent for an arbitrary tab
+  playing audio — the only way to get this would be Apple's undocumented
+  MediaRemote framework (what third-party "now playing" menu bar utilities
+  use), which is exactly the private-API fragility already avoided when
+  now-playing was first built. Confirmed live: asking about YouTube audio
+  correctly reported nothing playing, since it isn't Music/Spotify — this
+  is the deliberate scope boundary working as intended, not a bug.
 
 - **Bluetooth toggle (on/off).** No reliable way to do this without `sudo`,
   a private framework, or a third-party CLI like `blueutil` (not

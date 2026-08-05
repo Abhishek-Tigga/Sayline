@@ -280,6 +280,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     var anyFailed = false
                     for action in actions {
                         NSLog("Sayline: agent executing -> \(action)")
+                        if case .answerQuery(let query) = action {
+                            let answer = AgentExecutor.answer(query)
+                            NSLog("Sayline: agent answered -> \(answer)")
+                            self.indicatorWindow.flashMessage(answer, duration: 4.5)
+                            continue
+                        }
                         if !AgentExecutor.execute(action) {
                             anyFailed = true
                         }

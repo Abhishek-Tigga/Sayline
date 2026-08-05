@@ -1,6 +1,8 @@
 import AppKit
 import CoreGraphics
+import Darwin
 import Foundation
+import IOKit.ps
 
 enum AgentExecutor {
     /// Returns whether the action actually did something concrete — lets
@@ -34,7 +36,148 @@ enum AgentExecutor {
             return emptyTrash()
         case .takeScreenshot:
             return takeScreenshot()
+        case .answerQuery(let query):
+            // The normal path for this is AppDelegate special-casing
+            // .answerQuery before calling execute() at all, so it can
+            // display the answer — this branch only exists so the
+            // switch stays exhaustive if execute() is ever called
+            // directly with a query action.
+            NSLog("Sayline: agent answered -> \(answer(query))")
+            return true
         }
+    }
+
+    /// Produces a displayable fact rather than performing a side effect
+    /// — deliberately no second LLM call to phrase these. Once we have
+    /// the real number, formatting it is just string templating; routing
+    /// a known-correct fact back through an LLM to "say it nicely" would
+    /// only add latency and a hallucination risk for zero benefit.
+    static func answer(_ query: AgentAction.SystemQuery) -> String {
+        switch query {
+        case .battery: return batteryAnswer()
+        case .storage: return storageAnswer()
+        case .memory: return memoryAnswer()
+        case .uptime: return uptimeAnswer()
+        case .volumeLevel: return volumeLevelAnswer()
+        case .macOSVersion: return macOSVersionAnswer()
+        case .nowPlaying: return nowPlayingAnswer()
+        }
+    }
+
+    private static func batteryAnswer() -> String {
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
+              let source = sources.first,
+              let description = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
+              let capacity = description[kIOPSCurrentCapacityKey] as? Int else {
+            return "Couldn't read battery status"
+        }
+        let isCharging = (description[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
+        return isCharging ? "Battery: \(capacity)% (charging)" : "Battery: \(capacity)%"
+    }
+
+    private static func storageAnswer() -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        guard let values = try? home.resourceValues(forKeys: [
+            .volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey
+        ]), let available = values.volumeAvailableCapacityForImportantUsage,
+              let total = values.volumeTotalCapacity else {
+            return "Couldn't read storage info"
+        }
+        let availableGB = Double(available) / 1_000_000_000
+        let totalGB = Double(total) / 1_000_000_000
+        return String(format: "Storage: %.0f GB free of %.0f GB", availableGB, totalGB)
+    }
+
+    /// Mirrors Activity Monitor's rough "used" categorization
+    /// (active + wired + compressed pages) rather than raw free pages,
+    /// which alone is a misleading number on macOS due to aggressive
+    /// disk caching.
+    private static func memoryAnswer() -> String {
+        var stats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &stats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return "Couldn't read memory info" }
+
+        let pageSize = UInt64(vm_kernel_page_size)
+        let used = UInt64(stats.active_count + stats.wire_count + stats.compressor_page_count) * pageSize
+        let total = ProcessInfo.processInfo.physicalMemory
+        let usedGB = Double(used) / 1_000_000_000
+        let totalGB = Double(total) / 1_000_000_000
+        return String(format: "Memory: %.1f GB used of %.1f GB", usedGB, totalGB)
+    }
+
+    private static func uptimeAnswer() -> String {
+        let seconds = Int(ProcessInfo.processInfo.systemUptime)
+        let days = seconds / 86400
+        let hours = (seconds % 86400) / 3600
+        let minutes = (seconds % 3600) / 60
+        if days > 0 {
+            return "Uptime: \(days)d \(hours)h \(minutes)m"
+        } else if hours > 0 {
+            return "Uptime: \(hours)h \(minutes)m"
+        } else {
+            return "Uptime: \(minutes)m"
+        }
+    }
+
+    private static func volumeLevelAnswer() -> String {
+        guard let script = NSAppleScript(source: "output volume of (get volume settings)") else {
+            return "Couldn't read volume"
+        }
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+        guard error == nil else { return "Couldn't read volume" }
+        return "Volume: \(result.int32Value)%"
+    }
+
+    private static func macOSVersionAnswer() -> String {
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return "macOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+    }
+
+    /// Checks Music.app and Spotify specifically via AppleScript, in
+    /// that order, only if each is actually running (never launches
+    /// them just to check). Deliberately not using the private
+    /// MediaRemote framework third-party "now playing" tools rely on —
+    /// undocumented, fragile across macOS versions, not worth the risk
+    /// for this. First use will need a one-time Automation permission
+    /// grant per app, same category as Dark Mode/Empty Trash.
+    private static func nowPlayingAnswer() -> String {
+        if isRunning("Music"), let info = currentTrack(app: "Music") {
+            return info
+        }
+        if isRunning("Spotify"), let info = currentTrack(app: "Spotify") {
+            return info
+        }
+        return "Nothing appears to be playing"
+    }
+
+    private static func isRunning(_ appName: String) -> Bool {
+        NSWorkspace.shared.runningApplications.contains {
+            $0.localizedName?.caseInsensitiveCompare(appName) == .orderedSame
+        }
+    }
+
+    private static func currentTrack(app: String) -> String? {
+        let script = """
+        tell application "\(app)"
+            if player state is playing then
+                return (name of current track) & " — " & (artist of current track)
+            else
+                return "paused"
+            end if
+        end tell
+        """
+        guard let appleScript = NSAppleScript(source: script) else { return nil }
+        var error: NSDictionary?
+        let result = appleScript.executeAndReturnError(&error)
+        guard error == nil, let value = result.stringValue, value != "paused" else { return nil }
+        return "Now Playing: \(value)"
     }
 
     /// Sends a normal terminate request (equivalent to Cmd+Q) rather than

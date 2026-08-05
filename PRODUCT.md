@@ -302,6 +302,56 @@ dev-only pain, goes away entirely once real code signing lands.
   falling back across the other known folders (excluding Home, which is
   a slow recursive walk) before giving up.
 
+## Agent mode can answer questions (2026-08-05)
+
+Everything above is fire-and-forget — do a thing, maybe show a brief
+failure pill. A real chunk of what people ask for is a *question*, not
+an action ("what's my battery at," "how much storage do I have left"),
+which needed a genuinely different shape, not just another tool in the
+action list.
+
+**Decided on purpose rather than defaulting into it:**
+- **No second LLM call to phrase answers.** Once the real number is in
+  hand (battery %, bytes free, uptime), formatting it into text is just
+  string templating in Swift. Routing an already-correct fact back
+  through an LLM to "say it nicely" would only add latency and a real
+  hallucination risk for a case where correctness matters more than
+  phrasing. The LLM's job stays exactly what it already does — pick the
+  right tool and parameters — not narrate the result.
+- **Answers display only, never spoken (no TTS).** User's explicit call.
+- **Reuses the same tool-calling router**, not a parallel system — query
+  tools sit in the same `tools` list as action tools, so a single hold
+  can mix both ("open Safari, then what's my battery"). `AgentAction`
+  distinguishes them at the type level (`.answerQuery` vs. every action
+  case) since "did it succeed" isn't the right question for a fact
+  lookup — handled by a separate `AgentExecutor.answer(_:) -> String`
+  path rather than the Bool-returning `execute(_:)`.
+- **Answers get a longer on-screen duration (4.5s vs. the 1.6s
+  failure-flash)** — you need time to actually read a number, not just
+  notice something happened.
+
+Shipped: battery, storage, memory, uptime, volume level, macOS version,
+now-playing (Music.app/Spotify only, by name via AppleScript — see
+below for why not more than that). List-shaped answers ("biggest files
+in my Downloads folder") deliberately deferred — see BACKLOG.md; a list
+doesn't fit the single-line pill the way one fact does, and needs its
+own UI decision rather than a guess.
+
+**Two queries considered and dropped, both confirmed live, both logged
+in BACKLOG.md with the reasoning:**
+- **Wi-Fi network name** — assumed the `networksetup` CLI would sidestep
+  CoreWLAN's permission gate; it doesn't. macOS withholds the real SSID
+  from any process without Location Services permission (SSID can
+  geolocate a device). Confirmed live: reported "not connected" while
+  actually connected — the withholding behavior, not a bug. Adding
+  Location Services for a minor query is a bad trade for an app whose
+  whole pitch is dictation privacy.
+- **Now-playing for browser-sourced media** (confirmed live against
+  YouTube in Chrome) — browsers don't expose a queryable "current track"
+  the way Music/Spotify do; the only way in is Apple's undocumented
+  MediaRemote framework, exactly the private-API fragility already
+  avoided when now-playing was designed.
+
 ## Known rough edge (expected until V2 code signing)
 
 One Keychain prompt per fresh build/launch is real and understood, not a

@@ -82,6 +82,7 @@ struct RecordingIndicatorView: View {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(viewModel.isAgentMode ? .orange : .primary)
+                .lineLimit(1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

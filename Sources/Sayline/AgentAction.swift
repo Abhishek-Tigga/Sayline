@@ -16,6 +16,22 @@ enum AgentAction {
     case setDarkMode(enabled: Bool)
     case emptyTrash
     case takeScreenshot
+    /// Distinct from every case above — these don't perform a side
+    /// effect, they produce an answer to display. Handled by a separate
+    /// AgentExecutor.answer(_:) path rather than the Bool-returning
+    /// execute(_:), since "did it succeed" isn't the right question for
+    /// a fact lookup.
+    case answerQuery(SystemQuery)
+
+    enum SystemQuery: String, CaseIterable {
+        case battery = "Battery"
+        case storage = "Storage"
+        case memory = "Memory"
+        case uptime = "Uptime"
+        case volumeLevel = "VolumeLevel"
+        case macOSVersion = "MacOSVersion"
+        case nowPlaying = "NowPlaying"
+    }
 
     enum VolumeChange: String, CaseIterable {
         case mute = "Mute"
