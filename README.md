@@ -36,6 +36,15 @@ Built as a hands-on learning project and portfolio piece — commit history refl
 - [ ] Code signing, notarization, installer (blocked on Apple Developer Program enrollment — deferred to last)
 - [ ] Monetization (also blocked on signing/distribution being in place — deferred to last)
 
+**Phase 2 — agent mode** (in progress, one step at a time — see [PRODUCT.md](PRODUCT.md))
+- [x] Trigger: hold Option, press Space to flag a recording as an agent request instead of dictation
+- [x] LLM tool-calling router (Groq, declines safely on out-of-scope requests instead of forcing a bad match)
+- [x] Actions: open/close app, find file (folder fallback + nested subfolder support), open folder, open a System Settings pane, lock screen, volume control, Wi-Fi on/off, Dark Mode toggle, empty Trash, screenshot
+- [x] Multiple actions in one hold ("open Safari, then open Finder")
+- [x] Visible failure feedback (no more silent no-ops on a failed/no-match action)
+- [ ] "Sayline can answer questions" — everything above is fire-and-forget; answering things like "what's my battery at" needs the agent to speak/display a result back, which doesn't exist yet (see [BACKLOG.md](BACKLOG.md))
+- [ ] Email/calendar queries, browser automation (longer-term vision, not started — see [BACKLOG.md](BACKLOG.md))
+
 ## Tech stack
 
 - Swift + SwiftUI (menu bar app via `MenuBarExtra`)

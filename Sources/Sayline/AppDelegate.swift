@@ -268,16 +268,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.indicatorWindow.show(state: .agentRouting)
                 }
 
-                let action = try await agentRouter.route(transcript)
+                let actions = try await agentRouter.route(transcript)
 
                 await MainActor.run {
                     self.indicatorWindow.hide()
-                    guard let action else {
+                    guard !actions.isEmpty else {
                         NSLog("Sayline: agent could not determine an action for \"\(transcript)\"")
+                        self.indicatorWindow.flashMessage("Agent: nothing matched")
                         return
                     }
-                    NSLog("Sayline: agent executing -> \(action)")
-                    AgentExecutor.execute(action)
+                    var anyFailed = false
+                    for action in actions {
+                        NSLog("Sayline: agent executing -> \(action)")
+                        if !AgentExecutor.execute(action) {
+                            anyFailed = true
+                        }
+                    }
+                    if anyFailed {
+                        self.indicatorWindow.flashMessage("Agent: couldn't complete that")
+                    }
                 }
             } catch {
                 await MainActor.run {

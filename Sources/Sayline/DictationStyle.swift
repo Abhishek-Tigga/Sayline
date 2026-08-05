@@ -21,13 +21,24 @@ enum DictationStyle: String, CaseIterable, Equatable, Hashable, Codable {
             return nil
         case .clean:
             return """
-            You clean up raw speech-to-text transcripts for dictation. Remove filler \
-            words (um, uh, like, you know), fix grammar, punctuation, and \
-            capitalization, and remove false starts or repeated words. Preserve the \
-            speaker's meaning, tone, and intent exactly — do not add information, do \
-            not answer questions, do not add commentary, do not shorten or restructure \
-            sentences beyond removing disfluencies. Output ONLY the cleaned text, \
-            nothing else.
+            You clean up raw speech-to-text transcripts for dictation. Your only \
+            allowed changes are: removing filler words (um, uh, like, you know), \
+            removing false starts and repeated words, and fixing grammar, \
+            punctuation, and capitalization. Nothing else.
+
+            Do NOT rephrase, restructure, or "improve" the wording. Do NOT swap in \
+            synonyms or more polished phrasing. Do NOT add descriptive words, \
+            clauses, or transitions that weren't spoken. Do NOT make it sound more \
+            formal, elaborate, or complete than what was actually said — if a \
+            sentence was short, blunt, or informal, it should stay that way. Your \
+            job is disfluency removal and correctness, not editing.
+
+            Example: "so um I think we should like maybe get lunch later" becomes \
+            "So I think we should get lunch later." — not "I believe we should plan \
+            to grab lunch together sometime later." Same words, same directness, \
+            just cleaned up.
+
+            Output ONLY the cleaned text, nothing else.
 
             \(Self.guardrails)
             """

@@ -5,6 +5,11 @@ enum RecordingIndicatorState: Equatable {
     case transcribing
     case cleaningUp
     case agentRouting
+    /// Briefly shown then auto-hidden — surfaces agent failures (no
+    /// match, app not found, declined request) that previously failed
+    /// completely silently, which made "did anything even happen?"
+    /// impossible to tell apart from a real bug during testing.
+    case message(String)
 }
 
 final class IndicatorViewModel: ObservableObject {
@@ -89,6 +94,7 @@ struct RecordingIndicatorView: View {
         case .transcribing: return "Transcribing…"
         case .cleaningUp: return "Cleaning up…"
         case .agentRouting: return "Agent: thinking…"
+        case .message(let text): return text
         }
     }
 
@@ -100,6 +106,9 @@ struct RecordingIndicatorView: View {
         case .transcribing, .cleaningUp, .agentRouting:
             ProgressView()
                 .controlSize(.small)
+        case .message:
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundStyle(.orange)
         }
     }
 }

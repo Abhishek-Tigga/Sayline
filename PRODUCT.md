@@ -2,7 +2,9 @@
 
 Living document. Updated as decisions get made or the direction shifts — this
 is the "why," not the "what." For feature status, see [README.md](README.md).
-For a chronological log of changes, see [CHANGELOG.md](CHANGELOG.md).
+For a chronological log of changes, see [CHANGELOG.md](CHANGELOG.md). For
+things deliberately parked for later (and why), see
+[BACKLOG.md](BACKLOG.md).
 
 ## Vision
 
@@ -226,11 +228,79 @@ conversation on 2026-08-04; re-derive if Groq's pricing changes materially.
   than hand-building integrations for Calendar, Reminders, web search,
   etc. one at a time. The agent's job becomes "turn a voice command into a
   Shortcuts run request" wherever possible, not reimplementing every
-  integration.
+  integration. **Turned out differently in practice** — see below.
 - **Every new agent capability needs its own permission grant and its own
   confirmation/safety design.** A misheard command silently deleting a
   calendar event or sending something is a real failure mode. Not solved
   yet — needs real design work when Phase 2 starts, not an afterthought.
+  **Now characterized concretely** — see below.
+
+## Phase 2 agent mode — first slice shipped and hardened (2026-08-04/05)
+
+Trigger: hold Option, press Space to flag the current recording as an
+agent request instead of dictation (per-hold, not persistent). Routes via
+Groq LLM tool-calling (`llama-3.3-70b-versatile`, `tool_choice: "auto"` so
+an out-of-scope request declines safely instead of forcing a bad match).
+
+**Action execution ended up being direct native macOS APIs
+(`Process`/`NSWorkspace`/`NSAppleScript`/`CGEvent`), not Shortcuts/App
+Intents as originally planned.** For a small, explicit action set this
+was simpler and gave more control over failure detection (e.g. checking
+`open`'s exit status, retrying after a permission grant) than shelling
+out to `shortcuts run` would have. Worth revisiting Shortcuts/App Intents
+if the action set grows much larger or needs deeper per-app integration
+than a system call can reach.
+
+Current action set: open/close app, find file (with folder fallback +
+subpath support for nested folders), open folder, open a System Settings
+pane, lock screen, volume (mute/unmute/up/down), Wi-Fi on/off, Dark
+Mode/Light Mode, empty Trash, screenshot. Multiple actions in one hold
+are supported ("open Safari, then open Finder" does both — the router
+now processes every tool call the model returns, not just the first).
+
+**The permission landscape turned out to span five separate TCC
+categories**, discovered through live testing rather than designed
+upfront: Accessibility (hotkey/insertion, already had this), Microphone,
+per-folder access (Desktop/Documents/Downloads — each separate, each
+lazy/first-touch), Automation (per *target* app — System Events for dark
+mode, Finder for empty trash — a new grant per app controlled, not one
+blanket permission), and Screen Recording (screenshot). All of these
+reset on every rebuild under the current ad-hoc "Sign to Run Locally"
+signing (same root cause as the existing Keychain-prompt rough edge) —
+dev-only pain, goes away entirely once real code signing lands.
+
+**Real bugs found and fixed via live testing, worth remembering:**
+- The floating status panel (`FloatingIndicatorWindow`) went silently
+  stuck after enough show/hide cycles — stopped responding to
+  `orderFrontRegardless()` with no error. Root cause was never fully
+  pinned down (suspected `NSPanel` + `.canJoinAllSpaces`/`.stationary`
+  interacting badly with Space/focus changes); fixed structurally by
+  making the panel disposable — rebuilt fresh on every show rather than
+  reused for the app's lifetime — so no accumulated AppKit state can get
+  it stuck, regardless of the exact trigger.
+- System Settings pane identifiers (`open_system_setting`) — the classic
+  `com.apple.preference.*` scheme was wrong or reassigned for several
+  panes on modern macOS (e.g. "general" now belongs to Appearance, not
+  General; Network and Wi-Fi share one legacy ID and macOS picks Wi-Fi).
+  Fixed by reading the real identifiers directly out of
+  `/System/Library/ExtensionKit/Extensions/*.appex/Contents/Info.plist`
+  on a live machine instead of guessing — still version-fragile across
+  macOS releases in principle, but verified against an actual install.
+- `find_file` had no visible feedback on failure at all — a no-match or
+  a failed action did nothing observable, making "it failed" and "it
+  silently succeeded" indistinguishable during testing. Fixed by having
+  `AgentExecutor.execute` report success/failure and flashing a brief
+  message on the indicator when nothing matched or an action failed.
+- The very system call that triggers a folder-permission dialog doesn't
+  retroactively succeed just because the user clicked Allow — the *next*
+  call does. A real first-time-user's first request into a fresh folder
+  would silently fail for a reason unrelated to whether the file exists.
+  Fixed with a single automatic retry after a failed search.
+- The model has to guess a folder when the user doesn't name one, and
+  that guess is a semantic hunch, not real knowledge — "find meeting
+  notes" guessed Documents when the file was in Downloads. Fixed by
+  falling back across the other known folders (excluding Home, which is
+  a slow recursive walk) before giving up.
 
 ## Known rough edge (expected until V2 code signing)
 
