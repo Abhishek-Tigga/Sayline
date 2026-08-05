@@ -298,8 +298,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 await MainActor.run {
                     self.isTranscribing = false
                     self.transcriptionError = error.localizedDescription
-                    self.indicatorWindow.hide()
                     NSLog("Sayline: agent transcription/routing failed -> \(error.localizedDescription)")
+                    self.indicatorWindow.flashMessage("Agent: request failed")
                 }
             }
         }
