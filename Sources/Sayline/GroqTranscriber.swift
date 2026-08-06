@@ -62,6 +62,12 @@ final class GroqTranscriber: Transcriber {
         }
 
         appendField(name: "model", value: model)
+        // Pinned rather than left to auto-detect — Whisper models can
+        // hallucinate garbled/wrong-language output specifically when
+        // language auto-detection misfires on short or ambiguous audio.
+        // Forcing English removes that failure mode outright, no
+        // latency cost.
+        appendField(name: "language", value: "en")
 
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
