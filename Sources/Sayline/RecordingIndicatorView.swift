@@ -5,125 +5,224 @@ enum RecordingIndicatorState: Equatable {
     case transcribing
     case cleaningUp
     case agentRouting
-    /// Briefly shown then auto-hidden — surfaces agent failures (no
-    /// match, app not found, declined request) that previously failed
-    /// completely silently, which made "did anything even happen?"
-    /// impossible to tell apart from a real bug during testing.
+    /// Briefly shown then auto-hidden — surfaces agent answers and
+    /// failures (no match, app not found, declined request) that
+    /// previously had no visible feedback at all.
     case message(String)
 }
 
 final class IndicatorViewModel: ObservableObject {
     @Published var state: RecordingIndicatorState = .recording
-    @Published var style: DictationStyle = .clean
     @Published var focusedAppInfo: FocusedAppInfo?
     @Published var isAgentMode: Bool = false
+    /// Smoothed live mic loudness (0…1) driving the waveform.
+    @Published var audioLevel: Float = 0
 }
 
+/// Third UI pass, built against the Figma frame at node 14:100
+/// (figma.com/design/fnMh8Ujn4OxhdW9IKNFaH9, pulled 2026-08-06): a Logo
+/// Container and a Waveform Container, two elements only — the earlier
+/// bot/agent-eyes box is deliberately out of this pass, per explicit
+/// direction ("no bot box for now"). Both containers are pure
+/// `#000000`, matching the frame exactly (not the `#1F1F1F` from the
+/// previous attempt).
+///
+/// Figma only specifies the *recording* state (the waveform placeholder
+/// is explicitly a placeholder — the real content is meant to fill that
+/// box edge-to-edge, not sit inset inside extra padding). It has no
+/// element at all for Transcribing/Cleaning up/agent messages, so those
+/// reuse the Waveform Container's same visual language with text
+/// instead of the canvas — a deliberate interpretation to flag, not
+/// something pulled from the design file.
 struct RecordingIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
+    private static let containerFill = Color.black
+    private static let textColor = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
+    // Text states need to fit inside a fixed-size panel — see the
+    // crash this caused in the previous attempt (unbounded label width
+    // fighting NSHostingView's auto-resize). Capped well under the
+    // panel's width with margin to spare.
+    private static let statusLabelMaxWidth: CGFloat = 220
+
     var body: some View {
-        VStack(spacing: 8) {
+        HStack(spacing: 4) {
+            logoContainer
             if viewModel.state == .recording {
-                debugAppInfoBlock
-                if !viewModel.isAgentMode {
-                    styleRow
-                }
+                waveformContainer
+            } else {
+                statusContainer
             }
-            pill
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
-    /// Temporary, deliberately visible while building context-aware
-    /// formatting — lets us verify detection live instead of guessing.
-    /// Will come out (or move somewhere less prominent) once the UI gets
-    /// a real pass later.
-    private var debugAppInfoBlock: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            let info = viewModel.focusedAppInfo
-            Text("App: \(info?.name ?? "—")").lineLimit(1)
-            Text("Bundle: \(info?.bundleID ?? "—")").lineLimit(1)
-            Text("Window: \(info?.windowTitle ?? "—")").lineLimit(1)
-            Text("Context: \(info?.context.rawValue ?? "—")").bold()
-            if viewModel.isAgentMode {
-                Text("AGENT MODE").bold().foregroundStyle(.orange)
-            }
-        }
-        .font(.system(size: 9, design: .monospaced))
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 8).fill(.regularMaterial))
+    // MARK: - Logo Container (36×36: nested 4pt + 2pt padding around a 24×24 icon)
+
+    private var logoContainer: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Self.containerFill)
+            .frame(width: 36, height: 36)
+            .overlay(logoContent)
     }
 
-    private var styleRow: some View {
-        HStack(spacing: 4) {
-            ForEach(DictationStyle.allCases, id: \.self) { style in
-                Text(style.displayName)
-                    .font(.system(size: 11, weight: style == viewModel.style ? .bold : .regular))
-                    .foregroundStyle(style == viewModel.style ? .primary : .secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule().fill(style == viewModel.style ? Color.primary.opacity(0.12) : .clear)
-                    )
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(.regularMaterial))
-    }
-
-    private var pill: some View {
-        HStack(spacing: 8) {
-            icon
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(viewModel.isAgentMode ? .orange : .primary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Capsule().fill(.regularMaterial))
-    }
-
-    private var label: String {
-        switch viewModel.state {
-        case .recording: return viewModel.isAgentMode ? "Agent: Listening…" : "Listening…"
-        case .transcribing: return "Transcribing…"
-        case .cleaningUp: return "Cleaning up…"
-        case .agentRouting: return "Agent: thinking…"
-        case .message(let text): return text
-        }
-    }
-
+    /// Figma builds this as two nested auto-layout paddings — an outer
+    /// 4px wrapping an inner 2px wrapping the 24×24 logo — but the inner
+    /// wrapper has no background of its own, so it collapses to one
+    /// combined 6px offset here with an identical visual result
+    /// (figma.com/design/fnMh8Ujn4OxhdW9IKNFaH9, node 20:116, verified
+    /// directly after two rounds of mismatched padding values).
+    ///
+    /// Curated icons (AppIconCatalog) are clean, purpose-built assets —
+    /// safe to fit exactly into that slot. The real system-icon
+    /// fallback is deliberately *not* clipped to that shape: a genuine
+    /// macOS app icon already carries its own baked-in rounded-square
+    /// canvas, padding, and shadow, so forcing it into a second,
+    /// different rounded-square reintroduces the exact boundary
+    /// artifact found and fixed in the previous pass. Shown at its
+    /// native shape instead, aspect-fit, so there's nothing left to
+    /// clip against.
     @ViewBuilder
-    private var icon: some View {
+    private var logoContent: some View {
+        if let curated = AppIconCatalog.icon(forBundleID: viewModel.focusedAppInfo?.bundleID) {
+            Image(nsImage: curated)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 24, height: 24)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else if let icon = viewModel.focusedAppInfo?.icon {
+            Image(nsImage: icon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 24, height: 24)
+        }
+    }
+
+    // MARK: - Waveform Container (fixed 88×36: 8pt horizontal / 6pt vertical padding around a 72×24 waveform)
+
+    private var waveformContainer: some View {
+        ScrollingWaveformCanvas(currentLevel: viewModel.audioLevel, isLive: viewModel.state == .recording)
+            .frame(width: 72, height: 24)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(width: 88, height: 36)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Self.containerFill))
+    }
+
+    // MARK: - Status container (not in Figma — reuses the waveform box's visual language for text states)
+
+    private var statusContainer: some View {
+        Text(statusLabel)
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(Self.textColor)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: Self.statusLabelMaxWidth, alignment: .leading)
+            .padding(.horizontal, 8)
+            .frame(height: 36)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Self.containerFill))
+    }
+
+    private var statusLabel: String {
         switch viewModel.state {
-        case .recording:
-            PulsingDot(color: viewModel.isAgentMode ? .orange : .red)
-        case .transcribing, .cleaningUp, .agentRouting:
-            ProgressView()
-                .controlSize(.small)
-        case .message:
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(.orange)
+        case .recording: return "Listening"
+        case .transcribing: return "Transcribing"
+        case .cleaningUp: return "Cleaning up"
+        case .agentRouting: return "Agent: thinking"
+        case .message(let text): return text
         }
     }
 }
 
-private struct PulsingDot: View {
-    var color: Color = .red
-    @State private var isPulsing = false
+/// Real mic-reactive scrolling waveform with a fixed-position playhead —
+/// prototyped and tuned as a standalone HTML/Canvas mockup before this
+/// port (validated parameters, 2026-08-06). New bars are born at the
+/// playhead and pushed left as audio comes in; the playhead itself is
+/// drawn fresh every redraw at a fixed screen position, independent of
+/// the bar history, which is what makes it read as stationary while the
+/// wave scrolls underneath it.
+///
+/// `levels` lives in `@State` here rather than the shared view model —
+/// the floating panel is disposable (rebuilt fresh on every `show()`,
+/// see FloatingIndicatorWindow), so a new panel naturally gets fresh
+/// `@State`, which resets the waveform history at the start of every
+/// new dictation for free without any explicit reset call, while still
+/// persisting correctly across state transitions within one dictation
+/// (recording → transcribing reuses the same panel).
+private struct ScrollingWaveformCanvas: View {
+    var currentLevel: Float
+    var isLive: Bool
+
+    // Re-tuned specifically at real size (80×30) via the HTML
+    // prototype's dedicated "Real-size tuning" section (2026-08-06) —
+    // the first pass of these values was tuned against a much larger
+    // exploratory canvas and didn't hold up at actual scale.
+    private static let barSpacing: CGFloat = 2
+    private static let barThickness: CGFloat = 1
+    private static let barRoundness: CGFloat = 0.25
+    private static let playheadThickness: CGFloat = 1
+    private static let maxAmplitudeFraction: CGFloat = 0.75
+    private static let idleAmplitudeFraction: CGFloat = 0.10
+    private static let emptyDotAmplitudeFraction: CGFloat = 0.10
+    /// Sample cadence — how often a new bar is born and the rest shift
+    /// left by one spacing-increment. Still a placeholder (not part of
+    /// this latest tuning pass) — flagged for live comparison.
+    private static let sampleInterval: TimeInterval = 0.06
+
+    private static let waveColor = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
+    private static let dotColor = Color.white.opacity(0.18)
+    private static let playheadColor = Color(red: 0xC9 / 255, green: 0x99 / 255, blue: 0x0A / 255)
+
+    @State private var levels: [Float] = []
 
     var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 10, height: 10)
-            .scaleEffect(isPulsing ? 1.3 : 0.85)
-            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
+        Canvas { context, size in
+            draw(context: context, size: size)
+        }
+        .onReceive(Timer.publish(every: Self.sampleInterval, on: .main, in: .common).autoconnect()) { _ in
+            sample()
+        }
+    }
+
+    private func sample() {
+        let level: Float = isLive ? max(currentLevel, Float(Self.idleAmplitudeFraction)) : 0
+        levels.insert(level, at: 0)
+        if levels.count > 60 { levels.removeLast(levels.count - 60) }
+    }
+
+    private func draw(context: GraphicsContext, size: CGSize) {
+        let centerX = size.width / 2
+        let centerY = size.height / 2
+        // Small margin so the playhead never touches the box's own edges.
+        let playheadHalf = max(4, size.height / 2 - 2)
+        let barMaxHeight = playheadHalf * Self.maxAmplitudeFraction
+
+        for (i, level) in levels.enumerated() {
+            let x = centerX - CGFloat(i) * Self.barSpacing
+            if x < 0 { break }
+            let barH = min(barMaxHeight, max(1, CGFloat(level) * barMaxHeight))
+            let rect = CGRect(x: x - Self.barThickness / 2, y: centerY - barH, width: Self.barThickness, height: barH * 2)
+            context.fill(Path(roundedRect: rect, cornerRadius: Self.barRoundness), with: .color(Self.waveColor))
+        }
+
+        // Empty-dot region to the right of the playhead — uniform
+        // height, no wave pattern (a wave here would misleadingly imply
+        // it's showing real data; there's no "future" in a live take).
+        let dotH = playheadHalf * Self.emptyDotAmplitudeFraction
+        var dotX = centerX + 10
+        while dotX < size.width - 2 {
+            let rect = CGRect(x: dotX - Self.barThickness / 2, y: centerY - dotH, width: Self.barThickness, height: dotH * 2)
+            context.fill(Path(roundedRect: rect, cornerRadius: Self.barRoundness), with: .color(Self.dotColor))
+            dotX += Self.barSpacing
+        }
+
+        var playheadPath = Path()
+        playheadPath.move(to: CGPoint(x: centerX, y: centerY - playheadHalf))
+        playheadPath.addLine(to: CGPoint(x: centerX, y: centerY + playheadHalf))
+        context.stroke(
+            playheadPath,
+            with: .color(Self.playheadColor),
+            style: StrokeStyle(lineWidth: Self.playheadThickness, lineCap: .round)
+        )
     }
 }

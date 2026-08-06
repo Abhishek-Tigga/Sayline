@@ -25,9 +25,16 @@ final class FloatingIndicatorWindow {
     private var panel: NSPanel?
     private let viewModel = IndicatorViewModel()
 
+    // Wide enough for the widest text state (statusLabelMaxWidth 220pt
+    // + logo box + gaps + padding) with margin to spare; height is the
+    // 36pt container plus breathing room for the panel's shadow.
     private let width: CGFloat = 320
-    private let height: CGFloat = 190
-    private let bottomMargin: CGFloat = 40
+    private let height: CGFloat = 46
+    // Anchored to screen.visibleFrame (Dock/menu-bar aware) rather than
+    // raw screen bounds, so the pill never renders behind a visible
+    // Dock. Y position can shift slightly between recordings if the
+    // Dock auto-hides/reappears in between — expected, not a bug.
+    private let bottomMargin: CGFloat = 8
 
     func show(state: RecordingIndicatorState) {
         viewModel.state = state
@@ -49,9 +56,10 @@ final class FloatingIndicatorWindow {
         }
     }
 
-    func updateStyle(_ style: DictationStyle) {
-        viewModel.style = style
-        NSLog("Sayline: indicator style -> \(style.displayName)")
+    /// Exponential smoothing between ~20ms tap callbacks — raw RMS is
+    /// jumpy enough to make the waveform flicker without it.
+    func updateAudioLevel(_ level: Float) {
+        viewModel.audioLevel = viewModel.audioLevel * 0.55 + level * 0.45
     }
 
     func updateFocusedAppInfo(_ info: FocusedAppInfo) {
@@ -81,7 +89,7 @@ final class FloatingIndicatorWindow {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.level = .floating
-        panel.hasShadow = true
+        panel.hasShadow = false // temporarily disabled to test a reported lighter-than-black edge on all 4 sides
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false

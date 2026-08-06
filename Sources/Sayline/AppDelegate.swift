@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }() {
         didSet {
             UserDefaults.standard.set(dictationStyle.rawValue, forKey: Self.dictationStyleDefaultsKey)
-            indicatorWindow.updateStyle(dictationStyle)
+            NSLog("Sayline: dictation style -> \(dictationStyle.displayName)")
         }
     }
     @Published var useLocalTranscription: Bool = {
@@ -113,7 +113,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
                 self.audioRecorder.start(preferredDeviceUID: self.preferredInputDeviceUID)
                 self.indicatorWindow.show(state: .recording)
-                self.indicatorWindow.updateStyle(self.dictationStyle)
                 self.indicatorWindow.updateFocusedAppInfo(appInfo)
                 self.indicatorWindow.updateAgentMode(false)
             }
@@ -133,6 +132,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 self.isAgentModeThisRecording = true
                 self.indicatorWindow.updateAgentMode(true)
             }
+        }
+
+        audioRecorder.onLevel = { [weak self] level in
+            self?.indicatorWindow.updateAudioLevel(level)
         }
 
         refreshAccessibilityStatus()

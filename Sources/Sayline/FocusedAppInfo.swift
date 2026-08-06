@@ -6,6 +6,10 @@ struct FocusedAppInfo {
     let bundleID: String?
     let windowTitle: String?
     let context: AppContext
+    /// The app's real icon, captured at hotkey-down for the indicator's
+    /// logo box. App-level only — a web app in a browser shows the
+    /// browser's icon, not the site's (macOS exposes nothing deeper).
+    let icon: NSImage?
 }
 
 enum FocusedAppReader {
@@ -15,7 +19,7 @@ enum FocusedAppReader {
         let bundleID = app?.bundleIdentifier
         let title = focusedWindowTitle(pid: app?.processIdentifier)
         let context = AppContextDetector.context(forBundleID: bundleID, windowTitle: title)
-        return FocusedAppInfo(name: name, bundleID: bundleID, windowTitle: title, context: context)
+        return FocusedAppInfo(name: name, bundleID: bundleID, windowTitle: title, context: context, icon: app?.icon)
     }
 
     /// Window-level AX info tends to be exposed even by apps (often
