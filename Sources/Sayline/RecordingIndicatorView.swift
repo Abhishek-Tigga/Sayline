@@ -141,6 +141,10 @@ struct RecordingIndicatorView: View {
             .frame(width: 88, height: 36)
             .background(Self.materialBackground(cornerRadius: 8))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Agent mode only, and only on this box — not the logo
+            // container. BorderBeamKit vendored directly into this target
+            // (see BorderBeamKit/LICENSE-BorderBeamKit.txt for why).
+            .borderBeam(.sm, colorVariant: .ocean, active: viewModel.isAgentMode, borderRadius: 8)
     }
 
     // MARK: - Status container (not in Figma — reuses the waveform box's visual language for text states)
