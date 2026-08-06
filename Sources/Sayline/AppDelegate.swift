@@ -105,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         hotkeyManager.onHotkeyDown = { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
+                SoundEffectPlayer.shared.playHotkeyDown()
                 self.isRecording = true
                 self.transcriptionError = nil
                 self.isAgentModeThisRecording = false
@@ -190,6 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     private func handleHotkeyUp() {
+        SoundEffectPlayer.shared.playHotkeyUp()
         isRecording = false
         audioRecorder.stop()
         guard let url = audioRecorder.lastRecordingURL else {

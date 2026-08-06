@@ -30,11 +30,16 @@ final class FloatingIndicatorWindow {
     // 36pt container plus breathing room for the panel's shadow.
     private let width: CGFloat = 320
     private let height: CGFloat = 46
-    // Anchored to screen.visibleFrame (Dock/menu-bar aware) rather than
-    // raw screen bounds, so the pill never renders behind a visible
-    // Dock. Y position can shift slightly between recordings if the
-    // Dock auto-hides/reappears in between — expected, not a bug.
-    private let bottomMargin: CGFloat = 8
+    // Anchored to the screen's true physical bottom edge (screen.frame,
+    // not visibleFrame) rather than the Dock-aware visible area — found
+    // live that visibleFrame.minY differs across setups with different
+    // Dock configurations, so an identical bottomMargin value produced
+    // visibly different positions on an external monitor vs. the
+    // MacBook's built-in display. This makes "16px from bottom" literal
+    // and consistent everywhere. Tradeoff: if the Dock is visible
+    // (not auto-hidden) and tall, it can now sit on top of the pill —
+    // accepted since the alternative was inconsistent positioning.
+    private let bottomMargin: CGFloat = 16
 
     func show(state: RecordingIndicatorState) {
         viewModel.state = state
@@ -102,7 +107,7 @@ final class FloatingIndicatorWindow {
 
     private func reposition(_ panel: NSPanel) {
         guard let screen = NSScreen.main else { return }
-        let screenFrame = screen.visibleFrame
+        let screenFrame = screen.frame
         let x = screenFrame.midX - width / 2
         let y = screenFrame.minY + bottomMargin
         panel.setFrameOrigin(NSPoint(x: x, y: y))

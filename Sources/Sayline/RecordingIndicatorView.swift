@@ -37,7 +37,26 @@ final class IndicatorViewModel: ObservableObject {
 struct RecordingIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
-    private static let containerFill = Color.black
+    /// `#0A0A0A` at 80% opacity, layered over a real backdrop-blur
+    /// material — this is what actually distinguishes the bar from busy
+    /// content behind it (confirmed via a 6-variant HTML comparison)
+    /// rather than the shadow-caused edge from the previous pass, which
+    /// is now off entirely.
+    private static let containerTint = Color(red: 0x0A / 255, green: 0x0A / 255, blue: 0x0A / 255).opacity(0.75)
+
+    /// A blur "of 1" doesn't map to a literal parameter here the way
+    /// CSS's `backdrop-filter: blur(1px)` does — AppKit/SwiftUI
+    /// materials are fixed-intensity presets (.ultraThinMaterial,
+    /// .thinMaterial, …), not a continuous blur-radius dial.
+    /// `.ultraThinMaterial` is the subtlest preset available, used here
+    /// as the closest approximation — flagged as a real gap pending
+    /// live confirmation it reads as intended, not a guess I'm
+    /// confident matches "1" exactly.
+    private static func materialBackground(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(.ultraThinMaterial)
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius).fill(containerTint))
+    }
     private static let textColor = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
     // Text states need to fit inside a fixed-size panel — see the
     // crash this caused in the previous attempt (unbounded label width
@@ -48,7 +67,7 @@ struct RecordingIndicatorView: View {
     var body: some View {
         HStack(spacing: 4) {
             logoContainer
-            if viewModel.state == .recording {
+            if showsWaveform {
                 waveformContainer
             } else {
                 statusContainer
@@ -57,12 +76,26 @@ struct RecordingIndicatorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
+    /// Transcribing/cleaning-up are typically sub-second — showing a text
+    /// swap for them read as flickery/noisy, so they keep the same
+    /// waveform box on screen instead (frozen/idle rather than live,
+    /// since audio capture has already stopped by then). Only states
+    /// with something real to say (agent routing, a message/failure)
+    /// still switch to the text container.
+    private var showsWaveform: Bool {
+        switch viewModel.state {
+        case .recording, .transcribing, .cleaningUp: return true
+        case .agentRouting, .message: return false
+        }
+    }
+
     // MARK: - Logo Container (36×36: nested 4pt + 2pt padding around a 24×24 icon)
 
     private var logoContainer: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(Self.containerFill)
+        Color.clear
             .frame(width: 36, height: 36)
+            .background(Self.materialBackground(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(logoContent)
     }
 
@@ -106,7 +139,8 @@ struct RecordingIndicatorView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(width: 88, height: 36)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Self.containerFill))
+            .background(Self.materialBackground(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: - Status container (not in Figma — reuses the waveform box's visual language for text states)
@@ -120,7 +154,8 @@ struct RecordingIndicatorView: View {
             .frame(maxWidth: Self.statusLabelMaxWidth, alignment: .leading)
             .padding(.horizontal, 8)
             .frame(height: 36)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Self.containerFill))
+            .background(Self.materialBackground(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var statusLabel: String {
