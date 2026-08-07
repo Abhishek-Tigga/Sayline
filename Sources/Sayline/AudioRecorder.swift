@@ -7,6 +7,8 @@ final class AudioRecorder {
     private var audioFile: AVAudioFile?
     private(set) var isRecording = false
     private(set) var lastRecordingURL: URL?
+    private var recordingStartTime: Date?
+    private(set) var lastRecordingDuration: TimeInterval = 0
 
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -60,6 +62,7 @@ final class AudioRecorder {
             try engine.start()
             isRecording = true
             lastRecordingURL = url
+            recordingStartTime = Date()
             NSLog("Sayline: recording started -> \(url.path)")
         } catch {
             NSLog("Sayline: failed to start audio engine: \(error)")
@@ -74,7 +77,32 @@ final class AudioRecorder {
         engine.stop()
         audioFile = nil
         isRecording = false
-        NSLog("Sayline: recording stopped -> \(lastRecordingURL?.path ?? "?")")
+        lastRecordingDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
+        NSLog("Sayline: recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s")
+    }
+
+    /// True if the just-finished recording is too short or essentially
+    /// silent to be a real dictation attempt — an accidental hotkey tap,
+    /// not speech. Whisper hallucinates short filler phrases ("Thank
+    /// you.", ".") on near-silent audio like this, which was showing up
+    /// as real junk pastes in Sayline's own history log. Checked here,
+    /// before transcription is ever attempted, so it costs nothing.
+    func isTooShortOrSilent() -> Bool {
+        guard lastRecordingDuration >= 0.4 else { return true }
+        guard let url = lastRecordingURL, let file = try? AVAudioFile(forReading: url) else { return true }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else { return true }
+        guard (try? file.read(into: buffer)) != nil else { return true }
+        guard let channelData = buffer.floatChannelData else { return true }
+
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return true }
+        let samples = channelData[0]
+        var sumSquares: Float = 0
+        for i in 0..<frameCount {
+            sumSquares += samples[i] * samples[i]
+        }
+        let rms = (sumSquares / Float(frameCount)).squareRoot()
+        return rms < 0.005 // near-silence threshold; normal speech sits well above 0.02
     }
 
     private func setInputDevice(_ deviceID: AudioDeviceID, on node: AVAudioInputNode) {

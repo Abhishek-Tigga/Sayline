@@ -2,7 +2,6 @@ import Cocoa
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
-    private static let dictationStyleDefaultsKey = "com.abhishektigga.sayline.dictationStyle"
     private static let useLocalTranscriptionDefaultsKey = "com.abhishektigga.sayline.useLocalTranscription"
     private static let historyDefaultsKey = "com.abhishektigga.sayline.history"
     private static let maxHistoryEntries = 20
@@ -35,18 +34,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         didSet {
             UserDefaults.standard.set(hotkeyOption.rawValue, forKey: Self.hotkeyOptionDefaultsKey)
             hotkeyManager.hotkeyOption = hotkeyOption
-        }
-    }
-    @Published var dictationStyle: DictationStyle = {
-        if let raw = UserDefaults.standard.string(forKey: AppDelegate.dictationStyleDefaultsKey),
-           let style = DictationStyle(rawValue: raw) {
-            return style
-        }
-        return .clean
-    }() {
-        didSet {
-            UserDefaults.standard.set(dictationStyle.rawValue, forKey: Self.dictationStyleDefaultsKey)
-            NSLog("Sayline: dictation style -> \(dictationStyle.displayName)")
         }
     }
     @Published var useLocalTranscription: Bool = {
@@ -108,12 +95,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         hotkeyManager.onHotkeyUp = { [weak self] in
             DispatchQueue.main.async { self?.handleHotkeyUp() }
         }
-        hotkeyManager.onCycleStyleRequested = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.dictationStyle = self.dictationStyle.next()
-            }
-        }
         hotkeyManager.onAgentModeRequested = { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -145,8 +126,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         UserDefaults.standard.set(data, forKey: Self.historyDefaultsKey)
     }
 
-    private func addHistoryEntry(text: String, style: DictationStyle, usedLocal: Bool) {
-        let entry = HistoryEntry(id: UUID(), timestamp: Date(), text: text, style: style, usedLocal: usedLocal)
+    private func addHistoryEntry(text: String, usedLocal: Bool) {
+        let entry = HistoryEntry(id: UUID(), timestamp: Date(), text: text, usedLocal: usedLocal)
         historyEntries.insert(entry, at: 0)
         if historyEntries.count > Self.maxHistoryEntries {
             historyEntries.removeLast(historyEntries.count - Self.maxHistoryEntries)
@@ -196,12 +177,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         lastRecordingPath = url.path
 
+        guard !audioRecorder.isTooShortOrSilent() else {
+            NSLog("Sayline: recording too short/silent (\(audioRecorder.lastRecordingDuration)s) -> skipping transcription")
+            indicatorWindow.hide()
+            return
+        }
+
         if isAgentModeThisRecording {
             handleAgentModeHotkeyUp(url: url)
             return
         }
 
-        let style = dictationStyle
         let context = capturedFocusedAppInfo?.context ?? .general
         let usingLocal = useLocalTranscription && localTranscriber.isReady
 
@@ -231,8 +217,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
                 var finalText = rawText
                 do {
-                    finalText = try await cleaner.clean(rawText, style: style, context: context)
-                    NSLog("Sayline: cleaned transcript (\(style.displayName), context: \(context.rawValue)) -> \(finalText)")
+                    finalText = try await cleaner.clean(rawText, context: context)
+                    NSLog("Sayline: cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
                 } catch {
                     NSLog("Sayline: cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }
@@ -241,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.isCleaningUp = false
                     self.lastTranscript = finalText
                     self.indicatorWindow.hide()
-                    self.addHistoryEntry(text: finalText, style: style, usedLocal: usingLocal)
+                    self.addHistoryEntry(text: finalText, usedLocal: usingLocal)
                     TextInjector.insert(finalText)
                 }
             } catch {

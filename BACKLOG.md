@@ -9,6 +9,63 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **8B vs 70B cleanup compliance A/B test** (blocked, on hold — user
+  explicitly parked this 2026-08-08; remind them of this item whenever
+  they ask what's in the backlog). Before switching `TranscriptCleaner`
+  from `llama-3.1-8b-instant` to `llama-3.3-70b-versatile`, actually
+  measure whether 70B gives better prompt compliance on this narrow
+  cleanup task rather than assuming it — run both models against a set
+  of real/realistic raw transcripts (a couple of confirmed historical
+  failures plus constructed filler-heavy samples matching this user's
+  real dictation style) through the *actual* `TranscriptCleaner`
+  system prompt, score each output with the same disallowed-edit-
+  fraction logic `TranscriptCleanupValidator` uses, and compare. First
+  attempt (2026-08-08) failed before producing any real data — all 10
+  Groq API calls came back HTTP 403, and the follow-up diagnostic curl
+  (to see the actual error body) was blocked by the auto-mode
+  permission classifier since it echoed key-related output. Root cause
+  of the 403 was never established — could be the stored key, could be
+  the test script. **Before re-attempting: confirm the key still works
+  via a real dictation in the app itself first**, so a second blind
+  failure doesn't waste another round. The 70B swap itself stays on
+  hold until this test actually runs and shows a real difference —
+  don't swap on assumption.
+- **Dynamic System Settings pane catalog** (design agreed 2026-08-08,
+  discussion ongoing — do not start building until the open discussion
+  points are settled). Root cause being fixed: the hardcoded
+  `SettingsPane` enum covers 10 panes while the OS ships ~56, so every
+  pane outside the list ("keyboard settings", "wallpaper") silently
+  fails, and each fix so far has been a one-off patch (Privacy, then
+  Touch ID & Password) rather than closing the class. Agreed design:
+  1. **Read the vocabulary from the OS, not a hand list.** At launch,
+     scan `/System/Library/ExtensionKit/Extensions/*.appex`, filter to
+     real settings extensions (extension point identifier contains the
+     settings extension points — verified filter works on a live
+     machine, yields 56 panes incl. Keyboard, Wallpaper, Trackpad,
+     Screen Time, Battery, Focus, Siri), build a
+     `SettingsPaneCatalog` of display name → `CFBundleIdentifier`.
+     Delete the hardcoded enum entirely. Also self-heals macOS version
+     drift (the stale-General-identifier bug becomes structurally
+     impossible — the catalog is read from the installed OS).
+  2. **Generate the router tool's `pane` enum at runtime** from the
+     catalog (lightly cleaned names: "MouseExtension" → "Mouse"), so
+     the 70B model does the semantic mapping ("change wallpaper" →
+     Wallpaper) against the complete real vocabulary — the failures
+     were never the model's mapping, they were the missing vocabulary.
+  3. **Execute deterministically, fail visibly.** Open via
+     `x-apple.systempreferences:<bundle id>` (proven mechanism); if the
+     model's string doesn't match the catalog even after the existing
+     fuzzy normalization, open System Settings itself + flash
+     "couldn't find that pane" instead of dying silently.
+  4. **Direct-action tools keep precedence** (`set_wifi` for "turn
+     Wi-Fi off"; the pane tool is for viewing/adjusting-yourself).
+  Agreed limits: pane-level only (no sub-section deep links — modern
+  System Settings deep-linking is undocumented/unreliable, explicitly
+  not chased); a few junk catalog entries ("FollowUp", "Class
+  Progress") tolerated or tiny-denylisted; can't pre-verify all 56
+  URL-open correctly — spot-check a sample programmatically, rely on
+  the visible fallback for stragglers.
+
 - **List-shaped query answers** (e.g. "what are the biggest files in my
   Downloads folder"). Single-fact queries (battery, storage, memory,
   uptime, volume, macOS version, now-playing) shipped 2026-08-05, all
@@ -18,6 +75,14 @@ and [CHANGELOG.md](CHANGELOG.md).
   condensed format or the pill growing into a small multi-line surface
   for this case specifically. Deliberately scoped separately from the
   single-fact batch rather than guessed at alongside it.
+
+- **Cleanup quality polish** (low priority, not required now that
+  edit-validated cleanup — shipped 2026-08-08, see CHANGELOG — bounds
+  the downside). Upgrade the cleanup model from `llama-3.1-8b-instant`
+  to the 70B already used for agent routing, for better first-pass
+  compliance (cost is a rounding error per the existing cost analysis).
+  Whisper `prompt` parameter to bias transcription toward custom
+  vocabulary (app names, "Sayline").
 
 ## Agent actions considered and skipped (technical reasons, not scope)
 
