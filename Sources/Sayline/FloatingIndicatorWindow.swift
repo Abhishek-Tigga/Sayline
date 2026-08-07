@@ -78,6 +78,14 @@ final class FloatingIndicatorWindow {
         }
     }
 
+    /// Must be called before show(), since the panel (and its hosted
+    /// SwiftUI root view) is only rebuilt when nil — setting this after
+    /// the panel already exists for this hold has no effect until the
+    /// next fresh show().
+    func updateUIVersion(_ version: PillUIVersion) {
+        viewModel.uiVersion = version
+    }
+
     func hide() {
         panel?.orderOut(nil)
         panel = nil
@@ -93,13 +101,28 @@ final class FloatingIndicatorWindow {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        // Forces dark rendering for the whole hosted view tree regardless
+        // of the system-wide Light/Dark setting — matters specifically
+        // for v4's real Liquid Glass material (macOS 26+), which is
+        // colorScheme-aware and renders a visibly lighter variant under
+        // Light appearance. Without this, the panel would briefly settle
+        // into that lighter glass shortly after appearing, independent
+        // of the .tint() override, which only blends with the base
+        // light/dark glass rather than replacing it outright.
+        panel.appearance = NSAppearance(named: .darkAqua)
         panel.level = .floating
         panel.hasShadow = false // temporarily disabled to test a reported lighter-than-black edge on all 4 sides
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
 
-        let hosting = NSHostingView(rootView: RecordingIndicatorView(viewModel: viewModel))
+        let hosting: NSHostingView<AnyView>
+        switch viewModel.uiVersion {
+        case .v3:
+            hosting = NSHostingView(rootView: AnyView(RecordingIndicatorView(viewModel: viewModel)))
+        case .v4:
+            hosting = NSHostingView(rootView: AnyView(RecordingIndicatorViewV4(viewModel: viewModel)))
+        }
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
         return panel

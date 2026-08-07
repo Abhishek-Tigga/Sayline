@@ -14,22 +14,35 @@ final class HotkeyManager {
     /// regardless of key, so switching which one we treat as "the
     /// hotkey" doesn't require recreating the tap.
     var hotkeyOption: HotkeyOption = .rightOption
+    /// A second, independent hold-to-talk key — fixed (not exposed in
+    /// Settings) rather than user-configurable, since its only purpose
+    /// right now is letting the v3 and v4 floating-pill designs be
+    /// compared live: primary (Right Option) triggers v4, this triggers
+    /// v3. Both feed the same recording/transcription pipeline.
+    let secondaryHotkeyOption: HotkeyOption = .rightCommand
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var isHotkeyActive = false
+    private var isPrimaryActive = false
+    private var isSecondaryActive = false
     /// Guards against keyboard auto-repeat: holding Space sends many
     /// rapid keyDown events, not just one, so without this we'd fire
-    /// onAgentModeRequested (and log) dozens of times per hold.
+    /// onAgentModeRequested (and log) dozens of times per hold. Shared
+    /// across both hotkeys since only one hold is realistically active
+    /// at once — this is "was agent mode requested during the current
+    /// hold," not per-key state.
     private var agentModeAlreadyRequestedThisHold = false
 
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
+    var onSecondaryHotkeyDown: (() -> Void)?
+    var onSecondaryHotkeyUp: (() -> Void)?
     var onCycleStyleRequested: (() -> Void)?
-    /// Fired when Space is pressed while the hotkey is held — flags the
-    /// *current* recording as an agent request rather than dictation.
-    /// Per-hold, not a persistent toggle: each new hold defaults back to
-    /// dictation unless Space is pressed again during that hold.
+    /// Fired when Space is pressed while either hotkey is held — flags
+    /// the *current* recording as an agent request rather than
+    /// dictation. Per-hold, not a persistent toggle: each new hold
+    /// defaults back to dictation unless Space is pressed again during
+    /// that hold.
     var onAgentModeRequested: (() -> Void)?
 
     @discardableResult
@@ -61,7 +74,7 @@ final class HotkeyManager {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        NSLog("Sayline: hotkey listener started (hold \(hotkeyOption.displayName))")
+        NSLog("Sayline: hotkey listener started (hold \(hotkeyOption.displayName) for v4, \(secondaryHotkeyOption.displayName) for v3)")
         return true
     }
 
@@ -82,6 +95,7 @@ final class HotkeyManager {
             return Unmanaged.passUnretained(event)
         case .keyDown:
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            let isHotkeyActive = isPrimaryActive || isSecondaryActive
             if isHotkeyActive && keyCode == Self.cycleStyleKeyCode {
                 NSLog("Sayline: style cycle requested")
                 onCycleStyleRequested?()
@@ -112,18 +126,36 @@ final class HotkeyManager {
 
     private func handleFlagsChanged(event: CGEvent) {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        guard keyCode == hotkeyOption.rawValue else { return }
 
-        let isPressed = event.flags.contains(hotkeyOption.flagMask)
-        if isPressed && !isHotkeyActive {
-            isHotkeyActive = true
-            agentModeAlreadyRequestedThisHold = false
-            NSLog("Sayline: hotkey DOWN")
-            onHotkeyDown?()
-        } else if !isPressed && isHotkeyActive {
-            isHotkeyActive = false
-            NSLog("Sayline: hotkey UP")
-            onHotkeyUp?()
+        if keyCode == hotkeyOption.rawValue {
+            let isPressed = event.flags.contains(hotkeyOption.flagMask)
+            if isPressed && !isPrimaryActive {
+                isPrimaryActive = true
+                agentModeAlreadyRequestedThisHold = false
+                NSLog("Sayline: primary hotkey DOWN")
+                onHotkeyDown?()
+            } else if !isPressed && isPrimaryActive {
+                isPrimaryActive = false
+                NSLog("Sayline: primary hotkey UP")
+                onHotkeyUp?()
+            }
+        }
+
+        // Guards against the (unusual) case where a user's customized
+        // primary hotkey collides with the fixed secondary — without
+        // this both blocks would fire for the same physical key event.
+        if keyCode == secondaryHotkeyOption.rawValue && secondaryHotkeyOption != hotkeyOption {
+            let isPressed = event.flags.contains(secondaryHotkeyOption.flagMask)
+            if isPressed && !isSecondaryActive {
+                isSecondaryActive = true
+                agentModeAlreadyRequestedThisHold = false
+                NSLog("Sayline: secondary hotkey DOWN")
+                onSecondaryHotkeyDown?()
+            } else if !isPressed && isSecondaryActive {
+                isSecondaryActive = false
+                NSLog("Sayline: secondary hotkey UP")
+                onSecondaryHotkeyUp?()
+            }
         }
     }
 }

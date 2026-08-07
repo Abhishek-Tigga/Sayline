@@ -102,23 +102,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hotkeyManager.hotkeyOption = hotkeyOption
+        // Primary (Right Option, customizable) -> v4's pill. Secondary
+        // (fixed Right Command) -> v3's pill. Both share the exact same
+        // recording/transcription pipeline below — only which UI shows
+        // during the hold differs, tagged via updateUIVersion before
+        // the panel is ever shown for this hold.
         hotkeyManager.onHotkeyDown = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                SoundEffectPlayer.shared.playHotkeyDown()
-                self.isRecording = true
-                self.transcriptionError = nil
-                self.isAgentModeThisRecording = false
-                let appInfo = FocusedAppReader.current()
-                self.capturedFocusedAppInfo = appInfo
-                NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
-                self.audioRecorder.start(preferredDeviceUID: self.preferredInputDeviceUID)
-                self.indicatorWindow.show(state: .recording)
-                self.indicatorWindow.updateFocusedAppInfo(appInfo)
-                self.indicatorWindow.updateAgentMode(false)
-            }
+            DispatchQueue.main.async { self?.beginRecording(uiVersion: .v4) }
         }
         hotkeyManager.onHotkeyUp = { [weak self] in
+            DispatchQueue.main.async { self?.handleHotkeyUp() }
+        }
+        hotkeyManager.onSecondaryHotkeyDown = { [weak self] in
+            DispatchQueue.main.async { self?.beginRecording(uiVersion: .v3) }
+        }
+        hotkeyManager.onSecondaryHotkeyUp = { [weak self] in
             DispatchQueue.main.async { self?.handleHotkeyUp() }
         }
         hotkeyManager.onCycleStyleRequested = { [weak self] in
@@ -188,6 +186,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 self.isLocalModelReady = self.localTranscriber.isReady
             }
         }
+    }
+
+    /// Shared start-of-hold path for both hotkeys — only `uiVersion`
+    /// differs between the primary (v4) and secondary (v3) triggers;
+    /// everything else (recording, focused-app capture, agent-mode
+    /// reset) is identical regardless of which pill design shows.
+    private func beginRecording(uiVersion: PillUIVersion) {
+        SoundEffectPlayer.shared.playHotkeyDown()
+        isRecording = true
+        transcriptionError = nil
+        isAgentModeThisRecording = false
+        let appInfo = FocusedAppReader.current()
+        capturedFocusedAppInfo = appInfo
+        NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
+        audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID)
+        indicatorWindow.updateUIVersion(uiVersion)
+        indicatorWindow.show(state: .recording)
+        indicatorWindow.updateFocusedAppInfo(appInfo)
+        indicatorWindow.updateAgentMode(false)
     }
 
     private func handleHotkeyUp() {

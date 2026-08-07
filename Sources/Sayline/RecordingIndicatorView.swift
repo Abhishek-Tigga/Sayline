@@ -11,12 +11,25 @@ enum RecordingIndicatorState: Equatable {
     case message(String)
 }
 
+/// Which floating-pill design to render — lets the two designs be
+/// compared live, side by side in practice (different hotkeys, not
+/// simultaneously on screen), without either one's code touching the
+/// other's file.
+enum PillUIVersion {
+    case v3
+    case v4
+}
+
 final class IndicatorViewModel: ObservableObject {
     @Published var state: RecordingIndicatorState = .recording
     @Published var focusedAppInfo: FocusedAppInfo?
     @Published var isAgentMode: Bool = false
     /// Smoothed live mic loudness (0…1) driving the waveform.
     @Published var audioLevel: Float = 0
+    /// Set once, right before a panel is created for a given hold —
+    /// read at panel-build time in FloatingIndicatorWindow, not observed
+    /// live, since the panel is disposable and rebuilt per show() anyway.
+    var uiVersion: PillUIVersion = .v3
 }
 
 /// Third UI pass, built against the Figma frame at node 14:100
