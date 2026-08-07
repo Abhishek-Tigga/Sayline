@@ -64,9 +64,24 @@ struct RecordingIndicatorView: View {
     // panel's width with margin to spare.
     private static let statusLabelMaxWidth: CGFloat = 220
 
+    /// "Smooth" from the HTML motion prototype (2026-08-06) — confirmed
+    /// live against Springy/Snappy alternatives before porting.
+    private static let agentModeAnimation: Animation = .timingCurve(0.65, 0, 0.35, 1, duration: 0.42)
+
+    /// Logo hides and the waveform box takes over its space (88 -> 128,
+    /// total pill width unchanged) for the whole agent-mode session, not
+    /// just while actively recording — avoids it popping back mid-session
+    /// during transcribing/cleaning-up.
+    private var hidesLogoContainer: Bool {
+        showsWaveform && viewModel.isAgentMode
+    }
+
     var body: some View {
         HStack(spacing: 4) {
-            logoContainer
+            if !hidesLogoContainer {
+                logoContainer
+                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
             if showsWaveform {
                 waveformContainer
             } else {
@@ -74,6 +89,7 @@ struct RecordingIndicatorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .animation(Self.agentModeAnimation, value: viewModel.isAgentMode)
     }
 
     /// Transcribing/cleaning-up are typically sub-second — showing a text
@@ -131,14 +147,18 @@ struct RecordingIndicatorView: View {
         }
     }
 
-    // MARK: - Waveform Container (fixed 88×36: 8pt horizontal / 6pt vertical padding around a 72×24 waveform)
+    // MARK: - Waveform Container (88×36 normally, 128×36 in agent mode — same
+    // 8pt horizontal / 6pt vertical padding either way, so the extra width
+    // goes to the canvas itself rather than sitting as empty padding)
 
     private var waveformContainer: some View {
-        ScrollingWaveformCanvas(currentLevel: viewModel.audioLevel, isLive: viewModel.state == .recording)
-            .frame(width: 72, height: 24)
+        let innerWidth: CGFloat = viewModel.isAgentMode ? 112 : 72
+        let outerWidth: CGFloat = viewModel.isAgentMode ? 128 : 88
+        return ScrollingWaveformCanvas(currentLevel: viewModel.audioLevel, isLive: viewModel.state == .recording)
+            .frame(width: innerWidth, height: 24)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .frame(width: 88, height: 36)
+            .frame(width: outerWidth, height: 36)
             .background(Self.materialBackground(cornerRadius: 8))
             .clipShape(RoundedRectangle(cornerRadius: 8))
             // Agent mode only, and only on this box — not the logo
