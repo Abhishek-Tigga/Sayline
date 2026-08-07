@@ -92,7 +92,11 @@ final class FloatingIndicatorWindow {
         // driven by content behind the window, not app-declared
         // appearance — but is still correct to keep regardless.
         panel.appearance = NSAppearance(named: .darkAqua)
-        panel.level = .floating
+        // .statusBar (not .floating) so the pill renders above the Dock
+        // when it's visible/not-auto-hidden — .floating sits above
+        // normal app windows but below the Dock, which let a
+        // non-auto-hidden Dock visually cover the pill.
+        panel.level = .statusBar
         panel.hasShadow = false // temporarily disabled to test a reported lighter-than-black edge on all 4 sides
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]

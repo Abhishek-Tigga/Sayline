@@ -41,8 +41,6 @@ private struct HistoryRow: View {
             HStack(spacing: 6) {
                 Text(Self.formatter.string(from: entry.timestamp))
                 Text("·")
-                Text(entry.style.displayName)
-                Text("·")
                 Text(entry.usedLocal ? "local" : "cloud")
                 Spacer()
                 Button {

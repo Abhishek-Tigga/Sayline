@@ -1,13 +1,9 @@
 import Cocoa
 
 /// Watches for a chosen modifier key (see HotkeyOption) being held
-/// down/released, system-wide, via a low-level CGEventTap. Also catches
-/// Tab while the hotkey is held as a "cycle dictation style" shortcut,
-/// swallowing that keystroke so it doesn't get typed into whatever app is
-/// focused. Requires Accessibility permission to be granted before
-/// `start()` will succeed.
+/// down/released, system-wide, via a low-level CGEventTap. Requires
+/// Accessibility permission to be granted before `start()` will succeed.
 final class HotkeyManager {
-    private static let cycleStyleKeyCode: Int64 = 48 // kVK_Tab
     private static let agentModeKeyCode: Int64 = 49 // kVK_Space
 
     /// Changeable at runtime — the tap watches all flagsChanged events
@@ -25,7 +21,6 @@ final class HotkeyManager {
 
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
-    var onCycleStyleRequested: (() -> Void)?
     /// Fired when Space is pressed while the hotkey is held — flags the
     /// *current* recording as an agent request rather than dictation.
     /// Per-hold, not a persistent toggle: each new hold defaults back to
@@ -82,11 +77,6 @@ final class HotkeyManager {
             return Unmanaged.passUnretained(event)
         case .keyDown:
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-            if isHotkeyActive && keyCode == Self.cycleStyleKeyCode {
-                NSLog("Sayline: style cycle requested")
-                onCycleStyleRequested?()
-                return nil // swallow Tab while dictating so it isn't typed
-            }
             if isHotkeyActive && keyCode == Self.agentModeKeyCode {
                 if !agentModeAlreadyRequestedThisHold {
                     agentModeAlreadyRequestedThisHold = true

@@ -42,14 +42,6 @@ struct SettingsView: View {
                     .font(.caption2)
             }
 
-            Section("Dictation") {
-                Picker("Default Style", selection: $appDelegate.dictationStyle) {
-                    ForEach(DictationStyle.allCases, id: \.self) { style in
-                        Text(style.displayName).tag(style)
-                    }
-                }
-            }
-
             Section("Hotkey") {
                 Picker("Hold to Talk", selection: $appDelegate.hotkeyOption) {
                     ForEach(HotkeyOption.allCases, id: \.self) { option in

@@ -1,8 +1,8 @@
 import Foundation
 
-/// The tone/register axis for cleanup — independent of DictationStyle,
-/// which controls fidelity (how much to deviate from exact words). These
-/// combine: e.g. Clean + Email strips fillers AND leans professional.
+/// The tone/register axis for cleanup, layered on top of the fixed
+/// "Clean" disfluency-removal pass: e.g. Email adds a polished,
+/// professional lean on top of the usual filler/false-start cleanup.
 enum AppContext: String {
     case email
     case chat
