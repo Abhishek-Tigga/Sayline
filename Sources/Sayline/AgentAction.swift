@@ -64,5 +64,10 @@ enum AgentAction {
         case bluetooth = "Bluetooth"
         case wifi = "WiFi"
         case users = "Users"
+        /// "Password settings" — explicitly confirmed to mean this pane
+        /// (Touch ID & Password, local login/unlock), not the standalone
+        /// Passwords app, which is a different thing (saved website/app
+        /// passwords) reachable via open_app instead.
+        case touchIDPassword = "TouchIDPassword"
     }
 }

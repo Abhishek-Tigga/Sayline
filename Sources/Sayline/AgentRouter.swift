@@ -26,6 +26,17 @@ final class AgentRouter {
     request doesn't clearly match any available tool (for example it's \
     about email, calendar, or anything else not covered), do not call \
     any tool for that part — just reply normally.
+
+    General rule for "<X> settings" phrasing: default to \
+    open_system_setting (a real pane inside the System Settings app), \
+    not to opening a standalone app, whenever a matching pane exists — \
+    even if an app with a related name/purpose also exists. Only route \
+    to open_app instead when the user explicitly names the app itself \
+    (e.g. "open the Passwords app", "open Passwords") rather than \
+    "settings". Concretely: "password settings" / "Touch ID and \
+    password settings" -> open_system_setting with pane \
+    TouchIDPassword, NOT open_app("Passwords") — confirmed directly by \
+    the user, do not second-guess this one.
     """
 
     private let tools: [[String: Any]] = [
@@ -115,14 +126,14 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "open_system_setting",
-                "description": "Opens a specific pane in macOS System Settings, e.g. Privacy & Security, Notifications, Wi-Fi.",
+                "description": "Opens/shows a specific pane in the System Settings app so the user can look at or change something themselves — for VIEWING a pane, not for directly changing a value. For \"open Wi-Fi settings\" or \"show Wi-Fi settings\" (they want to see the pane), use this with pane WiFi. For \"turn Wi-Fi on/off\" (they want the actual change made now, no pane needs to open), use set_wifi instead, not this. \"password settings\" / \"Touch ID and password settings\" -> pane TouchIDPassword (this is the correct target, not the standalone Passwords app).",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "pane": [
                             "type": "string",
-                            "enum": ["PrivacySecurity", "Notifications", "General", "Displays", "Sound", "Network", "Bluetooth", "WiFi", "Users"],
-                            "description": "Which settings pane to open.",
+                            "enum": ["PrivacySecurity", "Notifications", "General", "Displays", "Sound", "Network", "Bluetooth", "WiFi", "Users", "TouchIDPassword"],
+                            "description": "Which settings pane to open. TouchIDPassword covers Touch ID, local login password, and password/autofill preferences.",
                         ]
                     ],
                     "required": ["pane"],
@@ -159,7 +170,7 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "set_wifi",
-                "description": "Turns Wi-Fi on or off.",
+                "description": "Directly turns Wi-Fi on or off right now — only when the user states which (\"turn Wi-Fi on\", \"turn off Wi-Fi\"). If they just want to see/open the Wi-Fi settings pane (\"open Wi-Fi settings\") without saying on or off, use open_system_setting with pane WiFi instead — do not guess a direction here.",
                 "parameters": [
                     "type": "object",
                     "properties": [
@@ -287,27 +298,31 @@ final class AgentRouter {
             return .openApp(name: appName)
         case "find_file":
             guard let query = arguments["query"] as? String else { return nil }
-            let folderRaw = arguments["folder"] as? String
-            let folder = AgentAction.SearchFolder(rawValue: folderRaw ?? "") ?? .downloads
+            let folder = Self.fuzzyMatch(arguments["folder"] as? String, as: AgentAction.SearchFolder.self) ?? .downloads
             let subpath = arguments["subpath"] as? String
             return .findFile(query: query, folder: folder, subpath: subpath)
         case "open_folder":
-            let folderRaw = arguments["folder"] as? String
-            let folder = AgentAction.SearchFolder(rawValue: folderRaw ?? "") ?? .downloads
+            let folder = Self.fuzzyMatch(arguments["folder"] as? String, as: AgentAction.SearchFolder.self) ?? .downloads
             let subpath = arguments["subpath"] as? String
             return .openFolder(folder, subpath: subpath)
         case "close_app":
             guard let appName = arguments["app_name"] as? String else { return nil }
             return .closeApp(name: appName)
         case "open_system_setting":
-            guard let paneRaw = arguments["pane"] as? String,
-                  let pane = AgentAction.SettingsPane(rawValue: paneRaw) else { return nil }
+            let paneRaw = arguments["pane"] as? String
+            guard let pane = Self.fuzzyMatch(paneRaw, as: AgentAction.SettingsPane.self) else {
+                NSLog("Sayline: agent router returned unmatched settings pane \(paneRaw ?? "nil")")
+                return nil
+            }
             return .openSystemSetting(pane)
         case "lock_screen":
             return .lockScreen
         case "set_volume":
-            guard let changeRaw = arguments["change"] as? String,
-                  let change = AgentAction.VolumeChange(rawValue: changeRaw) else { return nil }
+            let changeRaw = arguments["change"] as? String
+            guard let change = Self.fuzzyMatch(changeRaw, as: AgentAction.VolumeChange.self) else {
+                NSLog("Sayline: agent router returned unmatched volume change \(changeRaw ?? "nil")")
+                return nil
+            }
             return .setVolume(change)
         case "set_wifi":
             guard let enabled = arguments["enabled"] as? Bool else { return nil }
@@ -320,12 +335,37 @@ final class AgentRouter {
         case "take_screenshot":
             return .takeScreenshot
         case "answer_system_query":
-            guard let queryRaw = arguments["query"] as? String,
-                  let query = AgentAction.SystemQuery(rawValue: queryRaw) else { return nil }
+            let queryRaw = arguments["query"] as? String
+            guard let query = Self.fuzzyMatch(queryRaw, as: AgentAction.SystemQuery.self) else {
+                NSLog("Sayline: agent router returned unmatched system query \(queryRaw ?? "nil")")
+                return nil
+            }
             return .answerQuery(query)
         default:
             NSLog("Sayline: agent router returned unknown tool \(name)")
             return nil
         }
+    }
+
+    /// Groq's tool-calling doesn't always return an enum parameter in
+    /// the exact literal form given in the schema (e.g. "Privacy &
+    /// Security" or "privacy security" instead of the schema's exact
+    /// "PrivacySecurity") — a strict `RawValue` match against that would
+    /// silently fail with no error anywhere, which is exactly what was
+    /// happening for "open privacy settings" (traced live: the real
+    /// system identifier and URL scheme both work fine in isolation —
+    /// the break was here, the model's returned string just not being a
+    /// byte-for-byte match). Matches case/space/punctuation-insensitively
+    /// against every case's raw value instead of requiring an exact hit.
+    private static func fuzzyMatch<T: RawRepresentable & CaseIterable>(
+        _ raw: String?, as type: T.Type
+    ) -> T? where T.RawValue == String {
+        guard let raw else { return nil }
+        let normalized = normalize(raw)
+        return T.allCases.first { normalize($0.rawValue) == normalized }
+    }
+
+    private static func normalize(_ s: String) -> String {
+        s.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 }

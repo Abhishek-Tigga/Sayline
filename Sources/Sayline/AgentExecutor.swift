@@ -212,17 +212,27 @@ enum AgentExecutor {
     // belongs to Appearance, not General; Network and Wi-Fi share one
     // legacy ID and macOS picks Wi-Fi). Still version-fragile in
     // principle, but these are verified against an actual install.
+    //
+    // .general's identifier was re-checked (2026-08-08) and found stale:
+    // com.apple.systempreferences.GeneralSettings doesn't match any
+    // extension actually installed on a live machine (scanned every
+    // .appex under /System/Library/ExtensionKit/Extensions directly) —
+    // `open` doesn't error on a bad identifier, it silently opens
+    // System Settings to whatever pane was last viewed, which looks
+    // like success but isn't. Corrected to the real Appearance
+    // extension, confirmed installed under that exact identifier.
     private static func settingsURLString(for pane: AgentAction.SettingsPane) -> String {
         switch pane {
         case .privacySecurity: return "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension"
         case .notifications: return "x-apple.systempreferences:com.apple.Notifications-Settings.extension"
-        case .general: return "x-apple.systempreferences:com.apple.systempreferences.GeneralSettings"
+        case .general: return "x-apple.systempreferences:com.apple.Appearance-Settings.extension"
         case .displays: return "x-apple.systempreferences:com.apple.Displays-Settings.extension"
         case .sound: return "x-apple.systempreferences:com.apple.Sound-Settings.extension"
         case .network: return "x-apple.systempreferences:com.apple.Network-Settings.extension"
         case .bluetooth: return "x-apple.systempreferences:com.apple.BluetoothSettings"
         case .wifi: return "x-apple.systempreferences:com.apple.wifi-settings-extension"
         case .users: return "x-apple.systempreferences:com.apple.Users-Groups-Settings.extension"
+        case .touchIDPassword: return "x-apple.systempreferences:com.apple.Touch-ID-Settings.extension"
         }
     }
 
