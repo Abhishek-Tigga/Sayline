@@ -25,9 +25,10 @@ final class FloatingIndicatorWindow {
     private var panel: NSPanel?
     private let viewModel = IndicatorViewModel()
 
-    // Wide enough for the widest text state (statusLabelMaxWidth 220pt
-    // + logo box + gaps + padding) with margin to spare; height is the
-    // 36pt container plus breathing room for the panel's shadow.
+    // A fixed-size "stage" the small pill centers/bottom-anchors within
+    // (via RecordingIndicatorView's own frame alignment) — wider and
+    // taller than the pill itself actually needs, with margin to spare
+    // for the widest text state ("Agent Listening").
     private let width: CGFloat = 320
     private let height: CGFloat = 46
     // Anchored to the screen's true physical bottom edge (screen.frame,
@@ -61,29 +62,11 @@ final class FloatingIndicatorWindow {
         }
     }
 
-    /// Exponential smoothing between ~20ms tap callbacks — raw RMS is
-    /// jumpy enough to make the waveform flicker without it.
-    func updateAudioLevel(_ level: Float) {
-        viewModel.audioLevel = viewModel.audioLevel * 0.55 + level * 0.45
-    }
-
-    func updateFocusedAppInfo(_ info: FocusedAppInfo) {
-        viewModel.focusedAppInfo = info
-    }
-
     func updateAgentMode(_ isAgentMode: Bool) {
         viewModel.isAgentMode = isAgentMode
         if isAgentMode {
             NSLog("Sayline: agent mode flagged for this recording")
         }
-    }
-
-    /// Must be called before show(), since the panel (and its hosted
-    /// SwiftUI root view) is only rebuilt when nil — setting this after
-    /// the panel already exists for this hold has no effect until the
-    /// next fresh show().
-    func updateUIVersion(_ version: PillUIVersion) {
-        viewModel.uiVersion = version
     }
 
     func hide() {
@@ -102,13 +85,12 @@ final class FloatingIndicatorWindow {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // Forces dark rendering for the whole hosted view tree regardless
-        // of the system-wide Light/Dark setting — matters specifically
-        // for v4's real Liquid Glass material (macOS 26+), which is
-        // colorScheme-aware and renders a visibly lighter variant under
-        // Light appearance. Without this, the panel would briefly settle
-        // into that lighter glass shortly after appearing, independent
-        // of the .tint() override, which only blends with the base
-        // light/dark glass rather than replacing it outright.
+        // of the system-wide Light/Dark setting — matters for the real
+        // Liquid Glass material (macOS 26+), which is colorScheme-aware.
+        // Doesn't fix the material's separate backdrop-adaptive flicker
+        // (see RecordingIndicatorView's KNOWN OPEN ISSUE note) — that's
+        // driven by content behind the window, not app-declared
+        // appearance — but is still correct to keep regardless.
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.level = .floating
         panel.hasShadow = false // temporarily disabled to test a reported lighter-than-black edge on all 4 sides
@@ -116,13 +98,7 @@ final class FloatingIndicatorWindow {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
 
-        let hosting: NSHostingView<AnyView>
-        switch viewModel.uiVersion {
-        case .v3:
-            hosting = NSHostingView(rootView: AnyView(RecordingIndicatorView(viewModel: viewModel)))
-        case .v4:
-            hosting = NSHostingView(rootView: AnyView(RecordingIndicatorViewV4(viewModel: viewModel)))
-        }
+        let hosting = NSHostingView(rootView: RecordingIndicatorView(viewModel: viewModel))
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
         return panel

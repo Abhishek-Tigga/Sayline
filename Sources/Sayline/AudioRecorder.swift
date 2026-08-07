@@ -8,13 +8,6 @@ final class AudioRecorder {
     private(set) var isRecording = false
     private(set) var lastRecordingURL: URL?
 
-    /// Live input loudness, 0…1, delivered on the main queue roughly
-    /// every buffer (~20ms) while recording. Drives the indicator's
-    /// voice-reactive waveform; costs one RMS pass over samples we were
-    /// already handling in the tap anyway. Purely additive to the tap
-    /// callback — the file-write path above is untouched.
-    var onLevel: ((Float) -> Void)?
-
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
@@ -60,26 +53,6 @@ final class AudioRecorder {
                 try file.write(from: buffer)
             } catch {
                 NSLog("Sayline: failed writing audio buffer: \(error)")
-            }
-
-            if let onLevel = self.onLevel, let channel = buffer.floatChannelData?[0] {
-                let frames = Int(buffer.frameLength)
-                if frames > 0 {
-                    var sum: Float = 0
-                    for i in 0..<frames { sum += channel[i] * channel[i] }
-                    let rms = sqrt(sum / Float(frames))
-                    // Normal conversational volume should already
-                    // saturate this to 1.0 (the hard clamp then caps
-                    // everything louder at the same point, on purpose).
-                    // 6x only saturated under raised/emphasized speech;
-                    // 25x was still too conservative for normal volume
-                    // ("looks like I'm speaking really slowly"). No way
-                    // to measure real RMS values from this end, so this
-                    // is another rough correction pending live
-                    // confirmation, not a calibrated number.
-                    let level = min(1, rms * 40)
-                    DispatchQueue.main.async { onLevel(level) }
-                }
             }
         }
 
