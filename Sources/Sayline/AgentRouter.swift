@@ -14,7 +14,11 @@ final class AgentRouter {
     private let endpoint = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
     private let model = "llama-3.3-70b-versatile"
 
-    private let systemPrompt = """
+    /// Internal rather than private so `eval/run_eval.py` can read the
+    /// real prompt instead of keeping its own copy — a duplicated prompt
+    /// would drift from this one and quietly make every eval number a
+    /// measurement of the wrong thing.
+    let systemPrompt = """
     You route spoken requests to macOS automation actions, or answer \
     factual questions about the Mac's current state. The user is either \
     issuing a command ("open Safari") or asking a question ("what's my \
@@ -51,7 +55,9 @@ final class AgentRouter {
     \(SettingsPaneCatalog.panes.map { $0.displayName }.joined(separator: ", ")).
     """
 
-    private let tools: [[String: Any]] = [
+    /// Internal for the same reason as `systemPrompt` above — the eval
+    /// harness derives all three arms' request payloads from this array.
+    let tools: [[String: Any]] = [
         [
             "type": "function",
             "function": [

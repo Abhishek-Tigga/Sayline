@@ -73,6 +73,30 @@ and [CHANGELOG.md](CHANGELOG.md).
   sites read `APIKeyProvider.groqAPIKey`. Roughly 30 lines plus a
   Settings field. Not needed for arms A and B.
 
+- **Live-verify the settings fixes that never got a clean run**
+  (requested 2026-08-09 — raise this as soon as the harness has run and
+  OpenAI is wired up). Three changes shipped today were never confirmed
+  working in the actual app, because every attempt was rejected by the
+  Groq daily token cap before reaching the router:
+  - `"open general settings"` → should open About (macOS has no General
+    pane; aliased).
+  - `"open dock settings"` → should open Desktop & Dock. Note Whisper
+    reliably hears this as "doc", and the model did map it correctly
+    live before the request died — so this is really testing the
+    display-name override, not the matcher.
+  - `"open settings"` → should open the System Settings *app* via
+    `openApp`, not hit the do-nothing fallback. This is the regression
+    fixed in `de17653` and is the most important of the three, since it
+    was broken by an earlier fix rather than being a pre-existing gap.
+
+  All three are already cases in `eval/router-test-set.json`
+  (`settings-general`, `settings-dock-asr-noise`,
+  `open-settings-app-itself`), so an eval run covers the *routing*
+  decision. That is not the same as live verification: the eval scores
+  what the router decides, while only the real app proves the pane
+  actually opens. Do both — the eval first (cheaper, repeatable), the
+  live check once to confirm the executor end.
+
 - **Teach the eval methodology back to Abhishek** (requested
   2026-08-09 — surface this when the eval work is done, or whenever he
   asks about it). He asked for the harness to be *built* first without
