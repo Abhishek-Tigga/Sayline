@@ -73,6 +73,26 @@ and [CHANGELOG.md](CHANGELOG.md).
   sites read `APIKeyProvider.groqAPIKey`. Roughly 30 lines plus a
   Settings field. Not needed for arms A and B.
 
+- **Teach the eval methodology back to Abhishek** (requested
+  2026-08-09 — surface this when the eval work is done, or whenever he
+  asks about it). He asked for the harness to be *built* first without
+  a walkthrough, then explained afterwards: he's a PM learning to build
+  hands-on, so the goal is transferable industry practice, not a tour
+  of this repo's files. Worth covering when the time comes: why a
+  frozen test set beats ad-hoc manual testing (this whole session is
+  the cautionary tale — same bug resurfacing in different clothes
+  because nothing was ever measured twice the same way); why the test
+  set must be written *before* the implementation; why scoring has to
+  be mechanical rather than a human judging output quality; what
+  regression cases are and why passing-cases belong in the set;
+  golden/reference datasets and how real teams build them; the
+  difference between offline eval and production monitoring; and where
+  this sits relative to how LLM products are actually evaluated in
+  industry (eval-driven development, LLM-as-judge and its pitfalls,
+  why benchmark scores rarely predict your specific task). Use
+  `eval/router-test-set.json` as the concrete worked example since he
+  will have watched it get built.
+
   **Guardrails, agreed in this order:**
   1. **Write the test set before the implementation.** Building first
      and designing the test after means unconsciously picking cases the

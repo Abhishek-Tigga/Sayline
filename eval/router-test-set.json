@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "created": "2026-08-09",
+  "about": "Frozen test set for the agent router. Written BEFORE any candidate implementation exists, so no arm can be tuned against it after the fact. Every case marked source 'live-log' is a verbatim transcript Whisper actually produced during real use on 2026-08-09 — including its mishearings ('doc' for 'dock', 'Closed' for 'Close'), which are real input the router must survive. Cases marked 'constructed' fill coverage gaps for actions that were never exercised live.",
+  "scoring": "Mechanical only. An arm passes a case when the produced action list matches `expect` on action name and on every argument listed. Arguments not listed are ignored. Never score by judging whether output 'looks reasonable'.",
+  "cases": [
+    {
+      "id": "open-app-safari",
+      "transcript": "Open Safari",
+      "source": "live-log",
+      "expect": [{ "action": "openApp", "args": { "name": "Safari" } }],
+      "guards": "Simplest happy path, verified working today. Any arm that breaks this is disqualified regardless of other scores."
+    },
+    {
+      "id": "open-app-finder",
+      "transcript": "Open Finder",
+      "source": "live-log",
+      "expect": [{ "action": "openApp", "args": { "name": "Finder" } }],
+      "guards": "Second app to catch a name-specific fluke."
+    },
+    {
+      "id": "open-app-preview",
+      "transcript": "Open preview.",
+      "source": "live-log",
+      "expect": [{ "action": "openApp", "args": { "name": "Preview" } }],
+      "guards": "Lowercase app name plus trailing period. Never got a clean run today (rate-limited every attempt), so genuinely unmeasured."
+    },
+    {
+      "id": "open-settings-app-itself",
+      "transcript": "Open Settings",
+      "source": "live-log",
+      "expect": [{ "action": "openApp", "args": { "name": "System Settings" } }],
+      "guards": "Debatable and important: 'open settings' with no pane named should open the System Settings app, NOT route to open_system_setting with a bogus pane. The model got this right live and only failed on malformed syntax. If an arm routes this to a pane lookup it will hit the no-match fallback and now do nothing at all — a real UX regression introduced 2026-08-09."
+    },
+    {
+      "id": "close-app-safari",
+      "transcript": "Close Safari",
+      "source": "live-log",
+      "expect": [{ "action": "closeApp", "args": { "name": "Safari" } }],
+      "guards": "Verified working today after initially looking broken (it was rate limiting, not a bug)."
+    },
+    {
+      "id": "close-app-asr-noise",
+      "transcript": "Closed Safari",
+      "source": "live-log",
+      "expect": [{ "action": "closeApp", "args": { "name": "Safari" } }],
+      "guards": "Whisper heard 'Closed' for 'Close'. Real ASR noise; the router should still read the intent."
+    },
+    {
+      "id": "find-file-resume",
+      "transcript": "Find my latest resume in downloads folder.",
+      "source": "live-log",
+      "expect": [{ "action": "findFile", "args": { "query": "resume", "folder": "Downloads" } }],
+      "guards": "Verified working today. Multi-argument extraction — the query must not swallow 'my latest' or 'folder'."
+    },
+    {
+      "id": "open-folder-downloads",
+      "transcript": "Open my downloads folder",
+      "source": "constructed",
+      "expect": [{ "action": "openFolder", "args": { "folder": "Downloads" } }],
+      "guards": "openFolder vs findFile is a genuine ambiguity — browsing a folder, not searching inside it."
+    },
+    {
+      "id": "settings-keyboard",
+      "transcript": "Open keyboard settings.",
+      "source": "live-log",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Keyboard" } }],
+      "guards": "Verified working today, and only after the matcher fix — this exact phrase was a NO MATCH before 2026-08-09."
+    },
+    {
+      "id": "settings-screen-time-explicit",
+      "transcript": "Open Screen Time Settings",
+      "source": "live-log",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Screen Time" } }],
+      "guards": "Worked live. Pair it with settings-screen-time-implicit below: same destination, different phrasing, only one of them malformed."
+    },
+    {
+      "id": "settings-screen-time-implicit",
+      "transcript": "Show my screen time.",
+      "source": "live-log",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Screen Time" } }],
+      "guards": "The worst offender today: malformed tool call on every attempt including the higher-temperature retry, twice. If an arm fixes only one case, this is the one that matters. 'Show my X' phrasing without the word 'settings'."
+    },
+    {
+      "id": "settings-dock-asr-noise",
+      "transcript": "Open doc settings",
+      "source": "live-log",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Desktop & Dock" } }],
+      "guards": "Whisper heard 'doc' for 'dock'. The model DID map it to 'Desktop & Dock' correctly live — then malformed the wrapper. Tests semantic mapping through ASR noise."
+    },
+    {
+      "id": "settings-general",
+      "transcript": "Open general settings.",
+      "source": "live-log",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "About" } }],
+      "guards": "Debatable expectation, recorded deliberately: macOS has no General pane (verified — it is a sidebar category), so 'general' is aliased to About, the first pane inside it. If we later decide a different target is better, change it HERE first, then re-run. Never measured live — every attempt was rate-limited."
+    },
+    {
+      "id": "settings-wallpaper",
+      "transcript": "Change my wallpaper",
+      "source": "constructed",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Wallpaper" } }],
+      "guards": "Intent phrased as an action, not as 'open X settings'. Wallpaper was one of the panes the old hardcoded enum could never reach."
+    },
+    {
+      "id": "settings-touch-id",
+      "transcript": "Open password settings",
+      "source": "constructed",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Touch ID & Password" } }],
+      "guards": "User-confirmed rule: 'password settings' means the Touch ID & Password pane, NOT the standalone Passwords app. Regression guard on an explicit product decision."
+    },
+    {
+      "id": "settings-wifi-view",
+      "transcript": "Open Wi-Fi settings",
+      "source": "constructed",
+      "expect": [{ "action": "openSystemSetting", "args": { "pane": "Wi-Fi" } }],
+      "guards": "Must NOT become setWiFi. Viewing the pane vs toggling the radio — the pair with wifi-toggle-off below is the whole point."
+    },
+    {
+      "id": "wifi-toggle-off",
+      "transcript": "Turn off Wi-Fi",
+      "source": "constructed",
+      "expect": [{ "action": "setWiFi", "args": { "enabled": false } }],
+      "guards": "Must NOT become openSystemSetting. Direct action takes precedence when a direction is stated."
+    },
+    {
+      "id": "settings-unknown-pane",
+      "transcript": "Open banana settings",
+      "source": "constructed",
+      "expect": [{ "action": "openSystemSettingsFallback" }],
+      "guards": "Nonsense pane must reach the visible fallback rather than silently matching something adjacent. Guards against over-eager fuzzy matching."
+    },
+    {
+      "id": "volume-mute",
+      "transcript": "Mute the volume",
+      "source": "constructed",
+      "expect": [{ "action": "setVolume", "args": { "change": "Mute" } }],
+      "guards": "Enum argument extraction."
+    },
+    {
+      "id": "volume-up",
+      "transcript": "Turn the volume up",
+      "source": "constructed",
+      "expect": [{ "action": "setVolume", "args": { "change": "Up" } }],
+      "guards": "Same tool, different enum value — catches an arm that always picks the first enum member."
+    },
+    {
+      "id": "dark-mode-on",
+      "transcript": "Switch to dark mode",
+      "source": "constructed",
+      "expect": [{ "action": "setDarkMode", "args": { "enabled": true } }],
+      "guards": "Boolean argument. Must not route to an Appearance pane open."
+    },
+    {
+      "id": "lock-screen",
+      "transcript": "Lock my screen",
+      "source": "constructed",
+      "expect": [{ "action": "lockScreen" }],
+      "guards": "No-argument tool. Must not be confused with the Lock Screen settings pane."
+    },
+    {
+      "id": "empty-trash",
+      "transcript": "Empty the trash",
+      "source": "constructed",
+      "expect": [{ "action": "emptyTrash" }],
+      "guards": "No-argument tool, and the one irreversible action — a false positive here destroys data."
+    },
+    {
+      "id": "screenshot",
+      "transcript": "Take a screenshot",
+      "source": "constructed",
+      "expect": [{ "action": "takeScreenshot" }],
+      "guards": "No-argument tool."
+    },
+    {
+      "id": "query-battery",
+      "transcript": "What's my battery at",
+      "source": "constructed",
+      "expect": [{ "action": "answerQuery", "args": { "query": "Battery" } }],
+      "guards": "Question, not command. Must reach answerQuery rather than any side-effecting tool."
+    },
+    {
+      "id": "query-storage",
+      "transcript": "How much storage do I have left",
+      "source": "constructed",
+      "expect": [{ "action": "answerQuery", "args": { "query": "Storage" } }],
+      "guards": "Must NOT open the Storage settings pane — asking a question vs opening a pane is a real confusion risk now that Storage exists in the catalog."
+    },
+    {
+      "id": "query-now-playing",
+      "transcript": "What's playing right now",
+      "source": "constructed",
+      "expect": [{ "action": "answerQuery", "args": { "query": "NowPlaying" } }],
+      "guards": "Query enum coverage."
+    },
+    {
+      "id": "multi-action",
+      "transcript": "Open Safari, then tell me my battery",
+      "source": "constructed",
+      "expect": [
+        { "action": "openApp", "args": { "name": "Safari" } },
+        { "action": "answerQuery", "args": { "query": "Battery" } }
+      ],
+      "guards": "Two actions in one utterance, in order. Tool calling returns a native array; JSON mode needs our own array shape, so this is where arm B is most likely to differ."
+    },
+    {
+      "id": "out-of-scope-weather",
+      "transcript": "What's the weather tomorrow",
+      "source": "constructed",
+      "expect": [],
+      "guards": "Nothing matches — must return an empty action list, not force a bad fit into open_app. Tool calling gets this free via tool_choice auto; JSON mode needs an explicit empty-array convention in the prompt."
+    },
+    {
+      "id": "out-of-scope-email",
+      "transcript": "Check my email for anything from a recruiter",
+      "source": "constructed",
+      "expect": [],
+      "guards": "Plausible-sounding but genuinely unbuilt capability. Tempting for a model to map onto open_app('Mail'), which would be wrong — the user asked to search, not to launch."
+    }
+  ]
+}
