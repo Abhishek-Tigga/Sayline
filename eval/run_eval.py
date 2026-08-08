@@ -454,7 +454,15 @@ def main():
             else:
                 print(f"    actual:   {json.dumps(actual)}")
 
-    if not args.no_record:
+    # A run where nothing reached the model measures the harness, not the
+    # arm. Recording it as 0% accuracy would put a row in the results table
+    # that reads like a real result and isn't — happened once on 2026-08-08
+    # with a truncated API key.
+    every_case_errored = n > 0 and all(r["error"] for _, r in results)
+    if every_case_errored:
+        print("\nEvery case errored before reaching the model — not recording this run.")
+
+    if not args.no_record and not every_case_errored:
         row = (f"| {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} | `{commit}` | "
                f"{args.arm} | `{model}` | {passed}/{n} ({acc:.0f}%) | "
                f"{syntax_failures} ({syn:.0f}%) | {med_tok} | {med_lat} ms |")
