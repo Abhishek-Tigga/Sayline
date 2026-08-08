@@ -176,15 +176,17 @@ and [CHANGELOG.md](CHANGELOG.md).
   system prompt, score each output with the same disallowed-edit-
   fraction logic `TranscriptCleanupValidator` uses, and compare. First
   attempt (2026-08-08) failed before producing any real data — all 10
-  Groq API calls came back HTTP 403, and the follow-up diagnostic curl
-  (to see the actual error body) was blocked by the auto-mode
-  permission classifier since it echoed key-related output. Root cause
-  of the 403 was never established — could be the stored key, could be
-  the test script. **Before re-attempting: confirm the key still works
-  via a real dictation in the app itself first**, so a second blind
-  failure doesn't waste another round. The 70B swap itself stays on
-  hold until this test actually runs and shows a real difference —
-  don't swap on assumption.
+  Groq API calls came back HTTP 403 and the cause went unidentified at
+  the time. **Root cause found 2026-08-09: Groq sits behind Cloudflare,
+  which rejects Python's default `Python-urllib/x.y` User-Agent with
+  403 "error code: 1010"** — no rate-limit headers, no JSON body,
+  nothing resembling an API error, which is why it read like a bad key.
+  Any honest agent string is accepted; `eval/run_eval.py` now sends
+  `Sayline-Eval/1.0`. Nothing was ever wrong with the key. Reuse
+  `post_json` from the eval harness rather than writing a fresh
+  request, and this cannot recur. The 70B swap itself stays on hold
+  until the test actually runs and shows a real difference — don't swap
+  on assumption.
 - **List-shaped query answers** (e.g. "what are the biggest files in my
   Downloads folder"). Single-fact queries (battery, storage, memory,
   uptime, volume, macOS version, now-playing) shipped 2026-08-05, all

@@ -160,7 +160,18 @@ def read_key(env_var, keychain_account):
 def post_json(url, key, payload, timeout=60):
     req = urllib.request.Request(
         url, data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            # Required, not cosmetic: Groq sits behind Cloudflare, which
+            # rejects Python's default "Python-urllib/x.y" agent outright
+            # with HTTP 403 "error code: 1010" — no rate-limit headers, no
+            # JSON body, nothing that looks like an API error. That is what
+            # sank the first A/B attempt on 2026-08-08 and got misread as a
+            # possible bad key. Any honest agent string is accepted; this
+            # does not need to impersonate a browser.
+            "User-Agent": "Sayline-Eval/1.0",
+        },
         method="POST",
     )
     started = time.monotonic()
@@ -407,7 +418,15 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="build payloads, make no API calls")
     ap.add_argument("--limit", type=int, default=None, help="run only the first N cases")
     ap.add_argument("--no-record", action="store_true", help="skip appending to results.md")
+    ap.add_argument("--delay", type=float, default=None,
+                    help="seconds between calls; defaults to 0.4 for OpenAI, 13 for Groq")
     args = ap.parse_args()
+
+    # Groq's free tier allows 12,000 tokens per minute and a router call
+    # costs ~2,400, so roughly five calls per minute is the ceiling. Firing
+    # them back to back just produces a run full of 429s that measures
+    # nothing. OpenAI's Tier 1 limits are far higher and need no pacing.
+    delay = args.delay if args.delay is not None else (0.4 if args.arm == "openai" else 13.0)
 
     model = args.model or ("gpt-5-nano" if args.arm == "openai" else GROQ_MODEL)
     suite = json.loads(TEST_SET.read_text())
@@ -454,7 +473,8 @@ def main():
         results.append((case, r))
         flag = "ERR " if r["error"] else "    "
         print(f"  {i:>2}/{len(cases)} {flag}{case['id']}")
-        time.sleep(0.4)  # be kind to the per-minute limit
+        if i < len(cases):
+            time.sleep(delay)
 
     print("\nResolving pane strings through the real SettingsPaneCatalog …")
     pane_resolutions = swift_helper("resolve-panes", "\n".join(sorted(pane_strings))) \
