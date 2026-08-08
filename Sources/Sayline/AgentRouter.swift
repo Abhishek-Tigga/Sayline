@@ -340,7 +340,71 @@ final class AgentRouter {
             return []
         }
 
-        return toolCalls.compactMap(parseAction)
+        return correctedSettingsPane(toolCalls.compactMap(parseAction), transcript: transcript)
+    }
+
+    /// Deterministic correction for "<X> settings" where X names a real
+    /// pane but the model opened the Settings app instead of that pane.
+    ///
+    /// Measured 2026-08-09 via `eval/`: four of five OpenAI models routed
+    /// "open general settings" to `open_app("System Settings")`. It's an
+    /// understandable reading — "general" sounds like a hedge rather than
+    /// a pane name — but it loses the user's actual target, and prompt
+    /// wording did not fix it (two attempts, both measured, both
+    /// reverted). The catalog already knows where these go, so the
+    /// mapping is enforced here rather than left to model compliance.
+    ///
+    /// Deliberately narrow: it only fires when the model produced exactly
+    /// one action *and* that action was "open the Settings app" or the
+    /// no-match fallback — i.e. only when the model already signalled it
+    /// couldn't place the request. A model that confidently picked the
+    /// wrong pane is left alone, since overriding that would be guessing
+    /// against a real decision rather than filling a gap.
+    private func correctedSettingsPane(_ actions: [AgentAction], transcript: String) -> [AgentAction] {
+        guard actions.count == 1 else { return actions }
+
+        let modelPunted: Bool
+        if case .openApp(let name) = actions[0], SettingsPaneCatalog.meansSystemSettingsApp(name) {
+            modelPunted = true
+        } else if case .openSystemSettingsFallback = actions[0] {
+            modelPunted = true
+        } else {
+            modelPunted = false
+        }
+
+        guard modelPunted,
+              let phrase = Self.panePhrase(in: transcript),
+              let bundleID = SettingsPaneCatalog.bundleID(forPaneName: phrase) else {
+            return actions
+        }
+
+        NSLog("Sayline: transcript said \"\(phrase) settings\" but the model opened System Settings itself — routing to the \(phrase) pane instead")
+        return [.openSystemSetting(paneName: phrase, bundleID: bundleID)]
+    }
+
+    /// The words sitting between a lead-in ("open", "show", "my", …) and
+    /// the word "settings" — "open general settings." yields "general",
+    /// "open touch id and password settings" yields the whole phrase.
+    /// Returns nil when nothing meaningful precedes it, which is exactly
+    /// the "open settings" / "open system settings" case that legitimately
+    /// means the app and must not be corrected.
+    /// Internal so `eval/run_eval.py` can apply the same correction the app
+    /// applies — otherwise the eval scores wire-level model output and
+    /// reports failures production no longer has.
+    static func panePhrase(in transcript: String) -> String? {
+        let words = transcript.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+        guard let settingsIndex = words.lastIndex(where: { $0 == "settings" || $0 == "setting" }) else {
+            return nil
+        }
+        let leadIns: Set<String> = ["open", "show", "launch", "go", "to", "the", "my", "me", "system", "in", "into", "up", "bring"]
+        var start = settingsIndex
+        while start > 0, !leadIns.contains(words[start - 1]) {
+            start -= 1
+        }
+        guard start < settingsIndex else { return nil }
+        return words[start..<settingsIndex].joined(separator: " ")
     }
 
     private func parseAction(from toolCall: [String: Any]) -> AgentAction? {

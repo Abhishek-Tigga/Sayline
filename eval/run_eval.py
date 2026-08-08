@@ -78,6 +78,23 @@ if mode == "dump-config" {
     let payload: [String: Any] = ["systemPrompt": router.systemPrompt, "tools": router.tools]
     let data = try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
     print(String(data: data, encoding: .utf8)!)
+} else if mode == "pane-phrases" {
+    // For each transcript, what phrase sits before "settings" and where
+    // does the catalog send it? Lets the harness reproduce
+    // AgentRouter.correctedSettingsPane without reimplementing either the
+    // phrase extraction or the matching in Python.
+    let byID = Dictionary(SettingsPaneCatalog.panes.map { ($0.bundleID, $0.displayName) },
+                          uniquingKeysWith: { a, _ in a })
+    var out: [String: [String: String]] = [:]
+    while let line = readLine(strippingNewline: true) {
+        if line.isEmpty { continue }
+        guard let phrase = AgentRouter.panePhrase(in: line) else { continue }
+        if let id = SettingsPaneCatalog.bundleID(forPaneName: phrase) {
+            out[line] = ["phrase": phrase, "displayName": byID[id] ?? id]
+        }
+    }
+    let data = try! JSONSerialization.data(withJSONObject: out, options: [.sortedKeys])
+    print(String(data: data, encoding: .utf8)!)
 } else if mode == "resolve-panes" {
     let byID = Dictionary(SettingsPaneCatalog.panes.map { ($0.bundleID, $0.displayName) },
                           uniquingKeysWith: { a, _ in a })
@@ -319,9 +336,10 @@ def run_arm(arm, model, config, transcript, keys):
 # Normalizing and scoring
 # --------------------------------------------------------------------------
 
-def normalize(raw_calls, pane_resolutions):
+def normalize(raw_calls, pane_resolutions, correction=None):
     """Wire-level calls -> the action vocabulary the test set uses, with pane
-    strings resolved exactly as AgentRouter.parseAction would resolve them."""
+    strings resolved exactly as AgentRouter.parseAction would resolve them,
+    then AgentRouter.correctedSettingsPane applied on top."""
     actions = []
     for name, args in raw_calls:
         mapped = TOOL_TO_ACTION.get(name)
@@ -345,6 +363,20 @@ def normalize(raw_calls, pane_resolutions):
                 action_name, out_args = "openSystemSettingsFallback", {}
 
         actions.append({"action": action_name, "args": out_args})
+
+    # Mirrors AgentRouter.correctedSettingsPane: when the transcript named a
+    # pane but the model punted to the Settings app (or the fallback), the
+    # catalog's answer wins. Same narrow conditions as the Swift.
+    if correction and len(actions) == 1:
+        only = actions[0]
+        punted = (
+            (only["action"] == "openApp"
+             and str(only["args"].get("name", "")).lower() == "system settings")
+            or only["action"] == "openSystemSettingsFallback"
+        )
+        if punted:
+            return [{"action": "openSystemSetting",
+                     "args": {"pane": correction["displayName"]}}]
     return actions
 
 
@@ -427,11 +459,13 @@ def main():
     print("\nResolving pane strings through the real SettingsPaneCatalog …")
     pane_resolutions = swift_helper("resolve-panes", "\n".join(sorted(pane_strings))) \
         if pane_strings else {}
+    corrections = swift_helper("pane-phrases", "\n".join(c["transcript"] for c in cases))
 
     passed, syntax_failures, other_errors = 0, 0, 0
     tokens, latencies, failures = [], [], []
     for case, r in results:
-        actual = normalize(r["raw_calls"], pane_resolutions)
+        actual = normalize(r["raw_calls"], pane_resolutions,
+                           corrections.get(case["transcript"]))
         ok = (not r["error"]) and case_passes(case["expect"], actual)
         if ok:
             passed += 1
