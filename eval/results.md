@@ -11,3 +11,4 @@ existed and has been removed.
 
 | When | Commit | Arm | Model | Accuracy | Syntax failures | Median tokens | Median latency |
 |---|---|---|---|---|---|---|---|
+| 2026-08-08 21:17 UTC | `a2ef4fc` | openai | `gpt-5-nano` | 26/30 (87%) | 0 (0%) | 1602 | 2952 ms |
