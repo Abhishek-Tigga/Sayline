@@ -523,15 +523,19 @@ def main():
             else:
                 print(f"    actual:   {json.dumps(actual)}")
 
-    # A run where nothing reached the model measures the harness, not the
-    # arm. Recording it as 0% accuracy would put a row in the results table
-    # that reads like a real result and isn't — happened once on 2026-08-08
-    # with a truncated API key.
-    every_case_errored = n > 0 and all(r["error"] for _, r in results)
-    if every_case_errored:
-        print("\nEvery case errored before reaching the model — not recording this run.")
+    # A run where most cases never reached the model measures the harness or
+    # the account's rate limits, not the arm. Recording it would put a row in
+    # the table that reads like a real result and isn't. The first version of
+    # this only skipped when *every* case errored, which let a Groq run
+    # through at 27/30 errored and 2/30 accuracy — a meaningless number that
+    # looked like a catastrophic baseline. Anything above a fifth is junk.
+    error_rate = (sum(1 for _, r in results if r["error"]) / n) if n else 0
+    unusable = error_rate > 0.2
+    if unusable:
+        print(f"\n{error_rate:.0%} of cases errored before reaching the model — "
+              "not recording this run. Fix the cause and re-run.")
 
-    if not args.no_record and not every_case_errored:
+    if not args.no_record and not unusable:
         row = (f"| {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC} | `{commit}` | "
                f"{args.arm} | `{model}` | {passed}/{n} ({acc:.0f}%) | "
                f"{syntax_failures} ({syn:.0f}%) | {med_tok} | {med_lat} ms |")
