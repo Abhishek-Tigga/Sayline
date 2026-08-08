@@ -22,9 +22,16 @@ enum FocusedAppReader {
     /// Electron-based) whose deeper accessibility trees are thin —
     /// this is the practical signal for probing whether an app reveals
     /// its current mode/tab in its title, since bundle ID alone can't.
+    /// Same reasoning as TextInjector.axTimeout: this runs at hotkey-down,
+    /// and an unbounded AX call against a slow app stalls the caller. A
+    /// missing window title only costs context detection accuracy, which is
+    /// a far better outcome than a stalled thread.
+    private static let axTimeout: Float = 0.5
+
     private static func focusedWindowTitle(pid: pid_t?) -> String? {
         guard let pid else { return nil }
         let axApp = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(axApp, axTimeout)
 
         var windowRef: AnyObject?
         guard AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
@@ -32,6 +39,7 @@ enum FocusedAppReader {
             return nil
         }
         let window = windowRef as! AXUIElement
+        AXUIElementSetMessagingTimeout(window, axTimeout)
 
         var titleRef: AnyObject?
         guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleRef) == .success else {

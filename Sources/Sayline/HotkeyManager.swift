@@ -13,6 +13,19 @@ final class HotkeyManager {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    /// The tap gets its own thread and run loop. It used to live on the
+    /// main run loop, which meant every tap callback queued behind
+    /// whatever the main thread was doing — including the synchronous
+    /// Accessibility IPC in FocusedAppReader and TextInjector. When those
+    /// blocked (Electron apps answer AX slowly), macOS could not deliver
+    /// events to the tap, held keyboard and mouse input while it waited,
+    /// and then disabled the tap with kCGEventTapDisabledByTimeout. That
+    /// held input *is* a system-wide freeze: observed live 2026-08-09,
+    /// three times in ~3 hours, with six timeout events logged in one
+    /// 65-second window. On a dedicated thread the callback answers
+    /// immediately no matter what the app is doing.
+    private var tapThread: Thread?
+    private var tapDidInstall = false
     private var isHotkeyActive = false
     /// Guards against keyboard auto-repeat: holding Space sends many
     /// rapid keyDown events, not just one, so without this we'd fire
@@ -27,10 +40,41 @@ final class HotkeyManager {
     /// dictation unless Space is pressed again during that hold.
     var onAgentModeRequested: (() -> Void)?
 
+    /// Spins up the tap thread and waits briefly for it to report whether
+    /// the tap was created, so callers keep the synchronous success/failure
+    /// contract they had when this ran inline on the main thread.
     @discardableResult
     func start() -> Bool {
-        guard eventTap == nil else { return true }
+        guard tapThread == nil else { return true }
 
+        let ready = DispatchSemaphore(value: 0)
+        let thread = Thread { [weak self] in
+            guard let self else { ready.signal(); return }
+            self.tapDidInstall = self.installTap()
+            ready.signal()
+            guard self.tapDidInstall else { return }
+            // A plain CFRunLoopRun() would never return, so the loop is
+            // driven in short slices to stay cancellable.
+            while !Thread.current.isCancelled {
+                CFRunLoopRunInMode(.defaultMode, 0.25, false)
+            }
+            self.uninstallTap()
+        }
+        thread.name = "com.abhishektigga.sayline.event-tap"
+        // Input handling is as latency-critical as it gets — this thread
+        // must never be deprioritised behind background work.
+        thread.qualityOfService = .userInteractive
+        tapThread = thread
+        thread.start()
+
+        _ = ready.wait(timeout: .now() + 2)
+        if !tapDidInstall {
+            tapThread = nil
+        }
+        return tapDidInstall
+    }
+
+    private func installTap() -> Bool {
         let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
             | CGEventMask(1 << CGEventType.keyDown.rawValue)
         let selfPointer = Unmanaged.passUnretained(self).toOpaque()
@@ -56,18 +100,27 @@ final class HotkeyManager {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        NSLog("Sayline: hotkey listener started (hold \(hotkeyOption.displayName))")
+        NSLog("Sayline: hotkey listener started on its own thread (hold \(hotkeyOption.displayName))")
         return true
     }
 
     func stop() {
-        guard let tap = eventTap else { return }
-        CGEvent.tapEnable(tap: tap, enable: false)
+        tapThread?.cancel()
+        tapThread = nil
+    }
+
+    /// Runs on the tap thread as its run loop exits, so the source is
+    /// removed from the same run loop it was added to.
+    private func uninstallTap() {
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+        }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
         }
         eventTap = nil
         runLoopSource = nil
+        tapDidInstall = false
     }
 
     private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {

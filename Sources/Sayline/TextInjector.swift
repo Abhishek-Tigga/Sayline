@@ -27,14 +27,26 @@ enum TextInjector {
 
     // MARK: - Direct AX insertion
 
+    /// Accessibility calls are synchronous cross-process IPC, and without an
+    /// explicit cap they inherit a system default measured in seconds. A slow
+    /// target (Electron apps are the usual culprit) therefore stalls whichever
+    /// thread makes the call. That stall is what starved the event tap and
+    /// froze system input on 2026-08-09 — see HotkeyManager.tapThread. Half a
+    /// second is far longer than a healthy app needs and short enough that a
+    /// wedged one just drops to the clipboard fallback.
+    private static let axTimeout: Float = 0.5
+
     private static func insertViaAccessibility(_ text: String) -> Bool {
         let systemWide = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(systemWide, axTimeout)
         var focusedRef: AnyObject?
         let focusResult = AXUIElementCopyAttributeValue(
             systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef
         )
         guard focusResult == .success, let focusedRef else { return false }
         let element = focusedRef as! AXUIElement
+        // The timeout is per-element, so the focused element needs its own.
+        AXUIElementSetMessagingTimeout(element, axTimeout)
 
         var settable: DarwinBoolean = false
         let settableResult = AXUIElementIsAttributeSettable(
