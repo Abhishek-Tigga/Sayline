@@ -9,6 +9,78 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **Agent router eval harness + JSON-mode migration** (agreed
+  2026-08-09, harness to be built first). Two linked pieces: a way to
+  *measure* the router, then a change to the router that needs
+  measuring.
+
+  Why now: every debugging round this session has been anecdotal — try
+  a phrase, read a log, guess. No fixed inputs, no score, no memory
+  between rounds, which is exactly why the same failure kept
+  resurfacing in different clothes. The harness exists to end that.
+
+  **The change being evaluated:** replace Groq tool-calling with JSON
+  object mode (`response_format: {"type": "json_object"}`, supported on
+  all Groq models incl. `llama-3.3-70b-versatile`; strict
+  schema-enforcing mode is GPT-OSS-only, so not an option here).
+  Rationale: tool calling makes the model emit a bespoke
+  `<function=name>{...}</function>` wrapper that Groq's server parses;
+  that wrapper is unconstrained learned behavior, and when the model
+  drops the `>` the whole request dies server-side with HTTP 400
+  `tool_use_failed`. Measured 60% of calls reaching the API in one
+  session log (n=5, biased toward hard cases). JSON mode has no wrapper
+  to malform. Also ~33% cheaper per call: measured the payload at
+  ~2,370 tokens, of which the tools array is 72% (~1,626), and 47% of
+  that array (~772 tokens) is pure JSON Schema scaffolding that prose
+  doesn't need. Blast radius is one file — `AgentAction`,
+  `SettingsPaneCatalog`, `AgentExecutor` are untouched.
+
+  **Guardrails, agreed in this order:**
+  1. **Write the test set before the implementation.** Building first
+     and designing the test after means unconsciously picking cases the
+     new version happens to pass — drawing the target around where the
+     arrow landed. ~20 transcripts with expected action + arguments,
+     checked into `eval/`.
+  2. **Include cases that already work,** not just broken ones
+     (`Open Safari`, `Close Safari`, `find my resume in downloads`) —
+     otherwise we fix syntax failures and silently regress action
+     selection, which is the specific risk JSON mode carries (tool
+     calling is a heavily trained path; JSON mode leans on our prompt).
+     Also include the session's real failures (`Show my screen time`,
+     `Open doc settings`, `Close settings`, `Open general settings`),
+     multi-action requests, and out-of-scope requests that must match
+     nothing.
+  3. **Baseline the current implementation first,** at commit
+     `4f80fe1`, on that same test set — same inputs, same scoring, so
+     the comparison isn't today's log vs. tomorrow's impression.
+  4. **Pass bar set up front, not judged in the moment:** syntax
+     failures → 0%; action accuracy ≥ baseline; tokens/call < ~1,800.
+     Syntax fixed but accuracy down is a *fail*, not a trade to
+     rationalize later.
+  5. **Branch, don't delete** (`agent-json-mode` off `main`) — the
+     established branch-per-experiment convention. Reverting stays a
+     `git checkout`, not a reconstruction.
+
+  **Scoring must be mechanical** — compare to expected values in the
+  file, never a judgment call about output quality, or it's vibes with
+  extra steps. Metrics: syntax failure rate (count of `tool_use_failed`
+  / unparseable), action accuracy (exact match on action + key args),
+  tokens per call (from `usage.prompt_tokens` in each response —
+  measured, not estimated), latency.
+
+  **Maintaining the score:** results checked into `eval/` as an
+  append-only file (date, commit SHA, implementation, the four
+  numbers), re-run whenever the router changes. It becomes a regression
+  guard — when a prompt tweak quietly breaks `find_file` months from
+  now, the numbers say so instead of a user noticing.
+
+  **Known constraint:** ~20 cases × 2 implementations × ~2,000 tokens ≈
+  80,000 tokens against a 100,000/day cap. Baseline and candidate runs
+  realistically fall on different days, or the set trims to ~12 cases.
+  This is the first concrete argument for a paid Groq tier — not for
+  daily use, but because you can't measure what you can't afford to
+  run.
+
 - **8B vs 70B cleanup compliance A/B test** (blocked, on hold — user
   explicitly parked this 2026-08-08; remind them of this item whenever
   they ask what's in the backlog). Before switching `TranscriptCleaner`

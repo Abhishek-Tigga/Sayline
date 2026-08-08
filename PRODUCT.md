@@ -43,6 +43,23 @@ and committed before moving on.
   both calls) and cost (see cost analysis below) — not because either model
   is uniquely best in class, but because the combination is fast and cheap
   enough to not be the bottleneck.
+  - **Swapping providers is deliberately asymmetric, and that's worth
+    knowing before planning a migration.** *Transcription* sits behind
+    the `Transcriber` protocol (one method, `transcribe(fileURL:) async
+    throws -> String`) — `GroqTranscriber` and `WhisperKitTranscriber`
+    already prove two very different backends fit it (one HTTP, one
+    on-device), so a third (Deepgram, OpenAI) is a new file conforming
+    to it plus a settings toggle, with nothing else touched. The *LLM*
+    calls have no such seam: `TranscriptCleaner` and `AgentRouter` each
+    hardcode `api.groq.com` and their model name. If a second LLM
+    provider ever becomes likely, extract a small protocol there first
+    rather than threading conditionals through both files — but don't
+    build it speculatively for one provider.
+  - **Rate limits are the real constraint, not price.** The free tier's
+    per-day token cap on the 70B router (100K TPD) was hit repeatedly
+    during a single testing session; cost at personal-use volume is
+    pennies. Evaluate any provider change on limits and reliability
+    first, cost second.
 - **One permission (Accessibility) gates both the hotkey and text
   insertion.** Deliberately avoided also requiring separate Input
   Monitoring permission — simpler permission story for the user.
