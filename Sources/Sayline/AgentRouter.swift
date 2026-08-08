@@ -347,7 +347,7 @@ final class AgentRouter {
     /// rather than absent. Mirrors `openai_strict_tools()` in
     /// `eval/run_eval.py` — if you change one, change both, or the eval
     /// stops describing production.
-    private static func strictTools(_ tools: [[String: Any]]) -> [[String: Any]] {
+    static func strictTools(_ tools: [[String: Any]]) -> [[String: Any]] {
         tools.map { tool in
             guard var function = tool["function"] as? [String: Any] else { return tool }
             let parameters = function["parameters"] as? [String: Any] ?? [:]
@@ -368,7 +368,12 @@ final class AgentRouter {
             function["parameters"] = [
                 "type": "object",
                 "properties": strictProperties,
-                "required": Array(properties.keys),
+                // Sorted, not raw dictionary order, which Swift does not
+                // guarantee between runs. JSON Schema ignores the order of
+                // `required`, but a payload that differs run to run defeats
+                // provider-side prompt caching and makes captured requests
+                // impossible to diff.
+                "required": properties.keys.sorted(),
                 "additionalProperties": false,
             ] as [String: Any]
             return ["type": "function", "function": function]

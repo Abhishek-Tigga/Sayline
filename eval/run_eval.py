@@ -68,7 +68,10 @@ TOOL_TO_ACTION = {
 
 SWIFT_STUBS = """
 enum TranscriptionError: Error { case missingAPIKey, invalidResponse, apiError(String) }
-enum APIKeyProvider { static var groqAPIKey: String? { nil } }
+enum APIKeyProvider {
+    static var groqAPIKey: String? { nil }
+    static var openAIAPIKey: String? { nil }
+}
 """
 
 SWIFT_MAIN = """
@@ -77,6 +80,10 @@ if mode == "dump-config" {
     let router = AgentRouter()
     let payload: [String: Any] = ["systemPrompt": router.systemPrompt, "tools": router.tools]
     let data = try! JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+    print(String(data: data, encoding: .utf8)!)
+} else if mode == "dump-strict-tools" {
+    let data = try! JSONSerialization.data(withJSONObject: AgentRouter.strictTools(AgentRouter().tools),
+                                           options: [.sortedKeys])
     print(String(data: data, encoding: .utf8)!)
 } else if mode == "pane-phrases" {
     // For each transcript, what phrase sits before "settings" and where
@@ -234,6 +241,8 @@ def openai_strict_tools(tools):
         params = fn.get("parameters", {}) or {}
         props = {k: dict(v) for k, v in (params.get("properties") or {}).items()}
         originally_required = set(params.get("required", []))
+        # Sorted to match AgentRouter.strictTools — see the note there on why
+        # a stable `required` order matters even though JSON Schema ignores it.
         for name, spec in props.items():
             if name not in originally_required:
                 base = spec.get("type", "string")
