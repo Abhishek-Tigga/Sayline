@@ -38,6 +38,11 @@ final class AgentRouter {
     "Touch ID & Password", NOT open_app("Passwords") — confirmed \
     directly by the user, do not second-guess this one.
 
+    That rule is about naming a *specific* pane. If the user just says \
+    "open settings" / "open system settings" without naming one, they \
+    want the app itself — use open_app with "System Settings", not \
+    open_system_setting.
+
     open_system_setting's pane parameter is free text, not a fixed \
     enum in the tool schema — pick the closest real match from this \
     list of every settings pane actually installed on this Mac, even \
@@ -361,6 +366,14 @@ final class AgentRouter {
             guard let paneRaw = arguments["pane"] as? String else { return nil }
             if let bundleID = SettingsPaneCatalog.bundleID(forPaneName: paneRaw) {
                 return .openSystemSetting(paneName: paneRaw, bundleID: bundleID)
+            }
+            // "open settings" with no pane named wants the app, not a pane.
+            // Handled deterministically here rather than trusting the
+            // prompt to always steer the model to open_app, since it
+            // demonstrably doesn't.
+            if SettingsPaneCatalog.meansSystemSettingsApp(paneRaw) {
+                NSLog("Sayline: agent router read pane \"\(paneRaw)\" as the System Settings app itself — opening the app")
+                return .openApp(name: "System Settings")
             }
             // Doesn't match anything in the live catalog even after fuzzy
             // normalization — fail visibly (open System Settings + flash

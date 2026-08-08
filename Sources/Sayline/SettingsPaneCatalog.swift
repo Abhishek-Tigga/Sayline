@@ -29,12 +29,12 @@ enum SettingsPaneCatalog {
     /// settings", "display", "Dock", and "General" all falling through to
     /// the failure path despite each naming a real pane.
     static func bundleID(forPaneName name: String) -> String? {
+        // "System Settings" / "Settings" means the app itself, not a pane.
+        // Left unmatched here on purpose — both so it can't subset-match
+        // its way into "System Extensions", and so the caller can route it
+        // to open_app instead (see meansSystemSettingsApp).
+        guard !meansSystemSettingsApp(name) else { return nil }
         let queryTokens = tokens(name)
-        // "System Settings" / "Settings" means the app itself, not a pane
-        // — the model does return this (seen live). Left unmatched on
-        // purpose so it hits the visible fallback rather than
-        // subset-matching its way into "System Extensions".
-        guard !queryTokens.isEmpty, queryTokens != ["system"] else { return nil }
 
         // 1. Whole-string match, punctuation and "and"/"&" folded away.
         //    Catches the cases token-splitting would break, notably
@@ -63,6 +63,18 @@ enum SettingsPaneCatalog {
             return nil
         }
         return scored.min(by: { $0.slack < $1.slack })?.pane.bundleID
+    }
+
+    /// True when the model's pane string names the System Settings app
+    /// rather than any pane inside it — "Settings", "System Settings", or
+    /// nothing left once noise words are stripped. Those requests want
+    /// the app opened, not a pane lookup, so the caller routes them to
+    /// open_app. Without this the no-match fallback swallows them and
+    /// (since 2026-08-09, when the fallback correctly stopped opening a
+    /// stale pane) "open settings" does nothing at all.
+    static func meansSystemSettingsApp(_ name: String) -> Bool {
+        let t = tokens(name)
+        return t.isEmpty || t == ["system"]
     }
 
     /// Folds "&" and the word "and" together so "Touch ID & Password"
