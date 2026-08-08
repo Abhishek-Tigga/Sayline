@@ -9,7 +9,14 @@ enum AgentAction {
     case closeApp(name: String)
     case findFile(query: String, folder: SearchFolder, subpath: String?)
     case openFolder(SearchFolder, subpath: String?)
-    case openSystemSetting(SettingsPane)
+    /// `bundleID` is resolved from the live `SettingsPaneCatalog` before
+    /// this case is ever constructed — no hardcoded pane enum here
+    /// anymore (see BACKLOG.md, "Dynamic System Settings pane catalog").
+    case openSystemSetting(paneName: String, bundleID: String)
+    /// Deterministic, visible fallback when the requested pane name
+    /// doesn't match anything in the live catalog — opens System
+    /// Settings itself rather than doing nothing silently.
+    case openSystemSettingsFallback(requestedPaneName: String)
     case lockScreen
     case setVolume(VolumeChange)
     case setWiFi(enabled: Bool)
@@ -50,24 +57,4 @@ enum AgentAction {
         case home = "Home"
     }
 
-    /// A curated set of the panes people actually ask for by voice —
-    /// not exhaustive. System Settings pane URL identifiers are notably
-    /// version-fragile across macOS releases, so this list may need
-    /// adjusting after live testing rather than trusting it blind.
-    enum SettingsPane: String, CaseIterable {
-        case privacySecurity = "PrivacySecurity"
-        case notifications = "Notifications"
-        case general = "General"
-        case displays = "Displays"
-        case sound = "Sound"
-        case network = "Network"
-        case bluetooth = "Bluetooth"
-        case wifi = "WiFi"
-        case users = "Users"
-        /// "Password settings" — explicitly confirmed to mean this pane
-        /// (Touch ID & Password, local login/unlock), not the standalone
-        /// Passwords app, which is a different thing (saved website/app
-        /// passwords) reachable via open_app instead.
-        case touchIDPassword = "TouchIDPassword"
-    }
 }

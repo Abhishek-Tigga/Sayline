@@ -22,8 +22,10 @@ enum AgentExecutor {
             return findFile(query: query, in: folder, subpath: subpath)
         case .openFolder(let folder, let subpath):
             return openFolder(folder, subpath: subpath)
-        case .openSystemSetting(let pane):
-            return openSystemSetting(pane)
+        case .openSystemSetting(let paneName, let bundleID):
+            return openSystemSetting(paneName: paneName, bundleID: bundleID)
+        case .openSystemSettingsFallback(let requestedPaneName):
+            return openSystemSettingsFallback(requestedPaneName: requestedPaneName)
         case .lockScreen:
             return lockScreen()
         case .setVolume(let change):
@@ -196,44 +198,32 @@ enum AgentExecutor {
         return didTerminate
     }
 
+    /// `bundleID` comes pre-resolved from the live `SettingsPaneCatalog`
+    /// (see AgentRouter.parseAction) — no hardcoded identifier switch
+    /// here anymore. Self-heals macOS version drift: the catalog is read
+    /// from whatever's actually installed, so there's no hand-copied
+    /// identifier left to go stale the way `.general`'s did before this
+    /// rewrite (see BACKLOG.md, "Dynamic System Settings pane catalog").
     @discardableResult
-    private static func openSystemSetting(_ pane: AgentAction.SettingsPane) -> Bool {
-        guard let url = URL(string: settingsURLString(for: pane)) else { return false }
+    private static func openSystemSetting(paneName: String, bundleID: String) -> Bool {
+        guard let url = URL(string: "x-apple.systempreferences:\(bundleID)") else { return false }
         let opened = NSWorkspace.shared.open(url)
-        NSLog("Sayline: agent opened system setting -> \(pane.rawValue) (success: \(opened))")
+        NSLog("Sayline: agent opened system setting -> \(paneName) [\(bundleID)] (success: \(opened))")
         return opened
     }
 
-    // Modern extension bundle identifiers, pulled directly from
-    // /System/Library/ExtensionKit/Extensions/*.appex/Contents/Info.plist
-    // on a live machine rather than guessed — several of the old
-    // com.apple.preference.* legacy IDs turned out to be wrong or to
-    // have been reassigned to a different pane (e.g. "general" now
-    // belongs to Appearance, not General; Network and Wi-Fi share one
-    // legacy ID and macOS picks Wi-Fi). Still version-fragile in
-    // principle, but these are verified against an actual install.
-    //
-    // .general's identifier was re-checked (2026-08-08) and found stale:
-    // com.apple.systempreferences.GeneralSettings doesn't match any
-    // extension actually installed on a live machine (scanned every
-    // .appex under /System/Library/ExtensionKit/Extensions directly) —
-    // `open` doesn't error on a bad identifier, it silently opens
-    // System Settings to whatever pane was last viewed, which looks
-    // like success but isn't. Corrected to the real Appearance
-    // extension, confirmed installed under that exact identifier.
-    private static func settingsURLString(for pane: AgentAction.SettingsPane) -> String {
-        switch pane {
-        case .privacySecurity: return "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension"
-        case .notifications: return "x-apple.systempreferences:com.apple.Notifications-Settings.extension"
-        case .general: return "x-apple.systempreferences:com.apple.Appearance-Settings.extension"
-        case .displays: return "x-apple.systempreferences:com.apple.Displays-Settings.extension"
-        case .sound: return "x-apple.systempreferences:com.apple.Sound-Settings.extension"
-        case .network: return "x-apple.systempreferences:com.apple.Network-Settings.extension"
-        case .bluetooth: return "x-apple.systempreferences:com.apple.BluetoothSettings"
-        case .wifi: return "x-apple.systempreferences:com.apple.wifi-settings-extension"
-        case .users: return "x-apple.systempreferences:com.apple.Users-Groups-Settings.extension"
-        case .touchIDPassword: return "x-apple.systempreferences:com.apple.Touch-ID-Settings.extension"
-        }
+    /// Deliberately opens nothing. The first version of this did open
+    /// System Settings via the bare `x-apple.systempreferences:` scheme,
+    /// which restores whatever pane was last viewed — so asking for a
+    /// pane we don't have surfaced an unrelated one (reported live
+    /// 2026-08-09: "open general settings" opened Screen Time). A wrong
+    /// pane reads as a wrong *answer*, which is worse than visibly doing
+    /// nothing; the flash message from AppDelegate is the whole response
+    /// now. Returns false so the caller reports it as a real failure.
+    @discardableResult
+    private static func openSystemSettingsFallback(requestedPaneName: String) -> Bool {
+        NSLog("Sayline: agent could not match settings pane \"\(requestedPaneName)\" in the catalog — doing nothing, flashing a message instead")
+        return false
     }
 
     /// Simulates Cmd+Ctrl+Q, the standard system Lock Screen shortcut —

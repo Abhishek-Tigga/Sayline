@@ -35,8 +35,15 @@ final class AgentRouter {
     (e.g. "open the Passwords app", "open Passwords") rather than \
     "settings". Concretely: "password settings" / "Touch ID and \
     password settings" -> open_system_setting with pane \
-    TouchIDPassword, NOT open_app("Passwords") — confirmed directly by \
-    the user, do not second-guess this one.
+    "Touch ID & Password", NOT open_app("Passwords") — confirmed \
+    directly by the user, do not second-guess this one.
+
+    open_system_setting's pane parameter is free text, not a fixed \
+    enum in the tool schema — pick the closest real match from this \
+    list of every settings pane actually installed on this Mac, even \
+    if the user's phrasing isn't an exact match (e.g. "change my \
+    wallpaper" -> "Wallpaper", "trackpad settings" -> "Trackpad"): \
+    \(SettingsPaneCatalog.panes.map { $0.displayName }.joined(separator: ", ")).
     """
 
     private let tools: [[String: Any]] = [
@@ -122,18 +129,29 @@ final class AgentRouter {
                 ],
             ],
         ],
+        // pane is deliberately plain "type": "string" here, not an "enum"
+        // — putting the 49-entry SettingsPaneCatalog list directly into
+        // the JSON schema (as it was 2026-08-08) reliably caused Groq's
+        // llama-3.3-70b-versatile to emit malformed tool-call syntax
+        // specifically for settings requests (confirmed live via a
+        // stderr-captured log: `<function=open_app{...}` — missing the
+        // closing `>` — which Groq's parser then rejected outright with
+        // HTTP 400 "tool_use_failed" before the request ever reached our
+        // code). The pane vocabulary now lives as a prose list in
+        // systemPrompt instead, which the model handles more reliably;
+        // SettingsPaneCatalog.bundleID(forPaneName:) still fuzzy-matches
+        // whatever string comes back.
         [
             "type": "function",
             "function": [
                 "name": "open_system_setting",
-                "description": "Opens/shows a specific pane in the System Settings app so the user can look at or change something themselves — for VIEWING a pane, not for directly changing a value. For \"open Wi-Fi settings\" or \"show Wi-Fi settings\" (they want to see the pane), use this with pane WiFi. For \"turn Wi-Fi on/off\" (they want the actual change made now, no pane needs to open), use set_wifi instead, not this. \"password settings\" / \"Touch ID and password settings\" -> pane TouchIDPassword (this is the correct target, not the standalone Passwords app).",
+                "description": "Opens/shows a specific pane in the System Settings app so the user can look at or change something themselves — for VIEWING a pane, not for directly changing a value. For \"open Wi-Fi settings\" or \"show Wi-Fi settings\" (they want to see the pane), use this with pane \"Wi-Fi\". For \"turn Wi-Fi on/off\" (they want the actual change made now, no pane needs to open), use set_wifi instead, not this. \"password settings\" / \"Touch ID and password settings\" -> pane \"Touch ID & Password\" (this is the correct target, not the standalone Passwords app).",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "pane": [
                             "type": "string",
-                            "enum": ["PrivacySecurity", "Notifications", "General", "Displays", "Sound", "Network", "Bluetooth", "WiFi", "Users", "TouchIDPassword"],
-                            "description": "Which settings pane to open. TouchIDPassword covers Touch ID, local login password, and password/autofill preferences.",
+                            "description": "Which settings pane to open — see the pane list in the system prompt and pick the closest real match. Not a fixed enum here; free text is fine.",
                         ]
                     ],
                     "required": ["pane"],
@@ -236,7 +254,35 @@ final class AgentRouter {
         ],
     ]
 
+    /// Groq occasionally emits malformed tool-call syntax (a stochastic
+    /// generation slip, not something our request caused) and rejects its
+    /// own output with HTTP 400 "tool_use_failed" before anything reaches
+    /// us. One silent retry absorbs that — confirmed live (2026-08-08)
+    /// that the identical request succeeds on a second attempt.
+    private struct RetryableToolFailure: Error {
+        let message: String
+    }
+
     func route(_ transcript: String) async throws -> [AgentAction] {
+        do {
+            return try await performRoute(transcript, temperature: 0.1)
+        } catch let failure as RetryableToolFailure {
+            // Retry at a higher temperature, NOT the same 0.1. The first
+            // version of this retried identically and was useless:
+            // confirmed live (2026-08-09, "Show my screen time") that the
+            // retry reproduced a byte-identical malformed generation,
+            // because at 0.1 the model is near-deterministic — same input,
+            // same broken output. Sampling differently is the whole point.
+            NSLog("Sayline: agent router tool call malformed, retrying at higher temperature -> \(failure.message)")
+            do {
+                return try await performRoute(transcript, temperature: 0.6)
+            } catch let secondFailure as RetryableToolFailure {
+                throw TranscriptionError.apiError(secondFailure.message)
+            }
+        }
+    }
+
+    private func performRoute(_ transcript: String, temperature: Double) async throws -> [AgentAction] {
         guard let apiKey = APIKeyProvider.groqAPIKey else {
             throw TranscriptionError.missingAPIKey
         }
@@ -249,7 +295,7 @@ final class AgentRouter {
             ],
             "tools": tools,
             "tool_choice": "auto",
-            "temperature": 0.1,
+            "temperature": temperature,
         ]
 
         var request = URLRequest(url: endpoint)
@@ -265,6 +311,9 @@ final class AgentRouter {
         }
         guard httpResponse.statusCode == 200 else {
             let message = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+            if message.contains("tool_use_failed") {
+                throw RetryableToolFailure(message: message)
+            }
             throw TranscriptionError.apiError(message)
         }
 
@@ -309,12 +358,17 @@ final class AgentRouter {
             guard let appName = arguments["app_name"] as? String else { return nil }
             return .closeApp(name: appName)
         case "open_system_setting":
-            let paneRaw = arguments["pane"] as? String
-            guard let pane = Self.fuzzyMatch(paneRaw, as: AgentAction.SettingsPane.self) else {
-                NSLog("Sayline: agent router returned unmatched settings pane \(paneRaw ?? "nil")")
-                return nil
+            guard let paneRaw = arguments["pane"] as? String else { return nil }
+            if let bundleID = SettingsPaneCatalog.bundleID(forPaneName: paneRaw) {
+                return .openSystemSetting(paneName: paneRaw, bundleID: bundleID)
             }
-            return .openSystemSetting(pane)
+            // Doesn't match anything in the live catalog even after fuzzy
+            // normalization — fail visibly (open System Settings + flash
+            // a specific message in AppDelegate) rather than silently
+            // dropping the action, per the "fail visibly" principle the
+            // dynamic catalog was built around.
+            NSLog("Sayline: agent router returned unmatched settings pane \"\(paneRaw)\" — no catalog match")
+            return .openSystemSettingsFallback(requestedPaneName: paneRaw)
         case "lock_screen":
             return .lockScreen
         case "set_volume":

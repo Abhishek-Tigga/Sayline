@@ -30,42 +30,6 @@ and [CHANGELOG.md](CHANGELOG.md).
   failure doesn't waste another round. The 70B swap itself stays on
   hold until this test actually runs and shows a real difference —
   don't swap on assumption.
-- **Dynamic System Settings pane catalog** (design agreed 2026-08-08,
-  discussion ongoing — do not start building until the open discussion
-  points are settled). Root cause being fixed: the hardcoded
-  `SettingsPane` enum covers 10 panes while the OS ships ~56, so every
-  pane outside the list ("keyboard settings", "wallpaper") silently
-  fails, and each fix so far has been a one-off patch (Privacy, then
-  Touch ID & Password) rather than closing the class. Agreed design:
-  1. **Read the vocabulary from the OS, not a hand list.** At launch,
-     scan `/System/Library/ExtensionKit/Extensions/*.appex`, filter to
-     real settings extensions (extension point identifier contains the
-     settings extension points — verified filter works on a live
-     machine, yields 56 panes incl. Keyboard, Wallpaper, Trackpad,
-     Screen Time, Battery, Focus, Siri), build a
-     `SettingsPaneCatalog` of display name → `CFBundleIdentifier`.
-     Delete the hardcoded enum entirely. Also self-heals macOS version
-     drift (the stale-General-identifier bug becomes structurally
-     impossible — the catalog is read from the installed OS).
-  2. **Generate the router tool's `pane` enum at runtime** from the
-     catalog (lightly cleaned names: "MouseExtension" → "Mouse"), so
-     the 70B model does the semantic mapping ("change wallpaper" →
-     Wallpaper) against the complete real vocabulary — the failures
-     were never the model's mapping, they were the missing vocabulary.
-  3. **Execute deterministically, fail visibly.** Open via
-     `x-apple.systempreferences:<bundle id>` (proven mechanism); if the
-     model's string doesn't match the catalog even after the existing
-     fuzzy normalization, open System Settings itself + flash
-     "couldn't find that pane" instead of dying silently.
-  4. **Direct-action tools keep precedence** (`set_wifi` for "turn
-     Wi-Fi off"; the pane tool is for viewing/adjusting-yourself).
-  Agreed limits: pane-level only (no sub-section deep links — modern
-  System Settings deep-linking is undocumented/unreliable, explicitly
-  not chased); a few junk catalog entries ("FollowUp", "Class
-  Progress") tolerated or tiny-denylisted; can't pre-verify all 56
-  URL-open correctly — spot-check a sample programmatically, rely on
-  the visible fallback for stragglers.
-
 - **List-shaped query answers** (e.g. "what are the biggest files in my
   Downloads folder"). Single-fact queries (battery, storage, memory,
   uptime, volume, macOS version, now-playing) shipped 2026-08-05, all
@@ -126,14 +90,20 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Known fragility (shipped, but worth knowing about)
 
-- **System Settings pane identifiers (`open_system_setting`) are
-  version-fragile.** The working identifiers were pulled directly from
-  `/System/Library/ExtensionKit/Extensions/*.appex` on this machine's
-  actual macOS build, not guessed — but Apple has changed these before
-  (Ventura's System Settings rewrite broke the old `com.apple.preference.*`
-  scheme) and could again. If a pane opens the wrong thing after a macOS
-  update, that's why — re-derive the identifier the same way rather than
-  guessing.
+- **System Settings pane identifiers are read live, not hardcoded**
+  (`SettingsPaneCatalog`, shipped 2026-08-08 — see CHANGELOG) — scans
+  `/System/Library/ExtensionKit/Extensions/*.appex` at launch, so the
+  stale-identifier class of bug (Ventura's System Settings rewrite broke
+  the old `com.apple.preference.*` scheme; `.general` went stale again
+  later) is now self-healing across macOS updates rather than something
+  to re-derive by hand. What's still worth knowing: Apple splits these
+  extensions across two different plist schemas (`NSExtension` vs the
+  newer `EXAppExtensionAttributes`) — if a future macOS version
+  introduces a third schema, the scan would silently under-count again
+  the same way the first verification pass did before this was caught.
+  If the catalog's pane count ever looks low, check
+  `SettingsPaneCatalog.extensionPointIdentifier(from:)` for a missed
+  schema before assuming panes were removed.
 - **`AgentExecutor` file-search folder fallback deliberately excludes
   `.home`** — it's a full recursive walk of the entire home directory and
   would be slow plus prompt-heavy. Only searched if the user names it

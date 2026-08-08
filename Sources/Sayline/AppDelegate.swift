@@ -273,6 +273,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             self.indicatorWindow.flashMessage(answer, duration: 4.5)
                             continue
                         }
+                        if case .openSystemSettingsFallback(let requestedPaneName) = action {
+                            AgentExecutor.execute(action)
+                            self.indicatorWindow.flashMessage("Couldn't find \"\(requestedPaneName)\" settings", duration: 3.0)
+                            continue
+                        }
                         if !AgentExecutor.execute(action) {
                             anyFailed = true
                         }
