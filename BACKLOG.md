@@ -19,21 +19,59 @@ and [CHANGELOG.md](CHANGELOG.md).
   between rounds, which is exactly why the same failure kept
   resurfacing in different clothes. The harness exists to end that.
 
-  **The change being evaluated:** replace Groq tool-calling with JSON
-  object mode (`response_format: {"type": "json_object"}`, supported on
-  all Groq models incl. `llama-3.3-70b-versatile`; strict
-  schema-enforcing mode is GPT-OSS-only, so not an option here).
-  Rationale: tool calling makes the model emit a bespoke
-  `<function=name>{...}</function>` wrapper that Groq's server parses;
-  that wrapper is unconstrained learned behavior, and when the model
-  drops the `>` the whole request dies server-side with HTTP 400
+  **The problem being fixed:** tool calling makes the model emit a
+  bespoke `<function=name>{...}</function>` wrapper that Groq's server
+  parses; that wrapper is unconstrained learned behavior, and when the
+  model drops the `>` the whole request dies server-side with HTTP 400
   `tool_use_failed`. Measured 60% of calls reaching the API in one
-  session log (n=5, biased toward hard cases). JSON mode has no wrapper
-  to malform. Also ~33% cheaper per call: measured the payload at
-  ~2,370 tokens, of which the tools array is 72% (~1,626), and 47% of
-  that array (~772 tokens) is pure JSON Schema scaffolding that prose
-  doesn't need. Blast radius is one file — `AgentAction`,
+  session log (n=5, biased toward hard cases). The temperature-0.6
+  retry currently in `AgentRouter` does *not* reliably fix it —
+  confirmed live, a retried call reproduced byte-identical malformed
+  output — and it doubles token cost on exactly the requests already
+  failing, which contributed to hitting the daily cap.
+
+  **Three arms to compare, same test set, same scoring:**
+  - **A — Groq tool calling** (`llama-3.3-70b-versatile`, current, at
+    commit `4f80fe1`). The baseline everything else must beat.
+  - **B — Groq JSON object mode** (`response_format:
+    {"type": "json_object"}`, supported on all Groq models; strict
+    schema-enforcing mode is GPT-OSS-only so unavailable here). No
+    wrapper to malform. Also ~33% cheaper per call: measured payload
+    ~2,370 tokens, of which the tools array is 72% (~1,626), and 47%
+    of that array (~772 tokens) is pure JSON Schema scaffolding prose
+    doesn't need. Guarantees *valid* JSON, not *correct-shaped* JSON —
+    we validate the parsed structure ourselves (already do, via
+    `fuzzyMatch` + catalog lookup).
+  - **C — OpenAI small model with strict structured outputs**
+    (`gpt-5-nano` $0.05/$0.40 per 1M first, `gpt-5-mini` $0.25/$2.00 or
+    `gpt-4o-mini` $0.15/$0.60 if nano's action selection is too weak).
+    Strongest fix available: the schema is enforced *during*
+    generation, so malformed output is structurally impossible rather
+    than merely less likely. Also sidesteps the constraint that
+    actually hurts — Groq free tier caps the 70B router at 100K
+    tokens/**day** (hit twice in one session), while OpenAI Tier 1
+    ($5 paid) is ~200K tokens/**minute** on 4o-class models. Watch
+    latency: Groq's whole edge is speed and this sits in a
+    hold-to-talk loop, so record per-call latency, don't assume.
+
+  B and C are competing fixes for the same bug — build only the
+  winner. Blast radius either way is one file; `AgentAction`,
   `SettingsPaneCatalog`, `AgentExecutor` are untouched.
+
+  **Measure before implementing.** The harness is a standalone script
+  that hits all three arms directly with the same test set, so only the
+  winner gets written as production Swift — rather than building two
+  routers and discarding one. Risk to control: the harness must
+  faithfully reproduce the real system prompt and tool definitions or
+  the numbers mean nothing. Prefer concatenating the actual
+  `AgentRouter.swift` (+ its deps) into a `swift` script, the way
+  `TranscriptCleanupValidator` was tested, over retyping the prompts.
+
+  **Prerequisites before arm C:** an OpenAI API key (real money,
+  pennies at this volume) and a second Keychain entry — `KeychainStore`
+  currently hardcodes one account, `GROQ_API_KEY`, and all three call
+  sites read `APIKeyProvider.groqAPIKey`. Roughly 30 lines plus a
+  Settings field. Not needed for arms A and B.
 
   **Guardrails, agreed in this order:**
   1. **Write the test set before the implementation.** Building first
@@ -74,12 +112,13 @@ and [CHANGELOG.md](CHANGELOG.md).
   guard — when a prompt tweak quietly breaks `find_file` months from
   now, the numbers say so instead of a user noticing.
 
-  **Known constraint:** ~20 cases × 2 implementations × ~2,000 tokens ≈
-  80,000 tokens against a 100,000/day cap. Baseline and candidate runs
-  realistically fall on different days, or the set trims to ~12 cases.
-  This is the first concrete argument for a paid Groq tier — not for
-  daily use, but because you can't measure what you can't afford to
-  run.
+  **Known constraint:** only arms A and B spend Groq's budget —
+  ~20 cases × 2 arms × ~2,000 tokens ≈ 80,000 tokens against a
+  100,000/day cap, so they realistically run on different days (or the
+  set trims to ~12 cases). Arm C spends OpenAI credit instead, so it
+  can run the same day as either. Note the irony worth remembering:
+  the cheapest way to escape Groq's measurement bottleneck is the arm
+  that doesn't use Groq.
 
 - **8B vs 70B cleanup compliance A/B test** (blocked, on hold — user
   explicitly parked this 2026-08-08; remind them of this item whenever
