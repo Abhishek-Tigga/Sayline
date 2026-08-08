@@ -403,6 +403,14 @@ def main():
 
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO,
                             capture_output=True, text=True).stdout.strip()
+    # The harness reads the working tree, not the committed source, so a
+    # bare SHA would misdescribe any run made with uncommitted edits — which
+    # happened on 2026-08-09 while iterating on the prompt. Mark it.
+    dirty = subprocess.run(["git", "status", "--porcelain", "Sources"], cwd=REPO,
+                           capture_output=True, text=True).stdout.strip()
+    if dirty:
+        commit += "+dirty"
+        print(f"  note: Sources/ has uncommitted changes — recording as {commit}")
 
     print(f"\nRunning {len(cases)} cases — arm={args.arm} model={model} commit={commit}\n")
     results, pane_strings = [], set()
