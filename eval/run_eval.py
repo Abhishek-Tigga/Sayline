@@ -271,6 +271,13 @@ def run_arm(arm, model, config, transcript, keys):
             "messages": [{"role": "system", "content": config["systemPrompt"]},
                          {"role": "user", "content": transcript}],
         }
+        # The gpt-5.6 family reasons by default and rejects function tools
+        # on /v1/chat/completions unless reasoning is switched off. Routing
+        # is a fast classification, not a thinking task, so 'none' is what
+        # we want anyway — reasoning tokens would only add latency to a
+        # hold-to-talk loop.
+        if model.startswith("gpt-5.6"):
+            payload["reasoning_effort"] = "none"
         body, ms, err = post_json(OPENAI_URL, keys["openai"], payload)
 
     else:
