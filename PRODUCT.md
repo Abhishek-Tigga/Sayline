@@ -102,6 +102,15 @@ and committed before moving on.
   for now — it's the only one actually buildable without new
   infrastructure. Revisit the backend-proxy option when actually
   shipping/monetizing (see "Deferred decisions").
+  - **Update 2026-08-09: BYOK is a development-time arrangement, not the
+    product.** Sayline is intended to ship commercially with its own
+    infrastructure, so end users will never be asked for an API key —
+    the backend proxy above is the plan, not a maybe. Keep this in mind
+    when weighing provider choices: "would a user tolerate signing up
+    for this provider" is *not* a real constraint, because they never
+    will. Cost per call, rate limits, latency and accuracy are the real
+    ones. (Recorded because the BYOK framing had already been used once
+    to argue against a provider switch on grounds that don't apply.)
 - **Microphone: auto-follow system default, with a manual override —
   not a full device-management UI.** Verified live that AVAudioEngine
   already tracks whatever macOS considers the default input device

@@ -1,19 +1,24 @@
 import Foundation
 import Security
 
-/// Minimal wrapper around the macOS Keychain for storing the user's own
-/// Groq API key (BYOK) — never written to disk in plaintext, never
-/// committed anywhere.
+/// Minimal wrapper around the macOS Keychain for API keys — never written
+/// to disk in plaintext, never committed anywhere. Keys live here during
+/// development; the shipping product proxies through its own backend and
+/// never asks a user for one (see PRODUCT.md).
 enum KeychainStore {
-    private static let service = "com.abhishektigga.sayline"
-    private static let account = "GROQ_API_KEY"
+    enum Key: String {
+        case groq = "GROQ_API_KEY"
+        case openAI = "OPENAI_API_KEY"
+    }
 
-    static func save(_ value: String) {
+    private static let service = "com.abhishektigga.sayline"
+
+    static func save(_ value: String, for key: Key = .groq) {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: key.rawValue
         ]
         SecItemDelete(query as CFDictionary)
 
@@ -22,11 +27,11 @@ enum KeychainStore {
         SecItemAdd(newItem as CFDictionary, nil)
     }
 
-    static func load() -> String? {
+    static func load(_ key: Key = .groq) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: key.rawValue,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -36,11 +41,11 @@ enum KeychainStore {
         return String(data: data, encoding: .utf8)
     }
 
-    static func delete() {
+    static func delete(_ key: Key = .groq) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: key.rawValue
         ]
         SecItemDelete(query as CFDictionary)
     }

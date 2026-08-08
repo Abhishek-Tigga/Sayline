@@ -45,5 +45,30 @@ enum APIKeyProvider {
     static func invalidateCache() {
         hasResolved = false
         cachedKey = nil
+        hasResolvedOpenAI = false
+        cachedOpenAIKey = nil
+    }
+
+    private static var hasResolvedOpenAI = false
+    private static var cachedOpenAIKey: String?
+
+    /// Used by the agent router while it runs on OpenAI. Same
+    /// Keychain-then-environment order and same caching rationale as the
+    /// Groq key above.
+    static var openAIAPIKey: String? {
+        if hasResolvedOpenAI {
+            return cachedOpenAIKey
+        }
+        let resolved: String?
+        if let stored = KeychainStore.load(.openAI), !stored.isEmpty {
+            resolved = stored
+        } else if let envKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"], !envKey.isEmpty {
+            resolved = envKey
+        } else {
+            resolved = nil
+        }
+        cachedOpenAIKey = resolved
+        hasResolvedOpenAI = true
+        return resolved
     }
 }

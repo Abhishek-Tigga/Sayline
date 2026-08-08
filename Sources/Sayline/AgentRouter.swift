@@ -11,8 +11,53 @@ import Foundation
 /// by replying with no tool call, and we fail safe by doing nothing
 /// rather than forcing a bad match into open_app or find_file.
 final class AgentRouter {
-    private let endpoint = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
-    private let model = "llama-3.3-70b-versatile"
+    enum Provider {
+        case groq
+        case openAI
+
+        var endpoint: URL {
+            switch self {
+            case .groq: return URL(string: "https://api.groq.com/openai/v1/chat/completions")!
+            case .openAI: return URL(string: "https://api.openai.com/v1/chat/completions")!
+            }
+        }
+
+        var model: String {
+            switch self {
+            case .groq: return "llama-3.3-70b-versatile"
+            case .openAI: return "gpt-4o-mini"
+            }
+        }
+
+        var apiKey: String? {
+            switch self {
+            case .groq: return APIKeyProvider.groqAPIKey
+            case .openAI: return APIKeyProvider.openAIAPIKey
+            }
+        }
+    }
+
+    /// **Temporary, and not a product decision.** Switched to OpenAI on
+    /// 2026-08-09 purely to stop losing development time: Groq's free tier
+    /// caps the 70B router at 100K tokens/day, which normal testing
+    /// exhausted three days running, blocking both live verification and
+    /// the eval baseline itself.
+    ///
+    /// The provider comparison is still open and still governed by the
+    /// agreed pass bar in BACKLOG.md — accuracy ≥ baseline, 0% syntax
+    /// failures, tokens under ~1,800. What is measured so far:
+    /// `gpt-4o-mini` scores 28/30 with 0% syntax failures at ~1,518 tokens
+    /// and ~966 ms (`eval/results.md`), while Groq has never completed a
+    /// scored run. Do not read that as Groq losing — it has never been
+    /// measured. Moving day-to-day traffic off Groq is also what finally
+    /// frees its daily budget for that baseline run.
+    ///
+    /// Flip this back to `.groq` to compare, or once a backend proxy makes
+    /// rate limits somebody else's problem.
+    private let provider: Provider = .openAI
+
+    private var endpoint: URL { provider.endpoint }
+    private var model: String { provider.model }
 
     /// Internal rather than private so `eval/run_eval.py` can read the
     /// real prompt instead of keeping its own copy — a duplicated prompt
@@ -293,21 +338,65 @@ final class AgentRouter {
         }
     }
 
+    /// OpenAI's strict mode is the whole reason arm C measured 0% syntax
+    /// failures: the schema is enforced *during* generation rather than
+    /// parsed afterwards, so a malformed tool call becomes structurally
+    /// impossible instead of merely less likely. It requires every property
+    /// listed in `required` plus `additionalProperties: false`, so
+    /// genuinely optional parameters (`subpath`, `folder`) become nullable
+    /// rather than absent. Mirrors `openai_strict_tools()` in
+    /// `eval/run_eval.py` — if you change one, change both, or the eval
+    /// stops describing production.
+    private static func strictTools(_ tools: [[String: Any]]) -> [[String: Any]] {
+        tools.map { tool in
+            guard var function = tool["function"] as? [String: Any] else { return tool }
+            let parameters = function["parameters"] as? [String: Any] ?? [:]
+            let properties = parameters["properties"] as? [String: [String: Any]] ?? [:]
+            let originallyRequired = Set(parameters["required"] as? [String] ?? [])
+
+            var strictProperties: [String: Any] = [:]
+            for (name, spec) in properties {
+                var spec = spec
+                if !originallyRequired.contains(name) {
+                    let base = (spec["type"] as? String) ?? "string"
+                    spec["type"] = [base, "null"]
+                }
+                strictProperties[name] = spec
+            }
+
+            function["strict"] = true
+            function["parameters"] = [
+                "type": "object",
+                "properties": strictProperties,
+                "required": Array(properties.keys),
+                "additionalProperties": false,
+            ] as [String: Any]
+            return ["type": "function", "function": function]
+        }
+    }
+
     private func performRoute(_ transcript: String, temperature: Double) async throws -> [AgentAction] {
-        guard let apiKey = APIKeyProvider.groqAPIKey else {
+        guard let apiKey = provider.apiKey else {
             throw TranscriptionError.missingAPIKey
         }
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "model": model,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": transcript],
             ],
-            "tools": tools,
+            "tools": provider == .openAI ? Self.strictTools(tools) : tools,
             "tool_choice": "auto",
-            "temperature": temperature,
         ]
+        // Deliberately omitted on OpenAI so production sends exactly what
+        // eval/run_eval.py's arm C sent — a config that measured 0% syntax
+        // failures is only meaningful if production reproduces it. The
+        // temperature knob exists for the malformed-call retry, which
+        // strict mode makes unnecessary anyway.
+        if provider == .groq {
+            payload["temperature"] = temperature
+        }
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
