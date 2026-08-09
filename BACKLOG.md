@@ -73,50 +73,6 @@ and [CHANGELOG.md](CHANGELOG.md).
   sites read `APIKeyProvider.groqAPIKey`. Roughly 30 lines plus a
   Settings field. Not needed for arms A and B.
 
-- **Live-verify the settings fixes that never got a clean run**
-  (requested 2026-08-09 — raise this as soon as the harness has run and
-  OpenAI is wired up). Three changes shipped today were never confirmed
-  working in the actual app, because every attempt was rejected by the
-  Groq daily token cap before reaching the router:
-  - `"open general settings"` → should open About (macOS has no General
-    pane; aliased).
-  - `"open dock settings"` → should open Desktop & Dock. Note Whisper
-    reliably hears this as "doc", and the model did map it correctly
-    live before the request died — so this is really testing the
-    display-name override, not the matcher.
-  - `"open settings"` → should open the System Settings *app* via
-    `openApp`, not hit the do-nothing fallback. This is the regression
-    fixed in `de17653` and is the most important of the three, since it
-    was broken by an earlier fix rather than being a pre-existing gap.
-
-  All three are already cases in `eval/router-test-set.json`
-  (`settings-general`, `settings-dock-asr-noise`,
-  `open-settings-app-itself`), so an eval run covers the *routing*
-  decision. That is not the same as live verification: the eval scores
-  what the router decides, while only the real app proves the pane
-  actually opens. Do both — the eval first (cheaper, repeatable), the
-  live check once to confirm the executor end.
-
-- **Teach the eval methodology back to Abhishek** (requested
-  2026-08-09 — surface this when the eval work is done, or whenever he
-  asks about it). He asked for the harness to be *built* first without
-  a walkthrough, then explained afterwards: he's a PM learning to build
-  hands-on, so the goal is transferable industry practice, not a tour
-  of this repo's files. Worth covering when the time comes: why a
-  frozen test set beats ad-hoc manual testing (this whole session is
-  the cautionary tale — same bug resurfacing in different clothes
-  because nothing was ever measured twice the same way); why the test
-  set must be written *before* the implementation; why scoring has to
-  be mechanical rather than a human judging output quality; what
-  regression cases are and why passing-cases belong in the set;
-  golden/reference datasets and how real teams build them; the
-  difference between offline eval and production monitoring; and where
-  this sits relative to how LLM products are actually evaluated in
-  industry (eval-driven development, LLM-as-judge and its pitfalls,
-  why benchmark scores rarely predict your specific task). Use
-  `eval/router-test-set.json` as the concrete worked example since he
-  will have watched it get built.
-
   **Guardrails, agreed in this order:**
   1. **Write the test set before the implementation.** Building first
      and designing the test after means unconsciously picking cases the
@@ -164,6 +120,26 @@ and [CHANGELOG.md](CHANGELOG.md).
   the cheapest way to escape Groq's measurement bottleneck is the arm
   that doesn't use Groq.
 
+- **Teach the eval methodology back to Abhishek** (requested
+  2026-08-09 — surface this when the eval work is done, or whenever he
+  asks about it). He asked for the harness to be *built* first without
+  a walkthrough, then explained afterwards: he's a PM learning to build
+  hands-on, so the goal is transferable industry practice, not a tour
+  of this repo's files. Worth covering when the time comes: why a
+  frozen test set beats ad-hoc manual testing (this whole session is
+  the cautionary tale — same bug resurfacing in different clothes
+  because nothing was ever measured twice the same way); why the test
+  set must be written *before* the implementation; why scoring has to
+  be mechanical rather than a human judging output quality; what
+  regression cases are and why passing-cases belong in the set;
+  golden/reference datasets and how real teams build them; the
+  difference between offline eval and production monitoring; and where
+  this sits relative to how LLM products are actually evaluated in
+  industry (eval-driven development, LLM-as-judge and its pitfalls,
+  why benchmark scores rarely predict your specific task). Use
+  `eval/router-test-set.json` as the concrete worked example since he
+  will have watched it get built.
+
 - **8B vs 70B cleanup compliance A/B test** (blocked, on hold — user
   explicitly parked this 2026-08-08; remind them of this item whenever
   they ask what's in the backlog). Before switching `TranscriptCleaner`
@@ -187,6 +163,34 @@ and [CHANGELOG.md](CHANGELOG.md).
   request, and this cannot recur. The 70B swap itself stays on hold
   until the test actually runs and shows a real difference — don't swap
   on assumption.
+- **Open a URL / website by voice** (designed weeks ago, never
+  written down here, never built — logged 2026-08-09 after it surfaced
+  from memory rather than from this file, which is exactly the failure
+  mode this document exists to prevent). Today "open youtube" runs
+  `open -a "youtube"` and fails, because no app has that name.
+
+  Two requests that sound alike but are very different jobs, and only
+  the first is in scope for now:
+  - **"open youtube" / "open toolfolio.com"** — resolve to a URL and
+    hand it to the browser. Small.
+  - **"play lo-fi music on youtube"** — open, search, then click play.
+    That is browser automation, a different project entirely. See the
+    grand-vision section.
+
+  Agreed design from the original discussion: default browser via
+  `NSWorkspace.shared.open(url)`; a named browser ("open x in Chrome")
+  via `open -a <browser> <url>`, matching the existing open_app style;
+  and a hybrid of a curated list of common sites plus domain guessing,
+  so both "open youtube" and "open toolfolio.com" work. A 28-site
+  starter list was proposed and approved but never committed anywhere,
+  so it needs redoing.
+
+  Worth deciding before building: what happens to a bare word that is
+  neither a known site nor a valid domain. Guessing `.com` will
+  sometimes be wrong, and opening the wrong site is more annoying than
+  refusing. The visible-fallback pattern from the settings catalog
+  probably applies.
+
 - **List-shaped query answers** (e.g. "what are the biggest files in my
   Downloads folder"). Single-fact queries (battery, storage, memory,
   uptime, volume, macOS version, now-playing) shipped 2026-08-05, all
