@@ -199,6 +199,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 let rawText = try await activeTranscriber.transcribe(fileURL: url)
                 NSLog("Sayline: raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
+                if WhisperHallucination.isLikelyHallucinated(rawText, audioPeak: audioRecorder.lastRecordingPeak) {
+                    NSLog("Sayline: discarded \"\(rawText)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
+                        // Say so rather than doing nothing — a silent drop is
+                        // indistinguishable from the app being broken.
+                        self.indicatorWindow.flashMessage("Didn't catch that")
+                    }
+                    return
+                }
+
                 if let command = VoiceCommand.detect(in: rawText) {
                     NSLog("Sayline: voice command detected -> \(command)")
                     await MainActor.run {
@@ -249,6 +261,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             do {
                 let transcript = try await activeTranscriber.transcribe(fileURL: url)
                 NSLog("Sayline: agent transcript -> \(transcript)")
+
+                if WhisperHallucination.isLikelyHallucinated(transcript, audioPeak: audioRecorder.lastRecordingPeak) {
+                    NSLog("Sayline: discarded agent transcript \"\(transcript)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
+                        self.indicatorWindow.flashMessage("Didn't catch that")
+                    }
+                    return
+                }
 
                 await MainActor.run {
                     self.isTranscribing = false

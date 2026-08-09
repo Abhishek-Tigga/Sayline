@@ -185,17 +185,46 @@ enum AgentExecutor {
     /// Sends a normal terminate request (equivalent to Cmd+Q) rather than
     /// force-killing — respects the app's own unsaved-changes prompt
     /// instead of silently discarding work.
+    ///
+    /// Matching is normalized rather than exact, and falls back to the
+    /// bundle identifier. Exact comparison against `localizedName` failed
+    /// on WhatsApp every single time while "open WhatsApp" worked in the
+    /// same breath — its localizedName is 9 characters, not 8, because the
+    /// app prefixes its own name with U+200E LEFT-TO-RIGHT MARK. Invisible
+    /// on screen, fatal to `==`. Opening was unaffected because `open -a`
+    /// resolves through LaunchServices by app file, never touching the
+    /// display name.
     @discardableResult
     private static func closeApp(named name: String) -> Bool {
-        guard let app = NSWorkspace.shared.runningApplications.first(where: {
-            $0.localizedName?.caseInsensitiveCompare(name) == .orderedSame
-        }) else {
-            NSLog("Sayline: agent could not find a running app named \(name) to close")
+        let target = normalizedAppName(name)
+        let running = NSWorkspace.shared.runningApplications
+
+        let app = running.first { normalizedAppName($0.localizedName ?? "") == target }
+            // Bundle identifiers are stable and never carry display-name
+            // decoration, so "whatsapp" still finds net.whatsapp.WhatsApp.
+            ?? running.first { candidate in
+                guard let bundleID = candidate.bundleIdentifier else { return false }
+                return bundleID.split(separator: ".").contains { normalizedAppName(String($0)) == target }
+            }
+
+        guard let app else {
+            let names = running
+                .filter { $0.activationPolicy == .regular }
+                .compactMap { $0.localizedName }
+                .joined(separator: ", ")
+            NSLog("Sayline: agent could not find a running app named \"\(name)\" to close — running: [\(names)]")
             return false
         }
         let didTerminate = app.terminate()
-        NSLog("Sayline: agent closed app -> \(name) (requested: \(didTerminate))")
+        NSLog("Sayline: agent closed app -> \(app.localizedName ?? name) (requested: \(didTerminate))")
         return didTerminate
+    }
+
+    /// Lowercased, letters and digits only. Strips whatever decoration an
+    /// app puts in its display name — directional marks, spaces,
+    /// punctuation — so comparison is on the part a person would say.
+    private static func normalizedAppName(_ name: String) -> String {
+        name.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
     /// `bundleID` comes pre-resolved from the live `SettingsPaneCatalog`

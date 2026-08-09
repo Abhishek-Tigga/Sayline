@@ -9,6 +9,10 @@ final class AudioRecorder {
     private(set) var lastRecordingURL: URL?
     private var recordingStartTime: Date?
     private(set) var lastRecordingDuration: TimeInterval = 0
+    /// Loudest sample in the last recording, set by `isTooShortOrSilent()`.
+    /// Kept so the transcript stage can tell a real "thank you" from one
+    /// Whisper invented out of silence — see `WhisperHallucination`.
+    private(set) var lastRecordingPeak: Float = 0
 
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -113,6 +117,7 @@ final class AudioRecorder {
               let channelData = buffer.floatChannelData,
               buffer.frameLength > 0 else {
             NSLog("Sayline: couldn't measure audio level — transcribing anyway")
+            lastRecordingPeak = 0
             return false // fail open
         }
 
@@ -121,6 +126,7 @@ final class AudioRecorder {
         for i in 0..<Int(buffer.frameLength) {
             peak = max(peak, abs(samples[i]))
         }
+        lastRecordingPeak = peak
 
         // Deliberately generous. Room tone and mic self-noise peak around
         // 0.001–0.005; even quiet speech peaks well above 0.05. Logged so
