@@ -40,6 +40,9 @@ enum AgentExecutor {
             return takeScreenshot()
         case .openWebsite(let label, let url):
             return openWebsite(label: label, url: url)
+        case .openedSiteButCouldNotSearch(let label, let url, let query):
+            NSLog("%@", "Sayline: no search URL for \(label) — opened it and dropped the query \"\(query)\"")
+            return openWebsite(label: label, url: url)
         case .unknownWebsite(let requested):
             // Handled visibly in AppDelegate, which flashes the "say the
             // full address" hint. Nothing to do here but report failure.

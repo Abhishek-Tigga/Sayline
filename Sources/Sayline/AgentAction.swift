@@ -30,6 +30,9 @@ enum AgentAction {
     /// purpose rather than guessing a TLD: opening the wrong site is more
     /// annoying than saying "say the full address".
     case unknownWebsite(requested: String)
+    /// Site opened, but it publishes no search URL we know, so the query
+    /// went unused. Reported rather than dropped quietly.
+    case openedSiteButCouldNotSearch(label: String, url: URL, query: String)
     /// "play <thing> on YouTube". Resolved asynchronously in AgentRouter
     /// into a real `/watch` URL, which autoplays — unlike the search page.
     /// Falls back to the search page if the lookup fails for any reason.

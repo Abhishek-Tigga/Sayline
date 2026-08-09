@@ -619,6 +619,8 @@ final class AgentRouter {
             switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query) {
             case .site(let label, let url):
                 return .openWebsite(label: query.map { "\(label) — \($0)" } ?? label, url: url)
+            case .siteWithoutSearch(let label, let url, let dropped):
+                return .openedSiteButCouldNotSearch(label: label, url: url, query: dropped)
             case .explicitDomain(let url):
                 return .openWebsite(label: url.host ?? site, url: url)
             case .unknown(let requested):

@@ -296,6 +296,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             self.indicatorWindow.flashMessage(answer, duration: 4.5)
                             continue
                         }
+                        if case .openedSiteButCouldNotSearch(let label, _, _) = action {
+                            AgentExecutor.execute(action)
+                            self.indicatorWindow.flashMessage("Opened \(label) — can't search it directly", duration: 3.0)
+                            continue
+                        }
                         if case .unknownWebsite(let requested) = action {
                             AgentExecutor.execute(action)
                             // Refuse rather than guess a TLD, and say what
