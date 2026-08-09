@@ -232,7 +232,7 @@ final class AgentRouter {
                     "properties": [
                         "site": [
                             "type": "string",
-                            "description": "The website. Known ones: \(WebsiteCatalog.promptVocabulary.joined(separator: ", ")). If the user said a full address like \"toolfolio.com\", pass that instead.",
+                            "description": "The website. Known ones: \(WebsiteCatalog.promptVocabulary.joined(separator: ", ")). If the user said a full address like \"toolfolio.com\", pass that instead. If the user named NO site at all — \"what's the population of India\", \"images of dogs\" — use \"Google\".",
                         ],
                         "query": [
                             "type": "string",
@@ -240,7 +240,11 @@ final class AgentRouter {
                         ],
                         "page_url": [
                             "type": "string",
-                            "description": "Use ONLY when the user wants a specific page rather than search results — \"open the iPhone page on Apple India\", \"show me Notion's pricing page\". Put the complete real URL of that page here (e.g. https://www.apple.com/in/iphone/). Leave it out entirely unless you are confident the exact URL exists; a guess that 404s is worse than search results. Never use it for ordinary searches like \"best headphones on Amazon\".",
+                            "description": "The complete real URL of a canonical page, when one exists for what the user wants. Judge this by whether the site HAS such a page — NOT by which verb the user used. \"Search for the iPhone page on Apple India\" wants https://www.apple.com/in/iphone/ even though they said search. Also use it for the user's own pages on a site: \"my Amazon orders\", \"my LinkedIn messages\", \"my YouTube subscriptions\". Leave it out when results are genuinely the answer — \"best headphones on Amazon\" and \"people from Razorpay on LinkedIn\" have no canonical page, so those want a search. Leave it out if unsure of the exact URL; a wrong guess is checked and discarded, but search is the better default.",
+                        ],
+                        "vertical": [
+                            "type": "string",
+                            "description": "Which search tab, when the user means a specific one: \(WebsiteCatalog.verticalVocabulary.joined(separator: ", ")). \"people from Razorpay on LinkedIn\" is people; \"Razorpay jobs\" is jobs; \"images of dogs\" is images; \"swift repos\" is repositories. Omit for an ordinary search.",
                         ],
                         "play": [
                             "type": "boolean",
@@ -509,14 +513,12 @@ final class AgentRouter {
             "tools": provider == .openAI ? Self.strictTools(tools) : tools,
             "tool_choice": "auto",
         ]
-        // Deliberately omitted on OpenAI so production sends exactly what
-        // eval/run_eval.py's arm C sent — a config that measured 0% syntax
-        // failures is only meaningful if production reproduces it. The
-        // temperature knob exists for the malformed-call retry, which
-        // strict mode makes unnecessary anyway.
-        if provider == .groq {
-            payload["temperature"] = temperature
-        }
+        // Set for both providers. It was previously omitted on OpenAI,
+        // which meant running at the API default of 1.0 — high randomness
+        // on a task that should give the same answer every time. That is
+        // what made the eval flaky: identical input returned NowPlaying,
+        // then Uptime, then Memory across three runs.
+        payload["temperature"] = temperature
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -662,7 +664,10 @@ final class AgentRouter {
             NSLog("Sayline: agent router returned unmatched settings pane \"\(paneRaw)\" — no catalog match")
             return .openSystemSettingsFallback(requestedPaneName: paneRaw)
         case "open_website":
-            guard let site = arguments["site"] as? String else { return nil }
+            // No site named means a plain web question; Google is the agreed
+            // default rather than refusing.
+            let site = (arguments["site"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                .nilIfEmpty ?? "Google"
             let query = (arguments["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let pageURL = (arguments["page_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !pageURL.isEmpty, let url = URL(string: pageURL), url.scheme?.hasPrefix("http") == true {
@@ -673,7 +678,8 @@ final class AgentRouter {
                WebsiteCatalog.isYouTube(site) {
                 return .playOnYouTube(query: query)
             }
-            switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query) {
+            let vertical = (arguments["vertical"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query, vertical: vertical) {
             case .site(let label, let url):
                 return .openWebsite(label: query.map { "\(label) — \($0)" } ?? label, url: url)
             case .siteWithoutSearch(let label, let url, let dropped):
@@ -736,4 +742,11 @@ final class AgentRouter {
     private static func normalize(_ s: String) -> String {
         s.lowercased().filter { $0.isLetter || $0.isNumber }
     }
+}
+
+
+private extension String {
+    /// Treat an empty or whitespace-only argument as absent. Models return
+    /// "" as readily as omitting a field.
+    var nilIfEmpty: String? { trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self }
 }

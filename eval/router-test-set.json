@@ -457,12 +457,11 @@
         {
           "action": "openWebsite",
           "args": {
-            "site": "Apple",
-            "query": "iPhone 15 Pro"
+            "page_url__contains": "apple.com/in/iphone"
           }
         }
       ],
-      "guards": "Country named explicitly. Expectation corrected 2026-08-09: the model returns 'Apple' and drops 'India' by itself, and the catalog's region detection resolves that to apple.com/in anyway — so the outcome was always right and the expectation was too strict. Country-word stripping is covered by Swift tests on WebsiteCatalog, not here."
+      "guards": "Expectation corrected twice. First I expected site 'Apple India'; the model strips the country itself and region detection handles it. Then I expected search results; the model returns the iPhone 15 Pro product page, which is verified real and plainly better than Apple's own search. The lesson recorded rather than the guess."
     },
     {
       "id": "web-play-flag",
@@ -523,6 +522,137 @@
         }
       ],
       "guards": "NEW: same shape on a site with no search URL at all, where a deep link is the only way to be useful."
+    },
+    {
+      "id": "web-vertical-people",
+      "transcript": "look for people from Razorpay on LinkedIn",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "LinkedIn",
+            "vertical": "people"
+          }
+        }
+      ],
+      "guards": "The People tab, not the mixed All tab. Today this lands on /search/results/all/ which buries people under posts and companies."
+    },
+    {
+      "id": "web-vertical-people-role",
+      "transcript": "look for product managers from Razorpay on LinkedIn",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "LinkedIn",
+            "vertical": "people"
+          }
+        }
+      ],
+      "guards": "Role plus company. Same vertical as above — the difference is only the keywords, which is why query wording is not scored."
+    },
+    {
+      "id": "web-vertical-jobs",
+      "transcript": "find product manager jobs on LinkedIn",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "LinkedIn",
+            "vertical": "jobs"
+          }
+        }
+      ],
+      "guards": "Jobs is a different URL entirely (/jobs/search/), not a tab on the same one."
+    },
+    {
+      "id": "web-vertical-images",
+      "transcript": "show me images of golden retrievers",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "Google",
+            "vertical": "images"
+          }
+        }
+      ],
+      "guards": "No site named and a vertical implied by the word images. Two inferences at once."
+    },
+    {
+      "id": "web-vertical-repos",
+      "transcript": "find swift concurrency repos on github",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "GitHub",
+            "vertical": "repositories"
+          }
+        }
+      ],
+      "guards": "GitHub defaults to a mixed result page; repositories is usually what is meant."
+    },
+    {
+      "id": "web-page-via-search-verb",
+      "transcript": "Search for iPhone page in Apple India website",
+      "source": "live-log",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "page_url__contains": "apple.com/in/iphone"
+          }
+        }
+      ],
+      "guards": "THE case that failed live while the eval passed. Verbatim transcript. The word 'search' must not stop it reaching the canonical page — routing on the verb rather than on whether a real page exists was the bug."
+    },
+    {
+      "id": "web-personal-orders",
+      "transcript": "show my Amazon orders",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "page_url__contains": "order"
+          }
+        }
+      ],
+      "guards": "Your own page on a site — a whole category missed until now. Orders, messages, subscriptions are canonical URLs that exist for every signed-in user."
+    },
+    {
+      "id": "web-personal-messages",
+      "transcript": "open my LinkedIn messages",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "page_url__contains": "messaging"
+          }
+        }
+      ],
+      "guards": "Same category, different site."
+    },
+    {
+      "id": "web-no-site-google",
+      "transcript": "what's the population of India",
+      "source": "constructed",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "Google"
+          }
+        }
+      ],
+      "guards": "No site named. Agreed default is Google rather than refusing."
     }
   ]
 }

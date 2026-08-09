@@ -29,6 +29,11 @@ enum WebsiteCatalog {
         /// this stores complete replacements rather than trying to patch
         /// one part of the URL.
         var regional: [String: Variant] = [:]
+        /// Separate search tabs, each its own URL. "People from Razorpay"
+        /// and "Razorpay jobs" are different pages on LinkedIn, not the
+        /// same page filtered — sending both to the default search buries
+        /// the answer under unrelated results.
+        var verticals: [String: String] = [:]
     }
 
     struct Variant {
@@ -48,7 +53,14 @@ enum WebsiteCatalog {
     static let sites: [Site] = [
         // Search / reference
         Site(label: "Google", aliases: ["google"], home: "https://www.google.com",
-             searchTemplate: "https://www.google.com/search?q=%@"),
+             searchTemplate: "https://www.google.com/search?q=%@",
+             verticals: [
+                "images": "https://www.google.com/search?q=%@&tbm=isch",
+                "news": "https://news.google.com/search?q=%@",
+                "videos": "https://www.google.com/search?q=%@&tbm=vid",
+                "maps": "https://www.google.com/maps/search/%@",
+                "shopping": "https://www.google.com/search?q=%@&tbm=shop",
+             ]),
         Site(label: "DuckDuckGo", aliases: ["duckduckgo", "duck duck go", "ddg"], home: "https://duckduckgo.com",
              searchTemplate: "https://duckduckgo.com/?q=%@"),
         Site(label: "Wikipedia", aliases: ["wikipedia", "wiki"], home: "https://en.wikipedia.org",
@@ -84,7 +96,13 @@ enum WebsiteCatalog {
 
         // Social
         Site(label: "LinkedIn", aliases: ["linkedin", "linked in"], home: "https://www.linkedin.com",
-             searchTemplate: "https://www.linkedin.com/search/results/all/?keywords=%@"),
+             searchTemplate: "https://www.linkedin.com/search/results/all/?keywords=%@",
+             verticals: [
+                "people": "https://www.linkedin.com/search/results/people/?keywords=%@",
+                "companies": "https://www.linkedin.com/search/results/companies/?keywords=%@",
+                "jobs": "https://www.linkedin.com/jobs/search/?keywords=%@",
+                "posts": "https://www.linkedin.com/search/results/content/?keywords=%@",
+             ]),
         Site(label: "X", aliases: ["x", "twitter"], home: "https://x.com",
              searchTemplate: "https://x.com/search?q=%@"),
         Site(label: "Instagram", aliases: ["instagram", "insta"], home: "https://www.instagram.com", searchTemplate: nil),
@@ -95,7 +113,12 @@ enum WebsiteCatalog {
 
         // Dev / maker
         Site(label: "GitHub", aliases: ["github", "git hub"], home: "https://github.com",
-             searchTemplate: "https://github.com/search?q=%@"),
+             searchTemplate: "https://github.com/search?q=%@",
+             verticals: [
+                "repositories": "https://github.com/search?q=%@&type=repositories",
+                "users": "https://github.com/search?q=%@&type=users",
+                "issues": "https://github.com/search?q=%@&type=issues",
+             ]),
         Site(label: "Stack Overflow", aliases: ["stack overflow", "stackoverflow"], home: "https://stackoverflow.com",
              searchTemplate: "https://stackoverflow.com/search?q=%@"),
         Site(label: "Hacker News", aliases: ["hacker news", "hackernews", "hn"], home: "https://news.ycombinator.com",
@@ -141,6 +164,14 @@ enum WebsiteCatalog {
     /// word sent requests to the wrong place entirely.
     static var promptVocabulary: [String] {
         sites.map { $0.label }
+    }
+
+    /// Every vertical any site supports, for the tool schema. The model
+    /// picks a name; resolve() only honours it if that site actually has
+    /// one, so an irrelevant pairing degrades to normal search rather than
+    /// failing.
+    static var verticalVocabulary: [String] {
+        Array(Set(sites.flatMap { $0.verticals.keys })).sorted()
     }
 
     /// Whether what the user said means YouTube — used to decide if a
@@ -194,7 +225,7 @@ enum WebsiteCatalog {
         return (text, nil)
     }
 
-    static func resolve(_ requested: String, query: String?) -> Resolution {
+    static func resolve(_ requested: String, query: String?, vertical: String? = nil) -> Resolution {
         let trimmed = requested.trimmingCharacters(in: .whitespacesAndNewlines)
         let (baseName, explicitRegion) = splitCountry(trimmed)
         let normalized = normalize(baseName)
@@ -209,10 +240,16 @@ enum WebsiteCatalog {
             let template = variant?.search ?? site.searchTemplate
 
             if let query, !query.isEmpty {
-                if let template,
+                // A vertical wins when the site has that tab; otherwise the
+                // ordinary search, which is still a reasonable answer.
+                let chosen = vertical
+                    .flatMap { v in site.verticals.first { $0.key.caseInsensitiveCompare(v) == .orderedSame }?.value }
+                    ?? template
+                if let chosen,
                    let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryValueAllowed),
-                   let url = URL(string: String(format: template, encoded)) {
-                    return .site(label: site.label, url: url)
+                   let url = URL(string: String(format: chosen, encoded)) {
+                    let label = vertical.map { "\(site.label) · \($0)" } ?? site.label
+                    return .site(label: label, url: url)
                 }
                 if let url = URL(string: home) {
                     return .siteWithoutSearch(label: site.label, url: url, droppedQuery: query)

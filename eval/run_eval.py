@@ -55,7 +55,8 @@ TOOL_TO_ACTION = {
     # `page` is the deep-link flag: the user wants a specific page on the
     # site, not its search results. Scored here as a routing decision; the
     # URL it resolves to is deterministic Swift, tested separately.
-    "open_website": ("openWebsite", {"site": "site", "query": "query", "play": "play", "page_url": "page_url"}),
+    "open_website": ("openWebsite", {"site": "site", "query": "query", "play": "play",
+                                     "page_url": "page_url", "vertical": "vertical"}),
     "lock_screen": ("lockScreen", {}),
     "set_volume": ("setVolume", {"change": "change"}),
     "set_wifi": ("setWiFi", {"enabled": "enabled"}),
@@ -314,7 +315,7 @@ def run_arm(arm, model, config, transcript, keys):
     elif arm == "openai":
         payload = {
             "model": model, "tools": openai_strict_tools(config["tools"]),
-            "tool_choice": "auto",
+            "tool_choice": "auto", "temperature": 0.1,
             "messages": [{"role": "system", "content": config["systemPrompt"]},
                          {"role": "user", "content": transcript}],
         }
@@ -366,6 +367,28 @@ def run_arm(arm, model, config, transcript, keys):
 # Normalizing and scoring
 # --------------------------------------------------------------------------
 
+_page_cache = {}
+
+
+def page_is_real(url):
+    """Mirrors AgentRouter.verifiedPage. Without this the eval scores the
+    model's raw guess, which is not what production does — a URL that 404s
+    gets discarded there and falls back to search. Measuring the guess
+    instead of the outcome would overstate wins and hide losses."""
+    if url in _page_cache:
+        return _page_cache[url]
+    req = urllib.request.Request(url, method="HEAD", headers={
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36"})
+    try:
+        with urllib.request.urlopen(req, timeout=4) as r:
+            ok = 200 <= r.status < 400
+    except Exception:
+        ok = False
+    _page_cache[url] = ok
+    return ok
+
+
 def normalize(raw_calls, pane_resolutions, correction=None):
     """Wire-level calls -> the action vocabulary the test set uses, with pane
     strings resolved exactly as AgentRouter.parseAction would resolve them,
@@ -391,6 +414,12 @@ def normalize(raw_calls, pane_resolutions, correction=None):
                 action_name, out_args = "openApp", {"name": "System Settings"}
             else:
                 action_name, out_args = "openSystemSettingsFallback", {}
+
+        # A proposed page URL only counts if the page exists — same check
+        # production makes before opening it.
+        if action_name == "openWebsite" and out_args.get("page_url"):
+            if not page_is_real(out_args["page_url"]):
+                out_args.pop("page_url")
 
         actions.append({"action": action_name, "args": out_args})
 
