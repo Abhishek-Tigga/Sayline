@@ -34,22 +34,12 @@ enum AgentAction {
     /// into a real `/watch` URL, which autoplays — unlike the search page.
     /// Falls back to the search page if the lookup fails for any reason.
     case playOnYouTube(query: String)
-    /// Transport control for Apple Music. Verified live that AppleScript
-    /// really starts playback, unlike the search-page route.
-    case controlMusic(MusicCommand)
     /// Distinct from every case above — these don't perform a side
     /// effect, they produce an answer to display. Handled by a separate
     /// AgentExecutor.answer(_:) path rather than the Bool-returning
     /// execute(_:), since "did it succeed" isn't the right question for
     /// a fact lookup.
     case answerQuery(SystemQuery)
-
-    enum MusicCommand: String, CaseIterable {
-        case play = "Play"
-        case pause = "Pause"
-        case next = "Next"
-        case previous = "Previous"
-    }
 
     enum SystemQuery: String, CaseIterable {
         case battery = "Battery"

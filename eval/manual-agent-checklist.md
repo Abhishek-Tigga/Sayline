@@ -44,16 +44,17 @@ over-enunciate, the mishearings are useful data.
 The difference between B1 and C2 is the whole point — same site, same
 kind of query, different verb, different result.
 
-## D. Apple Music control
+## D. Music (all routed to YouTube)
 
-Have Music.app open with something queued first.
+Apple Music was removed 2026-08-09; every music request now goes to
+YouTube. Note there is no pause or skip any more — a link can start a
+video, but nothing can control one already playing. See BACKLOG.md.
 
 | # | Say | Expect |
 |---|---|---|
-| D1 | play music | Audio **actually starts** |
-| D2 | pause | Audio stops |
-| D3 | next track | Skips forward |
-| D4 | play a Kendrick Lamar song on apple music | Apple Music **search page** — known limit, can't autoplay the catalogue |
+| D1 | play a Kendrick Lamar song | Video plays — no site named, still YouTube |
+| D2 | play some music | YouTube, playing something |
+| D3 | play lo-fi on apple music | Still YouTube — the alias is redirected |
 
 ## E. Refusals — these are meant to fail
 

@@ -45,8 +45,6 @@ enum AgentExecutor {
             // full address" hint. Nothing to do here but report failure.
             NSLog("Sayline: agent doesn't know the site \"\(requested)\" and won't guess a domain")
             return false
-        case .controlMusic(let command):
-            return controlMusic(command)
         case .playOnYouTube(let query):
             // AgentRouter resolves this into .openWebsite before execution,
             // so reaching here means the lookup was skipped entirely. Open
@@ -281,30 +279,6 @@ enum AgentExecutor {
         let opened = NSWorkspace.shared.open(url)
         NSLog("Sayline: agent opened website -> \(label) \(url.absoluteString) (success: \(opened))")
         return opened
-    }
-
-    /// Real transport control, not a search page. Verified live
-    /// 2026-08-09 that `play` moves Music.app from paused to playing.
-    ///
-    /// Only covers play/pause/skip on purpose. Playing a *named* track
-    /// would need it to exist in the local library — AppleScript cannot
-    /// reach the streaming catalog — and on this machine the library holds
-    /// a single track, so that path would fail almost every time. Naming a
-    /// song routes to the Apple Music search page via WebsiteCatalog
-    /// instead, which lands one click short of playback but never lies
-    /// about having worked.
-    @discardableResult
-    private static func controlMusic(_ command: AgentAction.MusicCommand) -> Bool {
-        let verb: String
-        switch command {
-        case .play: verb = "play"
-        case .pause: verb = "pause"
-        case .next: verb = "next track"
-        case .previous: verb = "previous track"
-        }
-        let succeeded = runAppleScript("tell application \"Music\" to \(verb)")
-        NSLog("Sayline: agent music \(command.rawValue) (success: \(succeeded))")
-        return succeeded
     }
 
     /// Simulates Cmd+Ctrl+Q, the standard system Lock Screen shortcut —

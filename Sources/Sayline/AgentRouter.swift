@@ -242,24 +242,6 @@ final class AgentRouter {
         [
             "type": "function",
             "function": [
-                "name": "control_music",
-                "description": "Controls playback in the Apple Music app — actually starts, stops or skips audio. Use for \"play music\", \"pause\", \"next track\", \"previous song\", \"resume music\". Do NOT use this when the user names a specific song, artist or album (\"play a Kendrick Lamar song\") — that needs open_website with the Apple Music or YouTube search instead, because playback control cannot pick a track.",
-                "parameters": [
-                    "type": "object",
-                    "properties": [
-                        "command": [
-                            "type": "string",
-                            "enum": ["Play", "Pause", "Next", "Previous"],
-                            "description": "Which transport control to use.",
-                        ]
-                    ],
-                    "required": ["command"],
-                ],
-            ],
-        ],
-        [
-            "type": "function",
-            "function": [
                 "name": "lock_screen",
                 "description": "Locks the Mac's screen immediately.",
                 "parameters": ["type": "object", "properties": [:] as [String: Any]],
@@ -634,13 +616,6 @@ final class AgentRouter {
             case .unknown(let requested):
                 return .unknownWebsite(requested: requested)
             }
-        case "control_music":
-            let raw = arguments["command"] as? String
-            guard let command = Self.fuzzyMatch(raw, as: AgentAction.MusicCommand.self) else {
-                NSLog("Sayline: agent router returned unmatched music command \(raw ?? "nil")")
-                return nil
-            }
-            return .controlMusic(command)
         case "lock_screen":
             return .lockScreen
         case "set_volume":

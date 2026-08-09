@@ -38,14 +38,15 @@ enum WebsiteCatalog {
              searchTemplate: "https://www.google.com/maps/search/%@"),
 
         // Video / music
-        Site(label: "YouTube", aliases: ["youtube", "you tube", "yt"], home: "https://www.youtube.com",
+        // "music" points here on purpose: all music requests default to
+        // YouTube for now (2026-08-09). Apple Music was removed — see
+        // BACKLOG.md for what that gave up and how to bring it back.
+        Site(label: "YouTube", aliases: ["youtube", "you tube", "yt", "music", "apple music", "spotify music"], home: "https://www.youtube.com",
              searchTemplate: "https://www.youtube.com/results?search_query=%@"),
         Site(label: "Netflix", aliases: ["netflix"], home: "https://www.netflix.com",
              searchTemplate: "https://www.netflix.com/search?q=%@"),
         Site(label: "Spotify", aliases: ["spotify"], home: "https://open.spotify.com",
              searchTemplate: "https://open.spotify.com/search/%@"),
-        Site(label: "Apple Music", aliases: ["apple music", "music"], home: "https://music.apple.com",
-             searchTemplate: "https://music.apple.com/search?term=%@"),
 
         // Work
         Site(label: "Gmail", aliases: ["gmail", "google mail"], home: "https://mail.google.com",

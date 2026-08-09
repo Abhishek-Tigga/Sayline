@@ -191,23 +191,41 @@ and [CHANGELOG.md](CHANGELOG.md).
   refusing. The visible-fallback pattern from the settings catalog
   probably applies.
 
-- **Spotify playback control** (Apple Music shipped 2026-08-09, Spotify
-  deliberately deferred — user asked to be reminded). Apple Music now
-  gets real transport control via AppleScript: play, pause, next,
-  previous, verified live moving the app from paused to playing. Spotify
-  exposes the same AppleScript verbs plus `play track <uri>`, so the work
-  is a near copy of `AgentExecutor.controlMusic` with a second target
-  app, plus deciding what "play music" means when both are installed —
-  probably whichever is already running, falling back to a preference.
 
-  Note the limitation Apple Music hit, which Spotify may not share:
-  AppleScript can only play tracks in the *local library*, not the
-  streaming catalogue, and this machine's library holds one track. So
-  naming a song ("play a Kendrick Lamar song") routes to the Apple Music
-  search page instead — one click short of playback, but honest about it.
-  Spotify's `play track` takes a URI, and getting a URI for a named song
-  needs their Web API, so the same wall exists there unless an API key is
-  added.
+- **Bring back native music playback: Apple Music, then Spotify**
+  (Apple Music was built and working, then deliberately removed
+  2026-08-09 — user asked to be reminded, so raise this unprompted when
+  music comes up again). All music now defaults to YouTube, which does
+  play real audio via the video path.
+
+  **What was given up.** Apple Music had genuine transport control
+  through AppleScript — play, pause, next track, previous — verified
+  live moving the app from paused to playing. YouTube has no equivalent:
+  a link can start a video, but nothing can pause or skip what is
+  already playing. So "pause" and "next track" no longer do anything.
+  That is the real cost of the simplification, and it is worth
+  re-reading before deciding this was purely a cleanup.
+
+  **What was already impossible, so nothing was lost there.** Playing a
+  *named* song through Apple Music never worked and the dead ends are
+  documented: the free iTunes Search API does return the exact track,
+  but opening its URL leaves Music.app `stopped`, and sending `play`
+  afterwards errors with "Can't get name of current track" because a URL
+  navigation never queues anything. Real catalogue playback needs
+  MusicKit — Apple Developer account ($99/yr, already required for code
+  signing), a MusicKit key and developer token, plus an Apple Music
+  subscription on the user's side.
+
+  **Spotify**, still never built, hits a similar wall: it exposes the
+  same AppleScript transport verbs, so play/pause/skip would work, but
+  `play track` takes a URI and getting one for a named song needs their
+  Web API.
+
+  Restoring transport control is small — the removed `controlMusic` in
+  `AgentExecutor` plus its `control_music` tool, recoverable from git
+  history around commit `df34cd5`. Deciding *which* app a bare "pause"
+  should target when several are installed is the actual design
+  question, and probably means whichever is currently playing.
 
 - **List-shaped query answers** (e.g. "what are the biggest files in my
   Downloads folder"). Single-fact queries (battery, storage, memory,
