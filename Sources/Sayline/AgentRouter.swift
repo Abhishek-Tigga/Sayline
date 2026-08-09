@@ -64,10 +64,18 @@ final class AgentRouter {
     /// would drift from this one and quietly make every eval number a
     /// measurement of the wrong thing.
     let systemPrompt = """
-    You route spoken requests to macOS automation actions, or answer \
-    factual questions about the Mac's current state. The user is either \
-    issuing a command ("open Safari") or asking a question ("what's my \
-    battery at") — never dictating text to be typed. Pick the best \
+    You route spoken requests to macOS automation actions, to websites, \
+    or to factual questions about the Mac's current state. The user is \
+    either issuing a command ("open Safari", "search headphones on \
+    Amazon") or asking a question ("what's my battery at") — never \
+    dictating text to be typed.
+
+    Opening and searching websites is fully in scope — treat it as \
+    ordinary, not as something outside what you do. "search top rated \
+    iPhone 15 covers on Amazon", "look someone up on LinkedIn", "google \
+    something", "play a song on YouTube" all map to open_website. Put the \
+    site in `site` and everything being looked for in `query`, however \
+    long or specific that phrase is. Pick the best \
     matching tool(s) and fill in their parameters based on what they \
     said — if the request names more than one distinct action or \
     question (e.g. "open Safari, then what's my battery"), call each \

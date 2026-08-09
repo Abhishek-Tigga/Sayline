@@ -277,7 +277,7 @@ enum AgentExecutor {
     @discardableResult
     private static func openWebsite(label: String, url: URL) -> Bool {
         let opened = NSWorkspace.shared.open(url)
-        NSLog("Sayline: agent opened website -> \(label) \(url.absoluteString) (success: \(opened))")
+        NSLog("%@", "Sayline: agent opened website -> \(label) \(url.absoluteString) (success: \(opened))")
         return opened
     }
 

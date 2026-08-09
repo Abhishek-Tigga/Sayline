@@ -87,6 +87,11 @@ enum WebsiteCatalog {
              searchTemplate: "https://dribbble.com/search/%@"),
         Site(label: "Amazon", aliases: ["amazon"], home: "https://www.amazon.com",
              searchTemplate: "https://www.amazon.com/s?k=%@"),
+        // "apple india" was refused before this existed — a reasonable
+        // thing to say that isn't a domain and wasn't a known name.
+        Site(label: "Apple", aliases: ["apple", "apple store", "apple india", "apple website"],
+             home: "https://www.apple.com/in",
+             searchTemplate: "https://www.apple.com/in/search/%@"),
     ]
 
     /// What the router model is offered. It can only pick a name it has

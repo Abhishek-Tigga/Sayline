@@ -63,7 +63,7 @@ enum YouTubeSearch {
                 NSLog("Sayline: YouTube search returned no video for \"\(query)\"")
                 return nil
             }
-            NSLog("Sayline: YouTube top result for \"\(query)\" -> \(first.snippet.title) [\(videoID)]")
+            NSLog("%@", "Sayline: YouTube top result for \"\(query)\" -> \(first.snippet.title) [\(videoID)]")
             return URL(string: "https://www.youtube.com/watch?v=\(videoID)")
         } catch {
             NSLog("Sayline: YouTube search error -> \(error.localizedDescription)")
