@@ -52,6 +52,10 @@ TOOL_TO_ACTION = {
     "find_file": ("findFile", {"query": "query", "folder": "folder", "subpath": "subpath"}),
     "open_folder": ("openFolder", {"folder": "folder", "subpath": "subpath"}),
     "open_system_setting": ("openSystemSetting", {"pane": "pane"}),
+    # `page` is the deep-link flag: the user wants a specific page on the
+    # site, not its search results. Scored here as a routing decision; the
+    # URL it resolves to is deterministic Swift, tested separately.
+    "open_website": ("openWebsite", {"site": "site", "query": "query", "play": "play", "page_url": "page_url"}),
     "lock_screen": ("lockScreen", {}),
     "set_volume": ("setVolume", {"change": "change"}),
     "set_wifi": ("setWiFi", {"enabled": "enabled"}),
@@ -71,6 +75,7 @@ enum TranscriptionError: Error { case missingAPIKey, invalidResponse, apiError(S
 enum APIKeyProvider {
     static var groqAPIKey: String? { nil }
     static var openAIAPIKey: String? { nil }
+    static var youTubeAPIKey: String? { nil }
 }
 """
 
@@ -124,9 +129,14 @@ if mode == "dump-config" {
 
 def swift_helper(mode, stdin_text=""):
     """Concatenate the real sources with stubs + a main, run under `swift`."""
+    # Every dependency of AgentRouter has to be here. Missing one fails
+    # loudly at compile time, which is the good outcome — but it is worth
+    # noting this list has to grow whenever the router gains a dependency.
     parts = [
         (SRC / "AgentAction.swift").read_text(),
         (SRC / "SettingsPaneCatalog.swift").read_text(),
+        (SRC / "WebsiteCatalog.swift").read_text(),
+        (SRC / "YouTubeSearch.swift").read_text(),
         (SRC / "AgentRouter.swift").read_text(),
         SWIFT_STUBS,
         SWIFT_MAIN,
@@ -413,6 +423,14 @@ def case_passes(expected, actual):
         if exp["action"] != act["action"]:
             return False
         for k, v in (exp.get("args") or {}).items():
+            # `name__contains` matches loosely — used for URLs, where a
+            # trailing slash or an extra path segment doesn't change whether
+            # the answer is right.
+            if k.endswith("__contains"):
+                actual = str((act.get("args") or {}).get(k[: -len("__contains")], ""))
+                if str(v).lower() not in actual.lower():
+                    return False
+                continue
             if not same_value(v, (act.get("args") or {}).get(k)):
                 return False
     return True

@@ -48,6 +48,10 @@ enum AgentExecutor {
             // full address" hint. Nothing to do here but report failure.
             NSLog("Sayline: agent doesn't know the site \"\(requested)\" and won't guess a domain")
             return false
+        case .openDirectPage(let url, _, _):
+            // AgentRouter verifies and replaces this before execution;
+            // reaching here means the check was skipped.
+            return openWebsite(label: url.host ?? "page", url: url)
         case .playOnYouTube(let query):
             // AgentRouter resolves this into .openWebsite before execution,
             // so reaching here means the lookup was skipped entirely. Open

@@ -51,3 +51,5 @@ attempt.
 | 2026-08-08 21:38 UTC | `dc8b1af`+vocab-edit | openai | `gpt-4o-mini` | 27/30 (90%) | 0 (0%) | 1579 | 979 ms |
 | 2026-08-08 21:39 UTC | `dc8b1af`+vocab-edit | openai | `gpt-5.6-luna` | 26/30 (87%) | 0 (0%) | 1663 | 1228 ms |
 | 2026-08-08 21:57 UTC | `434f8c6`+pane-correction | openai | `gpt-4o-mini` | 28/30 (93%) | 0 (0%) | 1518 | 999 ms |
+| 2026-08-09 14:38 UTC | `3bab25b` | openai | `gpt-4o-mini` | 32/38 (84%) | 0 (0%) | 1963 | 1020 ms |
+| 2026-08-09 14:41 UTC | `3bab25b+dirty` | openai | `gpt-4o-mini` | 36/38 (95%) | 0 (0%) | 2064 | 1069 ms |

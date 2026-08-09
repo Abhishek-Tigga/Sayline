@@ -37,6 +37,10 @@ enum AgentAction {
     /// into a real `/watch` URL, which autoplays — unlike the search page.
     /// Falls back to the search page if the lookup fails for any reason.
     case playOnYouTube(query: String)
+    /// A specific page the model supplied from memory. Checked with a HEAD
+    /// request before opening, because it might not exist; falls back to
+    /// the site's search when it doesn't.
+    case openDirectPage(url: URL, fallbackSite: String, fallbackQuery: String?)
     /// Distinct from every case above — these don't perform a side
     /// effect, they produce an answer to display. Handled by a separate
     /// AgentExecutor.answer(_:) path rather than the Bool-returning

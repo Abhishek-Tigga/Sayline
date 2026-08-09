@@ -238,6 +238,10 @@ final class AgentRouter {
                             "type": "string",
                             "description": "What to search for on that site. Omit when the user just wants the site opened.",
                         ],
+                        "page_url": [
+                            "type": "string",
+                            "description": "Use ONLY when the user wants a specific page rather than search results — \"open the iPhone page on Apple India\", \"show me Notion's pricing page\". Put the complete real URL of that page here (e.g. https://www.apple.com/in/iphone/). Leave it out entirely unless you are confident the exact URL exists; a guess that 404s is worse than search results. Never use it for ordinary searches like \"best headphones on Amazon\".",
+                        ],
                         "play": [
                             "type": "boolean",
                             "description": "True only when the user said \"play\" rather than \"open\", \"search\" or \"find\" — e.g. \"play a Kendrick Lamar song on YouTube\". Currently honoured for YouTube only, where it opens the top result directly so it starts playing instead of showing a list.",
@@ -365,6 +369,10 @@ final class AgentRouter {
     private func resolvePlayback(_ actions: [AgentAction]) async -> [AgentAction] {
         var resolved: [AgentAction] = []
         for action in actions {
+            if case .openDirectPage(let url, let site, let query) = action {
+                resolved.append(await verifiedPage(url: url, site: site, query: query))
+                continue
+            }
             guard case .playOnYouTube(let query) = action else {
                 resolved.append(action)
                 continue
@@ -379,6 +387,51 @@ final class AgentRouter {
             }
         }
         return resolved
+    }
+
+    /// The model supplies deep-link URLs from memory, and memory is not
+    /// reliable — measured 4 of 5 real, with `apple.com/shop/buy-airpods`
+    /// invented outright. A HEAD request separates them: real pages answer
+    /// 200, invented ones 404 or 401.
+    ///
+    /// The check costs one round trip and only runs when a page_url was
+    /// supplied, so ordinary searches are unaffected. A short timeout
+    /// matters more than certainty here — this sits in a hold-to-talk loop,
+    /// and falling back to search is a perfectly good outcome.
+    private func verifiedPage(url: URL, site: String, query: String?) async -> AgentAction {
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 2.5
+        request.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36",
+            forHTTPHeaderField: "User-Agent"
+        )
+
+        let started = Date()
+        var reachable = false
+        if let (_, response) = try? await URLSession.shared.data(for: request),
+           let http = response as? HTTPURLResponse {
+            reachable = (200..<400).contains(http.statusCode)
+            NSLog("%@", "Sayline: page check \(url.absoluteString) -> HTTP \(http.statusCode) in \(Int(Date().timeIntervalSince(started) * 1000))ms")
+        } else {
+            NSLog("%@", "Sayline: page check \(url.absoluteString) -> unreachable")
+        }
+
+        if reachable {
+            return .openWebsite(label: url.host ?? site, url: url)
+        }
+        // Bad guess — fall back to exactly what would have happened without
+        // this feature, so it can only ever improve on the old behaviour.
+        switch WebsiteCatalog.resolve(site, query: query) {
+        case .site(let label, let url):
+            return .openWebsite(label: label, url: url)
+        case .siteWithoutSearch(let label, let url, let dropped):
+            return .openedSiteButCouldNotSearch(label: label, url: url, query: dropped)
+        case .explicitDomain(let url):
+            return .openWebsite(label: url.host ?? site, url: url)
+        case .unknown(let requested):
+            return .unknownWebsite(requested: requested)
+        }
     }
 
     private func routeWithRetry(_ transcript: String) async throws -> [AgentAction] {
@@ -611,6 +664,10 @@ final class AgentRouter {
         case "open_website":
             guard let site = arguments["site"] as? String else { return nil }
             let query = (arguments["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let pageURL = (arguments["page_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !pageURL.isEmpty, let url = URL(string: pageURL), url.scheme?.hasPrefix("http") == true {
+                return .openDirectPage(url: url, fallbackSite: site, fallbackQuery: query)
+            }
             let wantsPlayback = (arguments["play"] as? Bool) ?? false
             if wantsPlayback, let query, !query.isEmpty,
                WebsiteCatalog.isYouTube(site) {
