@@ -95,6 +95,14 @@ enum WebsiteCatalog {
         sites.map { $0.label }
     }
 
+    /// Whether what the user said means YouTube — used to decide if a
+    /// "play" request can be upgraded to a real video.
+    static func isYouTube(_ requested: String) -> Bool {
+        let n = normalize(requested)
+        guard let site = sites.first(where: { $0.label == "YouTube" }) else { return false }
+        return site.aliases.contains { normalize($0) == n } || normalize(site.label) == n
+    }
+
     enum Resolution {
         case site(label: String, url: URL)
         /// Contains a dot, so treat it as a real address the user spelled out.

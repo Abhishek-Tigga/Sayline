@@ -47,10 +47,31 @@ enum APIKeyProvider {
         cachedKey = nil
         hasResolvedOpenAI = false
         cachedOpenAIKey = nil
+        hasResolvedYouTube = false
+        cachedYouTubeKey = nil
     }
 
     private static var hasResolvedOpenAI = false
     private static var cachedOpenAIKey: String?
+    private static var hasResolvedYouTube = false
+    private static var cachedYouTubeKey: String?
+
+    /// Used only to turn "play X on YouTube" into a real video, so its
+    /// absence degrades to opening the search page rather than failing.
+    static var youTubeAPIKey: String? {
+        if hasResolvedYouTube { return cachedYouTubeKey }
+        let resolved: String?
+        if let stored = KeychainStore.load(.youTube), !stored.isEmpty {
+            resolved = stored
+        } else if let envKey = ProcessInfo.processInfo.environment["YOUTUBE_API_KEY"], !envKey.isEmpty {
+            resolved = envKey
+        } else {
+            resolved = nil
+        }
+        cachedYouTubeKey = resolved
+        hasResolvedYouTube = true
+        return resolved
+    }
 
     /// Used by the agent router while it runs on OpenAI. Same
     /// Keychain-then-environment order and same caching rationale as the

@@ -9,6 +9,7 @@ enum KeychainStore {
     enum Key: String {
         case groq = "GROQ_API_KEY"
         case openAI = "OPENAI_API_KEY"
+        case youTube = "YOUTUBE_API_KEY"
     }
 
     private static let service = "com.abhishektigga.sayline"

@@ -230,6 +230,10 @@ final class AgentRouter {
                             "type": "string",
                             "description": "What to search for on that site. Omit when the user just wants the site opened.",
                         ],
+                        "play": [
+                            "type": "boolean",
+                            "description": "True only when the user said \"play\" rather than \"open\", \"search\" or \"find\" — e.g. \"play a Kendrick Lamar song on YouTube\". Currently honoured for YouTube only, where it opens the top result directly so it starts playing instead of showing a list.",
+                        ],
                     ],
                     "required": ["site"],
                 ],
@@ -359,6 +363,35 @@ final class AgentRouter {
     }
 
     func route(_ transcript: String) async throws -> [AgentAction] {
+        let actions = try await routeWithRetry(transcript)
+        return await resolvePlayback(actions)
+    }
+
+    /// Turns any `.playOnYouTube` into a real `/watch` URL, which
+    /// autoplays. Done here rather than in the executor because it needs a
+    /// network call and `AgentExecutor.execute` is synchronous — and here
+    /// the call sits inside the routing wait the user is already expecting,
+    /// rather than adding a second visible pause.
+    private func resolvePlayback(_ actions: [AgentAction]) async -> [AgentAction] {
+        var resolved: [AgentAction] = []
+        for action in actions {
+            guard case .playOnYouTube(let query) = action else {
+                resolved.append(action)
+                continue
+            }
+            if let url = await YouTubeSearch.topVideoURL(for: query) {
+                resolved.append(.openWebsite(label: "YouTube — \(query)", url: url))
+            } else if case .site(let label, let url) = WebsiteCatalog.resolve("YouTube", query: query) {
+                // Key missing, quota gone or network flaky — the search page
+                // is exactly what this did before, so degrade to that.
+                NSLog("Sayline: couldn't resolve a video, opening YouTube search for \"\(query)\" instead")
+                resolved.append(.openWebsite(label: label, url: url))
+            }
+        }
+        return resolved
+    }
+
+    private func routeWithRetry(_ transcript: String) async throws -> [AgentAction] {
         do {
             return try await performRoute(transcript, temperature: 0.1)
         } catch let failure as RetryableToolFailure {
@@ -588,6 +621,11 @@ final class AgentRouter {
         case "open_website":
             guard let site = arguments["site"] as? String else { return nil }
             let query = (arguments["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let wantsPlayback = (arguments["play"] as? Bool) ?? false
+            if wantsPlayback, let query, !query.isEmpty,
+               WebsiteCatalog.isYouTube(site) {
+                return .playOnYouTube(query: query)
+            }
             switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query) {
             case .site(let label, let url):
                 return .openWebsite(label: query.map { "\(label) — \($0)" } ?? label, url: url)

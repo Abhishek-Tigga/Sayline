@@ -47,6 +47,15 @@ enum AgentExecutor {
             return false
         case .controlMusic(let command):
             return controlMusic(command)
+        case .playOnYouTube(let query):
+            // AgentRouter resolves this into .openWebsite before execution,
+            // so reaching here means the lookup was skipped entirely. Open
+            // the search page rather than doing nothing.
+            let fallback = WebsiteCatalog.resolve("YouTube", query: query)
+            if case .site(let label, let url) = fallback {
+                return openWebsite(label: label, url: url)
+            }
+            return false
         case .answerQuery(let query):
             // The normal path for this is AppDelegate special-casing
             // .answerQuery before calling execute() at all, so it can

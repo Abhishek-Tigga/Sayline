@@ -30,6 +30,10 @@ enum AgentAction {
     /// purpose rather than guessing a TLD: opening the wrong site is more
     /// annoying than saying "say the full address".
     case unknownWebsite(requested: String)
+    /// "play <thing> on YouTube". Resolved asynchronously in AgentRouter
+    /// into a real `/watch` URL, which autoplays — unlike the search page.
+    /// Falls back to the search page if the lookup fails for any reason.
+    case playOnYouTube(query: String)
     /// Transport control for Apple Music. Verified live that AppleScript
     /// really starts playback, unlike the search-page route.
     case controlMusic(MusicCommand)
