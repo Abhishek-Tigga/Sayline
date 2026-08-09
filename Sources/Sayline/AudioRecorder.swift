@@ -81,28 +81,53 @@ final class AudioRecorder {
         NSLog("Sayline: recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s")
     }
 
-    /// True if the just-finished recording is too short or essentially
-    /// silent to be a real dictation attempt — an accidental hotkey tap,
-    /// not speech. Whisper hallucinates short filler phrases ("Thank
-    /// you.", ".") on near-silent audio like this, which was showing up
-    /// as real junk pastes in Sayline's own history log. Checked here,
-    /// before transcription is ever attempted, so it costs nothing.
+    /// True only if the just-finished recording is an accidental hotkey tap
+    /// rather than speech. Exists because Whisper hallucinates filler
+    /// phrases ("Thank you.", ".") on near-silent audio, which showed up as
+    /// junk pastes in the history log.
+    ///
+    /// Rewritten 2026-08-09 after the first version silently ate real
+    /// dictation — the log showed 6s, 8s and 11s recordings all rejected as
+    /// "too short/silent". Two mistakes, both now fixed:
+    ///
+    /// 1. It averaged loudness (RMS) across the whole file. Natural pauses
+    ///    between words drag that average down, so a long sentence with
+    ///    gaps scored lower than a short continuous one. Peak amplitude is
+    ///    the right measure: it asks "was there ever real sound here",
+    ///    which is the actual question, and pauses can't dilute it.
+    /// 2. Every failure path returned `true`, i.e. "throw it away". A check
+    ///    that cannot make up its mind must fail open — a wasted API call
+    ///    is cheap, silently binning what someone just said is not.
     func isTooShortOrSilent() -> Bool {
-        guard lastRecordingDuration >= 0.4 else { return true }
-        guard let url = lastRecordingURL, let file = try? AVAudioFile(forReading: url) else { return true }
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else { return true }
-        guard (try? file.read(into: buffer)) != nil else { return true }
-        guard let channelData = buffer.floatChannelData else { return true }
-
-        let frameCount = Int(buffer.frameLength)
-        guard frameCount > 0 else { return true }
-        let samples = channelData[0]
-        var sumSquares: Float = 0
-        for i in 0..<frameCount {
-            sumSquares += samples[i] * samples[i]
+        // A hold this brief is a mis-tap, not a word.
+        if lastRecordingDuration < 0.4 {
+            NSLog("Sayline: recording \(lastRecordingDuration)s — too short to be speech, skipping")
+            return true
         }
-        let rms = (sumSquares / Float(frameCount)).squareRoot()
-        return rms < 0.005 // near-silence threshold; normal speech sits well above 0.02
+
+        guard let url = lastRecordingURL,
+              let file = try? AVAudioFile(forReading: url),
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                            frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil,
+              let channelData = buffer.floatChannelData,
+              buffer.frameLength > 0 else {
+            NSLog("Sayline: couldn't measure audio level — transcribing anyway")
+            return false // fail open
+        }
+
+        let samples = channelData[0]
+        var peak: Float = 0
+        for i in 0..<Int(buffer.frameLength) {
+            peak = max(peak, abs(samples[i]))
+        }
+
+        // Deliberately generous. Room tone and mic self-noise peak around
+        // 0.001–0.005; even quiet speech peaks well above 0.05. Logged so
+        // the threshold can be tuned against real numbers instead of guesses.
+        let isSilent = peak < 0.01
+        NSLog("Sayline: audio peak \(peak) over \(lastRecordingDuration)s -> \(isSilent ? "silent, skipping" : "has speech")")
+        return isSilent
     }
 
     private func setInputDevice(_ deviceID: AudioDeviceID, on node: AVAudioInputNode) {

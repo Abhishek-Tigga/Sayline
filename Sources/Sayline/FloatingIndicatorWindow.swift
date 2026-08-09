@@ -21,6 +21,34 @@ import SwiftUI
 /// exact AppKit cause wasn't pinned down). A freshly constructed panel
 /// can't carry forward whatever internal ordering state got corrupted,
 /// so this sidesteps the bug class instead of chasing the root cause.
+/// Temporary instrumentation (2026-08-09) for a suspected window leak.
+///
+/// `hide()` calls `orderOut(_:)` and drops our reference, but never
+/// `close()`, and the panel sets `isReleasedWhenClosed = false`. If AppKit
+/// is still holding these, every dictation leaves behind a live panel — and
+/// each one keeps running three `TimelineView(.animation)` loops (redrawing
+/// every display frame, 60–120fps) plus a Liquid Glass material that
+/// continuously samples the screen behind it. 22 of those accumulated in
+/// one 7-minute session, which is a plausible cause of the system-wide
+/// freezes, since a bogged-down graphics system would also explain why the
+/// event tap gets cut while the app is otherwise idle.
+///
+/// Counting creates against deallocs settles it. Equal counts means windows
+/// are fine and the freeze is elsewhere; zero deallocs confirms the leak.
+private final class IndicatorPanel: NSPanel {
+    private static var liveCount = 0
+
+    static func noteCreated() {
+        liveCount += 1
+        NSLog("Sayline: [panel-leak-probe] created — \(liveCount) alive")
+    }
+
+    deinit {
+        IndicatorPanel.liveCount -= 1
+        NSLog("Sayline: [panel-leak-probe] deallocated — \(IndicatorPanel.liveCount) alive")
+    }
+}
+
 final class FloatingIndicatorWindow {
     private var panel: NSPanel?
     private let viewModel = IndicatorViewModel()
@@ -76,12 +104,13 @@ final class FloatingIndicatorWindow {
     }
 
     private func makePanel() -> NSPanel {
-        let panel = NSPanel(
+        let panel = IndicatorPanel(
             contentRect: NSRect(x: 0, y: 0, width: width, height: height),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
+        IndicatorPanel.noteCreated()
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // Forces dark rendering for the whole hosted view tree regardless
