@@ -191,6 +191,24 @@ and [CHANGELOG.md](CHANGELOG.md).
   refusing. The visible-fallback pattern from the settings catalog
   probably applies.
 
+- **Spotify playback control** (Apple Music shipped 2026-08-09, Spotify
+  deliberately deferred — user asked to be reminded). Apple Music now
+  gets real transport control via AppleScript: play, pause, next,
+  previous, verified live moving the app from paused to playing. Spotify
+  exposes the same AppleScript verbs plus `play track <uri>`, so the work
+  is a near copy of `AgentExecutor.controlMusic` with a second target
+  app, plus deciding what "play music" means when both are installed —
+  probably whichever is already running, falling back to a preference.
+
+  Note the limitation Apple Music hit, which Spotify may not share:
+  AppleScript can only play tracks in the *local library*, not the
+  streaming catalogue, and this machine's library holds one track. So
+  naming a song ("play a Kendrick Lamar song") routes to the Apple Music
+  search page instead — one click short of playback, but honest about it.
+  Spotify's `play track` takes a URI, and getting a URI for a named song
+  needs their Web API, so the same wall exists there unless an API key is
+  added.
+
 - **List-shaped query answers** (e.g. "what are the biggest files in my
   Downloads folder"). Single-fact queries (battery, storage, memory,
   uptime, volume, macOS version, now-playing) shipped 2026-08-05, all

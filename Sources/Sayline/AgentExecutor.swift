@@ -38,6 +38,15 @@ enum AgentExecutor {
             return emptyTrash()
         case .takeScreenshot:
             return takeScreenshot()
+        case .openWebsite(let label, let url):
+            return openWebsite(label: label, url: url)
+        case .unknownWebsite(let requested):
+            // Handled visibly in AppDelegate, which flashes the "say the
+            // full address" hint. Nothing to do here but report failure.
+            NSLog("Sayline: agent doesn't know the site \"\(requested)\" and won't guess a domain")
+            return false
+        case .controlMusic(let command):
+            return controlMusic(command)
         case .answerQuery(let query):
             // The normal path for this is AppDelegate special-casing
             // .answerQuery before calling execute() at all, so it can
@@ -253,6 +262,40 @@ enum AgentExecutor {
     private static func openSystemSettingsFallback(requestedPaneName: String) -> Bool {
         NSLog("Sayline: agent could not match settings pane \"\(requestedPaneName)\" in the catalog — doing nothing, flashing a message instead")
         return false
+    }
+
+    /// Opens in the user's default browser. Named-browser routing ("open
+    /// x in Chrome") is deliberately not here yet — it needs its own tool
+    /// parameter, and the default covers the common case.
+    @discardableResult
+    private static func openWebsite(label: String, url: URL) -> Bool {
+        let opened = NSWorkspace.shared.open(url)
+        NSLog("Sayline: agent opened website -> \(label) \(url.absoluteString) (success: \(opened))")
+        return opened
+    }
+
+    /// Real transport control, not a search page. Verified live
+    /// 2026-08-09 that `play` moves Music.app from paused to playing.
+    ///
+    /// Only covers play/pause/skip on purpose. Playing a *named* track
+    /// would need it to exist in the local library — AppleScript cannot
+    /// reach the streaming catalog — and on this machine the library holds
+    /// a single track, so that path would fail almost every time. Naming a
+    /// song routes to the Apple Music search page via WebsiteCatalog
+    /// instead, which lands one click short of playback but never lies
+    /// about having worked.
+    @discardableResult
+    private static func controlMusic(_ command: AgentAction.MusicCommand) -> Bool {
+        let verb: String
+        switch command {
+        case .play: verb = "play"
+        case .pause: verb = "pause"
+        case .next: verb = "next track"
+        case .previous: verb = "previous track"
+        }
+        let succeeded = runAppleScript("tell application \"Music\" to \(verb)")
+        NSLog("Sayline: agent music \(command.rawValue) (success: \(succeeded))")
+        return succeeded
     }
 
     /// Simulates Cmd+Ctrl+Q, the standard system Lock Screen shortcut —

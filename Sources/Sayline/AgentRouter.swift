@@ -217,6 +217,45 @@ final class AgentRouter {
         [
             "type": "function",
             "function": [
+                "name": "open_website",
+                "description": "Opens a website in the browser, optionally at its search results. Use for \"open youtube\", \"open toolfolio.com\", \"search kendrick lamar on youtube\", \"look up John Smith on LinkedIn\", \"google swift concurrency\". Put ONLY the site in `site` and ONLY the thing being searched for in `query` — for \"search lo-fi music on youtube\", site is \"YouTube\" and query is \"lo-fi music\". If the user names a site not in the list below, pass exactly what they said and it will be handled. Note \"play <song> on youtube\" is also this tool: it opens the search results, which is as far as a link can go.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "site": [
+                            "type": "string",
+                            "description": "The website. Known ones: \(WebsiteCatalog.promptVocabulary.joined(separator: ", ")). If the user said a full address like \"toolfolio.com\", pass that instead.",
+                        ],
+                        "query": [
+                            "type": "string",
+                            "description": "What to search for on that site. Omit when the user just wants the site opened.",
+                        ],
+                    ],
+                    "required": ["site"],
+                ],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
+                "name": "control_music",
+                "description": "Controls playback in the Apple Music app — actually starts, stops or skips audio. Use for \"play music\", \"pause\", \"next track\", \"previous song\", \"resume music\". Do NOT use this when the user names a specific song, artist or album (\"play a Kendrick Lamar song\") — that needs open_website with the Apple Music or YouTube search instead, because playback control cannot pick a track.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "command": [
+                            "type": "string",
+                            "enum": ["Play", "Pause", "Next", "Previous"],
+                            "description": "Which transport control to use.",
+                        ]
+                    ],
+                    "required": ["command"],
+                ],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
                 "name": "lock_screen",
                 "description": "Locks the Mac's screen immediately.",
                 "parameters": ["type": "object", "properties": [:] as [String: Any]],
@@ -546,6 +585,24 @@ final class AgentRouter {
             // dynamic catalog was built around.
             NSLog("Sayline: agent router returned unmatched settings pane \"\(paneRaw)\" — no catalog match")
             return .openSystemSettingsFallback(requestedPaneName: paneRaw)
+        case "open_website":
+            guard let site = arguments["site"] as? String else { return nil }
+            let query = (arguments["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query) {
+            case .site(let label, let url):
+                return .openWebsite(label: query.map { "\(label) — \($0)" } ?? label, url: url)
+            case .explicitDomain(let url):
+                return .openWebsite(label: url.host ?? site, url: url)
+            case .unknown(let requested):
+                return .unknownWebsite(requested: requested)
+            }
+        case "control_music":
+            let raw = arguments["command"] as? String
+            guard let command = Self.fuzzyMatch(raw, as: AgentAction.MusicCommand.self) else {
+                NSLog("Sayline: agent router returned unmatched music command \(raw ?? "nil")")
+                return nil
+            }
+            return .controlMusic(command)
         case "lock_screen":
             return .lockScreen
         case "set_volume":

@@ -296,6 +296,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             self.indicatorWindow.flashMessage(answer, duration: 4.5)
                             continue
                         }
+                        if case .unknownWebsite(let requested) = action {
+                            AgentExecutor.execute(action)
+                            // Refuse rather than guess a TLD, and say what
+                            // would work instead — a bare "couldn't do that"
+                            // leaves no way to succeed on the retry.
+                            self.indicatorWindow.flashMessage("Say the full address, like \(requested).com", duration: 3.5)
+                            continue
+                        }
                         if case .openSystemSettingsFallback(let requestedPaneName) = action {
                             AgentExecutor.execute(action)
                             self.indicatorWindow.flashMessage("Couldn't find \"\(requestedPaneName)\" settings", duration: 3.0)
