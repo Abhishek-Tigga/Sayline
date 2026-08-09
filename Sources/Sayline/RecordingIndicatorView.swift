@@ -36,10 +36,47 @@ enum PillStyle {
     /// #F2F2F2 — hsl(0, 0%, 95%), a pure neutral (no hue/saturation).
     static let foreground = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
     /// True black. Opacity is applied per-instance so the comparison
-    /// harness can render several at once.
+    /// harness can render both surfaces at once.
     static let tintBase = Color(red: 0, green: 0, blue: 0)
     static let defaultTintOpacity: Double = 0.70
     static let cornerRadius: CGFloat = 8
+}
+
+/// The two container treatments being compared.
+///
+/// They are not two tints of the same thing — that distinction matters
+/// when judging them. `.liquidGlass` is the real macOS 26 material, which
+/// re-renders itself brighter over light content; that adaptivity is the
+/// source of the known flicker. `.flat` is an ordinary blurred backdrop
+/// under a fixed fill, so it cannot adapt and should not flicker.
+enum SurfaceStyle: Equatable {
+    /// Real Liquid Glass with a tint over it. Current shipping look:
+    /// true black at 70%.
+    case liquidGlass(tint: Color)
+    /// Figma node 91:778 — `bg-[rgba(20,20,20,0.75)]` over
+    /// `backdrop-blur`. Flat and non-adaptive.
+    case flat(fill: Color)
+
+    static let shipping = SurfaceStyle.liquidGlass(
+        tint: PillStyle.tintBase.opacity(PillStyle.defaultTintOpacity)
+    )
+    /// #141414 at 75%.
+    static let flatCandidate = SurfaceStyle.flat(
+        fill: Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255).opacity(0.75)
+    )
+}
+
+/// TEMPORARY — `ui-speech-back` branch only. Renders both surface
+/// treatments side by side so they can be judged against the same live
+/// backdrop in one pass. Judging serially meant a rebuild per value, and
+/// each rebuild costs a re-grant of Accessibility.
+///
+/// Set to `nil` for normal single-stack rendering.
+enum SurfaceComparison {
+    static let variants: [(style: SurfaceStyle, label: String)]? = [
+        (.shipping, "Glass · #000 70%"),
+        (.flatCandidate, "Flat · #141414 75%"),
+    ]
 }
 
 // MARK: - Top level
@@ -74,21 +111,51 @@ enum PillStyle {
 struct RecordingIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
-    /// Speech box, connector dots, pill — spaced 8px apart per Figma
-    /// (node 70:95 and siblings).
+    var body: some View {
+        Group {
+            if let variants = SurfaceComparison.variants {
+                HStack(alignment: .bottom, spacing: 24) {
+                    ForEach(Array(variants.enumerated()), id: \.offset) { _, variant in
+                        IndicatorStack(
+                            viewModel: viewModel,
+                            surface: variant.style,
+                            label: variant.label
+                        )
+                    }
+                }
+            } else {
+                IndicatorStack(viewModel: viewModel, surface: .shipping, label: nil)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+    }
+}
+
+/// One complete assembly: speech box, connector dots, pill — spaced 8px
+/// apart per Figma (node 70:95 and siblings). Both surfaces in a stack
+/// share one style, so the comparison is like for like.
+private struct IndicatorStack: View {
+    @ObservedObject var viewModel: IndicatorViewModel
+    let surface: SurfaceStyle
+    let label: String?
+
     var body: some View {
         VStack(spacing: 8) {
             if let transcript = viewModel.transcript, !transcript.isEmpty {
                 SpeechBackBox(
                     text: transcript,
                     setAt: viewModel.transcriptSetAt,
-                    tintOpacity: PillStyle.defaultTintOpacity
+                    surface: surface
                 )
                 LinearProcessingDots()
             }
-            PillView(viewModel: viewModel, tintOpacity: PillStyle.defaultTintOpacity)
+            PillView(viewModel: viewModel, surface: surface)
+            if let label {
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(PillStyle.foreground.opacity(0.55))
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 }
 
@@ -100,7 +167,7 @@ struct RecordingIndicatorView: View {
 private struct SpeechBackBox: View {
     let text: String
     let setAt: Date
-    let tintOpacity: Double
+    let surface: SurfaceStyle
 
     static let maxWidth: CGFloat = 324
     static let fontSize: CGFloat = 12
@@ -127,7 +194,7 @@ private struct SpeechBackBox: View {
                 .frame(maxWidth: Self.maxWidth - metrics.horizontalPadding * 2, alignment: .leading)
                 .padding(.horizontal, metrics.horizontalPadding)
                 .padding(.vertical, metrics.verticalPadding)
-                .glassBackground(cornerRadius: metrics.cornerRadius, tintOpacity: tintOpacity)
+                .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
         }
     }
 
@@ -247,7 +314,7 @@ private struct LinearProcessingDots: View {
 
 private struct PillView: View {
     @ObservedObject var viewModel: IndicatorViewModel
-    let tintOpacity: Double
+    let surface: SurfaceStyle
 
     /// Figma's nested 8/2.5 outer + 4 inner padding collapses to one
     /// combined value (no intermediate background between the two).
@@ -261,7 +328,7 @@ private struct PillView: View {
         content
             .padding(.horizontal, Self.horizontalPadding)
             .padding(.vertical, Self.verticalPadding)
-            .glassBackground(cornerRadius: PillStyle.cornerRadius, tintOpacity: tintOpacity)
+            .surfaceBackground(surface, cornerRadius: PillStyle.cornerRadius)
             // BorderBeamKit on both modes: agent gets .sm/.ocean at full
             // strength; plain dictation uses the pulse family's inward
             // variant (.pulseInner, not .pulseOutside — the outward bloom
@@ -298,26 +365,56 @@ private struct PillView: View {
 
 // MARK: - Glass
 
+/// A plain blurred backdrop, used by the `.flat` surface.
+///
+/// KNOWN APPROXIMATION: Figma specifies a 4px background blur, and there
+/// is no macOS API that takes a backdrop-blur radius the way CSS
+/// `backdrop-filter: blur(4px)` does. `NSVisualEffectView` is the only
+/// real backdrop blur available, and its radius is fixed by the material
+/// rather than settable. `.hudWindow` is the closest match for a small
+/// overlay. In practice the gap is small here: the fill sits at 75%
+/// opacity, so only a quarter of the backdrop shows through at all.
+private struct BackdropBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
 private extension View {
     /// One place for the container treatment so the pill and the speech
-    /// box can't drift apart, and so the comparison harness only has to
-    /// vary a single number.
+    /// box can't drift apart, and so the comparison only has to vary the
+    /// style passed in.
     @ViewBuilder
-    func glassBackground(cornerRadius: CGFloat, tintOpacity: Double) -> some View {
-        let tint = PillStyle.tintBase.opacity(tintOpacity)
-        if #available(macOS 26.0, *) {
-            self.glassEffect(
-                Glass.regular.tint(tint),
-                in: RoundedRectangle(cornerRadius: cornerRadius)
-            )
-        } else {
-            // Pre-macOS 26 fallback — real Liquid Glass isn't reachable.
+    func surfaceBackground(_ style: SurfaceStyle, cornerRadius: CGFloat) -> some View {
+        switch style {
+        case .liquidGlass(let tint):
+            if #available(macOS 26.0, *) {
+                self.glassEffect(
+                    Glass.regular.tint(tint),
+                    in: RoundedRectangle(cornerRadius: cornerRadius)
+                )
+            } else {
+                // Pre-macOS 26 fallback — real Liquid Glass isn't reachable.
+                self.background(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(.ultraThinMaterial)
+                        .overlay(RoundedRectangle(cornerRadius: cornerRadius).fill(tint))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            }
+
+        case .flat(let fill):
             self.background(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(.ultraThinMaterial)
-                    .overlay(RoundedRectangle(cornerRadius: cornerRadius).fill(tint))
+                BackdropBlur()
+                    .overlay(fill)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
     }
 }
