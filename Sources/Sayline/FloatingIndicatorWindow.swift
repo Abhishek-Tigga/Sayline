@@ -58,16 +58,12 @@ final class FloatingIndicatorWindow {
     // taller than the pill itself actually needs, with margin to spare
     // for the widest text state ("Agent Listening").
     /// Sized generously rather than resized per state. The speech box can
-    /// reach ~324x230, and the opacity comparison renders four stacks side
-    /// by side, so the old 320x46 stage is far too small. Growing the panel
-    /// on every state change would mean resizing and repositioning mid
-    /// animation; an oversized panel costs nothing instead, because it is
-    /// transparent and ignores mouse events. Width is clamped to the screen
-    /// so four stacks can never run off the edge.
-    private var width: CGFloat {
-        min(1400, (NSScreen.main?.frame.width ?? 1440) - 40)
-    }
-    private let height: CGFloat = 360
+    /// reach ~324x230, so the old 320x46 stage is far too small. Growing
+    /// the panel on every state change would mean resizing and
+    /// repositioning mid-animation; an oversized panel costs nothing
+    /// instead, because it is transparent and ignores mouse events.
+    private let width: CGFloat = 380
+    private let height: CGFloat = 320
     // Anchored to the screen's true physical bottom edge (screen.frame,
     // not visibleFrame) rather than the Dock-aware visible area — found
     // live that visibleFrame.minY differs across setups with different

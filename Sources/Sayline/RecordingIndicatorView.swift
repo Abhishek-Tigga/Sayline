@@ -42,16 +42,6 @@ enum PillStyle {
     static let cornerRadius: CGFloat = 8
 }
 
-/// TEMPORARY — exists only on the `ui-speech-back` branch, to judge pill
-/// opacity against real backdrops in one pass instead of rebuilding once
-/// per value (each rebuild also costs a re-grant of Accessibility, so
-/// serial comparison was expensive and relied on memory between builds).
-///
-/// Set to `nil` for normal single-pill rendering.
-enum OpacityComparison {
-    static let values: [Double]? = [1.0, 0.9, 0.8, 0.7]
-}
-
 // MARK: - Top level
 
 /// The floating overlay: in agent mode a speech-back box showing what was
@@ -84,56 +74,21 @@ enum OpacityComparison {
 struct RecordingIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
-    var body: some View {
-        Group {
-            if let values = OpacityComparison.values {
-                HStack(alignment: .bottom, spacing: 20) {
-                    ForEach(values, id: \.self) { value in
-                        IndicatorStack(
-                            viewModel: viewModel,
-                            tintOpacity: value,
-                            label: "\(Int(value * 100))"
-                        )
-                    }
-                }
-            } else {
-                IndicatorStack(
-                    viewModel: viewModel,
-                    tintOpacity: PillStyle.defaultTintOpacity,
-                    label: nil
-                )
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-    }
-}
-
-/// One complete assembly: speech box, connector dots, pill. Figma spaces
-/// these 8px apart (node 70:95 and siblings).
-private struct IndicatorStack: View {
-    @ObservedObject var viewModel: IndicatorViewModel
-    let tintOpacity: Double
-    let label: String?
-
+    /// Speech box, connector dots, pill — spaced 8px apart per Figma
+    /// (node 70:95 and siblings).
     var body: some View {
         VStack(spacing: 8) {
             if let transcript = viewModel.transcript, !transcript.isEmpty {
                 SpeechBackBox(
                     text: transcript,
                     setAt: viewModel.transcriptSetAt,
-                    tintOpacity: tintOpacity
+                    tintOpacity: PillStyle.defaultTintOpacity
                 )
                 LinearProcessingDots()
             }
-
-            PillView(viewModel: viewModel, tintOpacity: tintOpacity)
-
-            if let label {
-                Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(PillStyle.foreground.opacity(0.55))
-            }
+            PillView(viewModel: viewModel, tintOpacity: PillStyle.defaultTintOpacity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 }
 
