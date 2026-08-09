@@ -252,6 +252,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
                 await MainActor.run {
                     self.isTranscribing = false
+                    self.indicatorWindow.showTranscript(transcript)
                     self.indicatorWindow.show(state: .agentRouting)
                 }
 
