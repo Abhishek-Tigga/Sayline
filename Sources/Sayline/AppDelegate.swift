@@ -177,6 +177,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         lastRecordingPath = url.path
 
+        // Caught before the silence check because it is a different failure
+        // with a different fix. Sending a zero-frame file to Groq returns
+        // "Audio file is too short", which reads like the user spoke briefly
+        // when the real cause is that their input device gave us nothing.
+        guard !audioRecorder.capturedNoAudio else {
+            let device = audioRecorder.lastInputDeviceName
+            NSLog("Sayline: no audio captured from \(device) over \(audioRecorder.lastRecordingDuration)s — check the input device")
+            indicatorWindow.show(state: .message("No audio from \(device)"))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [weak self] in
+                self?.indicatorWindow.hide()
+            }
+            return
+        }
+
         guard !audioRecorder.isTooShortOrSilent() else {
             NSLog("Sayline: recording too short/silent (\(audioRecorder.lastRecordingDuration)s) -> skipping transcription")
             indicatorWindow.hide()

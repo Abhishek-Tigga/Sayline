@@ -9,6 +9,20 @@ final class AudioRecorder {
     private(set) var lastRecordingURL: URL?
     private var recordingStartTime: Date?
     private(set) var lastRecordingDuration: TimeInterval = 0
+    /// Frames the tap actually wrote. Zero means the device accepted the
+    /// engine but never delivered audio — see `capturedNoAudio`.
+    private var framesWritten: AVAudioFramePosition = 0
+    /// Name of the device the engine really used, read after `start()`.
+    private(set) var lastInputDeviceName = "unknown"
+
+    /// True when a recording ran its full length and captured nothing at
+    /// all. A Bluetooth speaker being the system default input does this:
+    /// it is a valid device, the engine starts happily, the tap never
+    /// fires. Worth separating from silence — silence is a quiet room,
+    /// this is a broken input, and only one of them is worth telling the
+    /// user about.
+    var capturedNoAudio: Bool { framesWritten == 0 && lastRecordingDuration >= 0.4 }
+
     /// Loudest sample in the last recording, set by `isTooShortOrSilent()`.
     /// Kept so the transcript stage can tell a real "thank you" from one
     /// Whisper invented out of silence — see `WhisperHallucination`.
@@ -42,7 +56,6 @@ final class AudioRecorder {
         }
 
         let format = input.outputFormat(forBus: 0)
-        NSLog("Sayline: input device -> \(currentInputDeviceName())")
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("sayline-\(UUID().uuidString).wav")
 
@@ -53,10 +66,12 @@ final class AudioRecorder {
             return
         }
 
+        framesWritten = 0
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self, let file = self.audioFile else { return }
             do {
                 try file.write(from: buffer)
+                self.framesWritten += AVAudioFramePosition(buffer.frameLength)
             } catch {
                 NSLog("Sayline: failed writing audio buffer: \(error)")
             }
@@ -67,7 +82,13 @@ final class AudioRecorder {
             isRecording = true
             lastRecordingURL = url
             recordingStartTime = Date()
-            NSLog("Sayline: recording started -> \(url.path)")
+            // Read after start, not before. Before the engine runs, the audio
+            // unit still reports whatever device it was initialised with, so
+            // the log claimed "MacBook Air Microphone" while the engine was
+            // actually on a Bluetooth device. Logging the format too, because
+            // 16 kHz on a device that should do 48 kHz is the tell.
+            lastInputDeviceName = currentInputDeviceName()
+            NSLog("Sayline: recording started on \(lastInputDeviceName) at \(Int(format.sampleRate)) Hz -> \(url.path)")
         } catch {
             NSLog("Sayline: failed to start audio engine: \(error)")
             input.removeTap(onBus: 0)
@@ -82,7 +103,7 @@ final class AudioRecorder {
         audioFile = nil
         isRecording = false
         lastRecordingDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
-        NSLog("Sayline: recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s")
+        NSLog("Sayline: recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s frames: \(framesWritten)")
     }
 
     /// True only if the just-finished recording is an accidental hotkey tap
