@@ -63,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// dictation path and was typed into whatever app was focused — the one
     /// outcome the design says must never happen. The hold now claims the
     /// question at the moment it starts.
+    private var accessibilityWatchdog: Timer?
     private var isAnsweringFollowUpThisRecording = false
     private var isAgentModeThisRecording = false
 
@@ -437,7 +438,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         isAccessibilityTrusted = AccessibilityPermission.isTrusted
         if isAccessibilityTrusted {
             hotkeyManager.start()
+            stopWatchingForAccessibility()
+        } else {
+            startWatchingForAccessibility()
         }
+    }
+
+    /// Polls until Accessibility is granted, then starts the hotkey.
+    ///
+    /// Trust used to be read at launch and on a menu button, and nowhere
+    /// else. Granting it in System Settings therefore did nothing visible
+    /// — the app had already decided it was untrusted and would not look
+    /// again, so the honest-looking conclusion was "I granted it and the
+    /// app is broken". macOS sends no notification when a grant changes,
+    /// so polling is the available mechanism.
+    ///
+    /// Cheap and self-cancelling: `AXIsProcessTrusted()` is a local check,
+    /// it runs every two seconds only while untrusted, and the timer stops
+    /// the moment the tap installs.
+    private func startWatchingForAccessibility() {
+        guard accessibilityWatchdog == nil else { return }
+        NSLog("Sayline: not trusted for Accessibility — watching for the grant")
+        accessibilityWatchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            guard AccessibilityPermission.isTrusted else { return }
+            NSLog("Sayline: Accessibility granted — starting the hotkey listener")
+            self.isAccessibilityTrusted = true
+            self.hotkeyManager.start()
+            self.stopWatchingForAccessibility()
+        }
+    }
+
+    private func stopWatchingForAccessibility() {
+        accessibilityWatchdog?.invalidate()
+        accessibilityWatchdog = nil
     }
 
 #if DEBUG

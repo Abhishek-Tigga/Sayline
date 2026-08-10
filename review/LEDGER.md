@@ -354,3 +354,26 @@ build whose grant was reset rather than a broken tap. Nothing hold-based
 can be exercised by either of us until it is re-granted — that is a human
 step in System Settings, and it is why F3's per-recording delete, both F4
 races and the F5 Empty Trash gate are all still code-read rather than run.
+
+### ENV · Accessibility grant — resolved, and a real bug behind it
+2026-08-11 · Opus · fixed
+The grant is in place and the tap installed: `Accessibility granted —
+starting the hotkey listener`, then `hotkey listener started`. Hold-based
+verification is now possible for the first time on this build.
+
+Diagnosing it found a genuine bug rather than only an environment quirk.
+Trust was read at launch and on a menu button, and nowhere else, so
+granting permission while the app ran changed nothing visible — it had
+already concluded it was untrusted and never looked again. The honest
+reading of that from a user's seat is "I granted it and the app is
+broken". macOS sends no notification when a grant changes, so the app now
+polls every two seconds while untrusted and stops the moment the tap
+installs.
+
+Root cause of the stale entry, worth recording because it will recur:
+ad-hoc signing means the code hash changes on every rebuild, so the
+Accessibility list keeps an entry matching a binary that no longer exists.
+Ticking it grants nothing. `tccutil reset Accessibility
+com.abhishektigga.sayline` plus the app's own "Grant Accessibility Access"
+button is the reliable sequence. It goes away with a real Developer ID
+certificate, which is parked until the end of V2.
