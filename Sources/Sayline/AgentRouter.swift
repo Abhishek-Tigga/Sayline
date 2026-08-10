@@ -613,8 +613,7 @@ final class AgentRouter {
             return []
         }
 
-        let parsed = correctedSettingsPane(toolCalls.compactMap(parseAction), transcript: transcript)
-        return rejectInventedPane(parsed, transcript: transcript)
+        return correctedSettingsPane(toolCalls.compactMap(parseAction), transcript: transcript)
     }
 
     /// Deterministic correction for "<X> settings" where X names a real
@@ -646,70 +645,22 @@ final class AgentRouter {
             modelPunted = false
         }
 
-        guard modelPunted,
-              let phrase = Self.panePhrase(in: transcript),
-              let bundleID = SettingsPaneCatalog.bundleID(forPaneName: phrase) else {
+        guard modelPunted, let phrase = Self.panePhrase(in: transcript) else {
             return actions
+        }
+
+        guard let bundleID = SettingsPaneCatalog.bundleID(forPaneName: phrase) else {
+            // A pane was named and the catalog does not have it. Left as a
+            // bare punt, this opens System Settings at whatever the user
+            // last looked at, which reads as an answer rather than a miss.
+            // The fallback opens the same window and says what it could not
+            // find, which is the honest version of the same outcome.
+            NSLog("%@", "Sayline: transcript said \"\(phrase) settings\", catalog has no such pane and the model punted — using the visible fallback")
+            return [.openSystemSettingsFallback(requestedPaneName: phrase)]
         }
 
         NSLog("Sayline: transcript said \"\(phrase) settings\" but the model opened System Settings itself — routing to the \(phrase) pane instead")
         return [.openSystemSetting(paneName: phrase, bundleID: bundleID)]
-    }
-
-    /// Refuses a pane the user plainly did not ask for.
-    ///
-    /// The catalog correctly rejects "banana", but the model rarely offers
-    /// it — asked for a pane that does not exist, it substitutes a real name
-    /// instead. Observed live: "open banana settings" returns pane
-    /// "General", the catalog resolves it, and a real pane opens
-    /// confidently. Fail-visibly is defeated not by a bad lookup but by a
-    /// plausible answer to a question nobody asked.
-    ///
-    /// So this compares the model's pane against the words actually spoken.
-    /// No shared word means the model invented it, and the visible fallback
-    /// is the honest answer — saying "I don't know that one" beats opening
-    /// the wrong pane with confidence.
-    ///
-    /// Deliberately narrow. It only fires when a pane phrase was spoken and
-    /// the catalog rejects it, so ordinary paraphrase ("wallpaper" ->
-    /// "Wallpaper") is untouched, and a spoken phrase the catalog knows
-    /// never reaches here.
-    private func rejectInventedPane(_ actions: [AgentAction], transcript: String) -> [AgentAction] {
-        guard actions.count == 1,
-              case .openSystemSetting(let paneName, _) = actions[0],
-              let phrase = Self.panePhrase(in: transcript),
-              SettingsPaneCatalog.bundleID(forPaneName: phrase) == nil else {
-            return actions
-        }
-        // Whole-word equality is too strict here. "Open doc settings" is a
-        // mis-hearing of Dock that the catalog rightly resolves; "doc" and
-        // "Dock" share no whole word, and a disjoint test refused it. A
-        // shared prefix catches that class without letting "banana" through.
-        guard !Self.sharesRoot(phrase, paneName) else { return actions }
-
-        NSLog("%@", "Sayline: user said \"\(phrase) settings\", model offered \"\(paneName)\" — no word in common, refusing rather than opening the wrong pane")
-        return [.openSystemSettingsFallback(requestedPaneName: phrase)]
-    }
-
-    /// True when any spoken word and any offered word plausibly refer to
-    /// the same thing — equal, or one a prefix of the other. Deliberately
-    /// generous: this gates a *refusal*, so erring toward "related" errs
-    /// toward doing what the user asked.
-    private static func sharesRoot(_ spoken: String, _ offered: String) -> Bool {
-        let a = words(spoken), b = words(offered)
-        for x in a {
-            for y in b where x == y || x.hasPrefix(y) || y.hasPrefix(x) {
-                return true
-            }
-        }
-        return false
-    }
-
-    private static func words(_ text: String) -> [String] {
-        text.lowercased()
-            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            .map(String.init)
-            .filter { $0.count > 1 }
     }
 
     /// The words sitting between a lead-in ("open", "show", "my", …) and

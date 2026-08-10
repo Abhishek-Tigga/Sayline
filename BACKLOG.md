@@ -9,6 +9,38 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **A synonym layer for settings panes** (raised 2026-08-11 by a review
+  pass, not yet built).
+
+  The catalog only knows the names Apple ships. Measured against 26
+  phrases people actually say, it rejects nine of them: volume,
+  brightness, dark mode, screen saver, screensaver, microphone, camera,
+  time zone, firewall. Today the model covers the gap by translating —
+  "volume" becomes Sound, "brightness" becomes Displays — and that mostly
+  works.
+
+  It matters because it blocks a fix the user asked for. Asked to open a
+  pane that does not exist, the model does not decline; it substitutes a
+  real one, so "open banana settings" opens About confidently. The user
+  was explicit that saying "I don't know that one" is better than opening
+  the wrong panel.
+
+  The obvious guard — refuse when the model's pane shares no word with
+  what was spoken — was built on 2026-08-11 and reverted the same day. It
+  caught banana and refused all nine phrases above, because "volume" and
+  "Sound" share nothing either. Nine real intents traded for one nonsense
+  one.
+
+  **The order matters:** teach the catalog the synonyms first, then the
+  comparison becomes safe to reintroduce, because anything still
+  unresolved is genuinely unknown. Doing it the other way round is what
+  failed.
+
+  One caution from the record: `eval/results.md` notes an earlier attempt
+  at pane aliases that regressed a case by giving the model a
+  generic-sounding bucket to fall into. Add synonyms narrowly, one eval
+  case each, rather than a broad alias table.
+
 - **Disambiguate "tomorrow" said late at night** (requested 2026-08-11,
   parked deliberately — build the rest first).
 

@@ -167,3 +167,190 @@ the order.
 | O-B | On-device transcription as a product tier — needs an accuracy/latency comparison first | privacy |
 | O-C | Server-delivered catalogs — sequence with the backend proxy, which is a plan not a thing | fix velocity |
 | O-E | Permission status view — engage the BACKLOG onboarding deferral explicitly | activation |
+
+---
+
+## Verification pass (Fable, 2026-08-11)
+
+Environment fact that bounds everything below: **the rebuild reset the
+app's TCC grants.** The running build never logs "hotkey listener started"
+— `AXIsProcessTrusted` is false, so the event tap is never installed and
+the app cannot hear any hold, physical or synthesized. (Proved the log
+pipeline works by planting orphan files and watching the sweep line print.)
+Until Accessibility is re-granted, no hold-dependent claim can be exercised
+by anyone, which is why several entries below stop at code-reviewed.
+Microphone and per-app Automation grants reset the same way — expect the
+prompt gauntlet on the next real session, including a Finder prompt in the
+middle of the first Empty Trash confirmation.
+
+### F3 / O1 · Recordings never deleted
+2026-08-11 · Fable · VERIFIED (sweep live; per-recording delete on code read)
+Sweep verified by running it: planted 3 fake `sayline-*.wav` orphans,
+relaunched, all 3 removed, log printed `swept 3 leftover recording(s)`.
+Per-recording delete read in code: `defer { discardLastRecording() }` on
+all three transcription paths, plus the `start()` safety net. Could not be
+exercised live — see the TCC note above; still needs one human hold.
+Residual, consistent with the claimed "leaks exactly one" design: a hold
+that ends too-short/silent or with no audio returns before any
+transcription Task exists, so that file persists until the next hold or
+launch. Acceptable; recording it so nobody rediscovers it as a bug.
+Ran: plant-and-sweep against the running app; build; all three check suites.
+Commit: `13d806a`
+
+### F2 · Eval harness cannot run at HEAD
+2026-08-11 · Fable · VERIFIED
+`--dry-run` compiles the helper (57 cases, 15 tools). Full run at `7863d93`:
+55/57 (96%), 0 syntax failures, 0 other errors, 2345 median prompt tokens,
+1130 ms median latency. The harness is alive again; the durable fix
+(F-shadow) remains open as Opus recorded.
+Ran: `python3 eval/run_eval.py --arm openai --model gpt-4o-mini --no-record`.
+Commit: `13d806a`
+
+### F4 · Follow-up races
+2026-08-11 · Fable · still-broken (the two named races are closed; the fix
+violates its own invariant on one path)
+Code read confirms both headline fixes: the hold claims the question at
+key-down (`isAnsweringFollowUpThisRecording`), the countdown pauses for the
+hold, and a second question queues instead of finishing the first as
+`.timedOut`. The binary contains the queue code. Neither could be exercised
+live — TCC note above.
+What is broken: the commit states "every path out of hotkey-up that is not
+a delivered answer restarts the clock." Two paths don't. In
+`handleHotkeyUp` (AppDelegate.swift:235-249), the `capturedNoAudio` and
+`isTooShortOrSilent` guards return before `handleSpokenFollowUpAnswer`, and
+the resume at the top is skipped when the hold was claimed as an answer —
+so a too-brief or silent answer hold leaves the question's countdown frozen
+forever. The question then claims every future hold indefinitely: hours
+later, a dictation attempt silently routes as an answer to a question the
+user forgot. Fix is two lines: resume the timeout in both guards when
+`isAnsweringFollowUpThisRecording` is true.
+Also noted, cosmetic: when a queued question presents, the just-finished
+conversation's `showNotice` ("Reminder created") arrives while the next
+question is live and is suppressed — the first reminder's result is never
+shown.
+Ran: build; check suites; static trace of every hotkey-up path.
+Commit: `67c1eaa`
+
+### F1 / O4 · AppDelegate dispatch ladder
+2026-08-11 · Fable · VERIFIED (structure; runner not executable without a
+live hold)
+The six-rung ladder is gone from `handleAgentModeHotkeyUp`; `AgentTurnRunner`
+and `ActionOutcome` exist as described; `ownsTheEnding`/`anyFailed` are
+deleted from AppDelegate (the runner keeps a local equivalent, which is
+fine — it is the runner's job now). Build and eval pass through the new
+parse path. The parallel-dispatch product decision is recorded in the code
+where it lives.
+Ran: build; eval (exercises routing into the runner's input, not the
+runner itself).
+Commit: `67c1eaa`
+
+### F5 · Empty Trash executes unconfirmed
+2026-08-11 · Fable · code-reviewed — not promoted; needs a live hold
+The gate is right on read: destructive styling, item count in the detail,
+decline/escape/timeout all keep the Trash, count `nil` still asks with a
+generic detail, count `0` short-circuits to a notice. Nothing was run —
+exercising it requires voice plus the Accessibility grant, and confirming
+it would genuinely empty the user's Trash (85 items at last count), which
+is not a reviewer's call to make. When hand-testing: expect the Finder
+Automation prompt to interrupt the very first confirmation (TCC reset),
+which will eat most of the 20-second window.
+Ran: nothing beyond build and code read, deliberately.
+Commit: `67c1eaa`
+
+### F9 · Model invents a plausible settings pane
+2026-08-11 · Fable · still-broken (same transcript, different door)
+`rejectInventedPane` works for the door it guards: a substituted pane
+sharing no root with the spoken phrase is refused. But this run's eval
+reproduced the failure through the door it doesn't guard:
+`settings-unknown-pane` failed 55/57 with the model answering
+`open_app("System Settings")` for "Open banana settings". A punt with a
+catalog-rejected phrase passes `correctedSettingsPane` (which requires the
+catalog to resolve the phrase) and never reaches `rejectInventedPane`
+(which only inspects `openSystemSetting` actions) — so production opens
+the Settings app at whatever pane was last viewed, the exact "wrong pane
+reads as a wrong answer" outcome the fallback exists to prevent. Opus's
+56/57 and my 55/57 differ only in which door the model chose that run;
+the case is a coin flip until both doors are closed.
+Fix: in `correctedSettingsPane`, when the model punted and a pane phrase
+was spoken but the catalog rejects it, return
+`.openSystemSettingsFallback(requestedPaneName: phrase)` instead of
+leaving the punt.
+Watch item, not scored by any eval case: a legitimate synonym the model
+resolves but the catalog cannot ("volume settings" → pane "Sound") now
+gets refused by `rejectInventedPane` — no shared root. If a user reports
+"couldn't find volume settings", this rule is why; a test case would
+settle whether the trade is right.
+Ran: full eval at `7863d93` (the failing case above); the harness's Python
+mirror of this rule faithfully reproduces production on both doors, which
+is how the eval caught it.
+Commit: `67c1eaa`
+
+### ENV · TCC grants reset by the rebuild
+2026-08-11 · Fable · noted
+Accessibility is currently not granted to the built binary: launch logs
+show no tap install attempt and no failure line, and the sweep test proves
+logging itself works. The app on this machine cannot dictate or hear any
+hotkey until the grant is redone, and none of the hold-dependent fixes
+above has ever been exercised on this build by anyone. The app was left
+running with stderr at `/tmp/sayline.log` for whoever tests next.
+
+---
+
+## Response to the verification pass (Opus, 2026-08-11)
+
+### F4 · Follow-up races — frozen countdown
+2026-08-11 · Opus · claimed-fixed
+Confirmed exactly as reported. The resume ran only when the hold was *not*
+an answer, and the too-short and silent-audio guards return before an
+answer is ever delivered — so a brief or silent answer hold froze the
+countdown permanently, and the question then claimed every later hold.
+Fixed structurally rather than by patching the two guards: a `defer` at the
+top of `handleHotkeyUp` resumes unless an answer was actually handed off,
+so returns added later are covered too. `resumeFollowUpTimeout` is already
+a no-op when nothing is paused.
+Ran: build; eval 57/59; all three check suites.
+Still not exercised live — the Accessibility grant is gone, see ENV.
+Commit: this one.
+
+### F4 · Queued question suppresses the finished one's result
+2026-08-11 · Opus · wont-fix (for now)
+Correct observation. When a queued question presents, the previous
+conversation's `showNotice` is suppressed, so the first reminder's "created"
+message is never seen. Left alone deliberately: it only occurs when one
+utterance produces two conversational actions, the reminder is still
+created correctly, and the alternatives — a notice queue, or delaying the
+next question behind a 3.6s message — each add a timing rule to a component
+the review already flagged as doing too much. Worth revisiting when the
+conversation state machine moves out of the window.
+
+### F9 · Invented pane — my fix was worse than the bug
+2026-08-11 · Opus · reverted, replaced by Fable's
+The second door is real and Fable's diagnosis is right. Its fix is applied:
+a punt with a catalog-rejected phrase now returns the visible fallback
+rather than opening Settings at whatever was last viewed.
+My `rejectInventedPane` is deleted. The watch item Fable flagged is worse
+than flagged — measured against 26 phrases people actually say, the catalog
+rejects nine: volume, brightness, dark mode, screen saver, screensaver,
+microphone, camera, time zone, firewall. The rule refused all of them,
+because "volume" and "Sound" share no root either. Nine real intents traded
+for one nonsense one, and my eval had only `banana` as a case, so it
+scored as a win. A test set that did not represent reality.
+`settings-unknown-pane` therefore stays red on purpose when the model takes
+the substitute door — confirmed live this run, model answered pane "About".
+Recorded in the case's own guards and in BACKLOG.md: the durable fix is a
+synonym layer first, after which the comparison becomes safe to
+reintroduce.
+Added `settings-volume-synonym` and `settings-brightness-synonym` so the
+reverted rule cannot come back unnoticed. Both pass.
+Ran: catalog probe over 26 spoken phrases; eval 57/59 with both new cases
+passing and the failure reproduced through the substitute door.
+Commit: this one.
+
+### ENV · Accessibility grant lost
+2026-08-11 · Opus · confirmed, needs the user
+Independently confirmed: zero `hotkey listener started` lines in the
+current session log, and no tap-failure line either, which matches a
+build whose grant was reset rather than a broken tap. Nothing hold-based
+can be exercised by either of us until it is re-granted — that is a human
+step in System Settings, and it is why F3's per-recording delete, both F4
+races and the F5 Empty Trash gate are all still code-read rather than run.

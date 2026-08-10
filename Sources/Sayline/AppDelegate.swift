@@ -213,12 +213,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         SoundEffectPlayer.shared.playHotkeyUp()
         isRecording = false
         audioRecorder.stop()
-        // The countdown stopped when the hold began. Every path out of here
-        // except a delivered answer has to start it again, or a question
-        // paused by a stray keypress waits forever with a frozen timer bar.
-        // handleSpokenFollowUpAnswer restarts it itself if it hears nothing.
-        if !isAnsweringFollowUpThisRecording {
-            indicatorWindow.resumeFollowUpTimeout()
+        // The countdown stopped when the hold began, and every path out of
+        // here except a delivered answer has to start it again.
+        //
+        // The first version of this only resumed when the hold was NOT an
+        // answer, and the too-short and silent-audio guards return before
+        // the answer is ever delivered — so a brief or silent answer hold
+        // left the countdown frozen forever. The question then claimed every
+        // later hold, and a dictation attempt hours afterwards would route
+        // as an answer to a question the user had long forgotten.
+        //
+        // A defer covers every return, including ones added later.
+        // resumeFollowUpTimeout is a no-op when nothing is paused.
+        var deliveredAnAnswer = false
+        defer {
+            if !deliveredAnAnswer { indicatorWindow.resumeFollowUpTimeout() }
         }
         guard let url = audioRecorder.lastRecordingURL else {
             indicatorWindow.hide()
@@ -252,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // turn an answer into dictation. Requiring the agent chord again
         // would mean forgetting Space pastes an answer as text.
         if isAnsweringFollowUpThisRecording {
+            deliveredAnAnswer = true
             handleSpokenFollowUpAnswer(url: url)
             return
         }

@@ -451,24 +451,11 @@ def normalize(raw_calls, pane_resolutions, correction=None):
         if punted and "displayName" in correction:
             return [{"action": "openSystemSetting",
                      "args": {"pane": correction["displayName"]}}]
-
-    # Mirrors AgentRouter.rejectInventedPane: the user named a pane the
-    # catalog rejects, and the model answered with a real pane sharing no
-    # word with what was said. It invented a plausible answer; refusing is
-    # the honest outcome. Same narrow conditions as the Swift.
-    if correction and "displayName" not in correction and len(actions) == 1:
-        only = actions[0]
-        if only["action"] == "openSystemSetting":
-            def words(text):
-                return {w for w in re.split(r"[^a-z0-9]+", str(text).lower()) if len(w) > 1}
-            # Mirrors AgentRouter.sharesRoot — a shared prefix counts as
-            # related, so "doc" does not get refused against "Dock".
-            spoken = words(correction["phrase"])
-            offered = words(only["args"].get("pane", ""))
-            related = any(x == y or x.startswith(y) or y.startswith(x)
-                          for x in spoken for y in offered)
-            if not related:
-                return [{"action": "openSystemSettingsFallback", "args": {}}]
+        # A pane was named, the catalog does not have it, and the model
+        # punted. A bare punt opens Settings at whatever was last viewed,
+        # which reads as an answer; the fallback says what it missed.
+        if punted:
+            return [{"action": "openSystemSettingsFallback", "args": {}}]
     return actions
 
 

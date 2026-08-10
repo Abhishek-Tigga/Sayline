@@ -252,7 +252,7 @@
           "action": "openSystemSettingsFallback"
         }
       ],
-      "guards": "Nonsense pane must reach the visible fallback rather than silently matching something adjacent. Guards against over-eager fuzzy matching."
+      "guards": "KNOWN FAILING, deliberately. Two doors lead here. When the model punts to the Settings app, correctedSettingsPane now returns the visible fallback and this passes. When the model instead substitutes a real pane — 'banana' -> 'About', which is what it did on 2026-08-11 — nothing catches it. A rule that compared the model's pane against the spoken words did catch it, and also refused volume, brightness, dark mode, screensaver, microphone, camera, time zone and firewall, because the catalog lacks all of those and the right answers share no word with what was said. Nine real intents for one nonsense one; the rule was reverted. The durable fix is a synonym layer so the catalog resolves what people actually say, after which the comparison becomes safe. Until then this case stays red on purpose — see BACKLOG.md."
     },
     {
       "id": "volume-mute",
@@ -785,6 +785,32 @@
         }
       ],
       "guards": "'Remind me' used conversationally, not as a command. Creating a reminder titled 'what my battery is at' would be a confident misread of a question."
+    },
+    {
+      "id": "settings-volume-synonym",
+      "transcript": "Open volume settings",
+      "expect": [
+        {
+          "action": "openSystemSetting",
+          "args": {
+            "pane__contains": "sound"
+          }
+        }
+      ],
+      "guards": "The catalog has no pane called 'volume' — the model translates it to Sound and that is correct. Added after a rule was written that refused exactly this: it compared the model's pane against the spoken words and rejected anything with no shared root, which caught 'banana' and also broke volume, brightness, dark mode, screensaver, microphone, camera, time zone and firewall. Nine real intents for one nonsense one. The rule was reverted; this case exists so it cannot come back unnoticed."
+    },
+    {
+      "id": "settings-brightness-synonym",
+      "transcript": "Open brightness settings",
+      "expect": [
+        {
+          "action": "openSystemSetting",
+          "args": {
+            "pane__contains": "display"
+          }
+        }
+      ],
+      "guards": "Same class as settings-volume-synonym. 'brightness' is not in the catalog; Displays is the right answer and shares no word with what was said."
     }
   ]
 }
