@@ -40,9 +40,15 @@ code, the rejected alternatives are not.
 | `PRODUCT.md` | Direction and the "why" behind product calls |
 | `CHANGELOG.md` | One row per meaningful change |
 | `eval/README.md` | What the router metrics mean, and the rules for changing the test set |
+| `review/LEDGER.md` | What has been claimed, what has been independently checked, what is still open |
 
 If something looks wrong, check these first. Several apparent mistakes are
 decisions with reasons written down.
+
+**Append to `review/LEDGER.md` when you close a review finding.** It is
+shared with whoever reviews next, and it carries one rule that is not
+optional: you may mark your own work `claimed-fixed`, never `VERIFIED`.
+Only a different reviewer promotes it, and only after running something.
 
 ## How to verify
 
