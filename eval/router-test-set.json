@@ -652,6 +652,58 @@
         }
       ],
       "guards": "No site named. Agreed default is Google rather than refusing."
+    },
+    {
+      "id": "web-personal-linkedin-messages",
+      "transcript": "open my LinkedIn messages",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "page_url__contains": "linkedin.com/messaging"
+          }
+        }
+      ],
+      "guards": "Failed live: landed on LinkedIn search with 'my LinkedIn messages' as the keyword. The model had no page_url and no vertical matched, so it fell through to the ordinary search template."
+    },
+    {
+      "id": "web-personal-amazon-orders-region",
+      "transcript": "show my Amazon orders",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "Amazon"
+          }
+        }
+      ],
+      "guards": "Asserts only that the model identifies the site. The URL is not its job — it cannot see the Mac's region, so it will always write amazon.com. Our own table supplies the region-correct path and overrides whatever URL the model offered. That half is covered by eval/catalog-checks, which tests code rather than a model. Expecting amazon.in here was asking the model for knowledge it does not have."
+    },
+    {
+      "id": "web-personal-youtube-subs",
+      "transcript": "open my YouTube subscriptions",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "page_url__contains": "youtube.com/feed/subscriptions"
+          }
+        }
+      ],
+      "guards": "YouTube has no regional variant, so this isolates the personal-page lookup from the region rewrite."
+    },
+    {
+      "id": "web-personal-not-personal",
+      "transcript": "search for wireless mouse on Amazon",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "Amazon"
+          }
+        }
+      ],
+      "guards": "Negative case for the personal-page table. An ordinary product search must not be captured by it — the table matches only when the query reduces to a bare intent word like 'orders' or 'cart'."
     }
   ]
 }

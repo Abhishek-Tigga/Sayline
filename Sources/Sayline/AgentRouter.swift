@@ -677,9 +677,28 @@ final class AgentRouter {
             let site = (arguments["site"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 .nilIfEmpty ?? "Google"
             let query = (arguments["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Our own table beats the model's URL for the user's own pages.
+            // The model cannot know the region, so it always writes .com, and
+            // it guesses paths that shift between runs. This is the same
+            // deterministic-rule-beats-prompt pattern as correctedSettingsPane:
+            // when we know the answer, we should not be asking.
+            if let query, !query.isEmpty,
+               let site = WebsiteCatalog.site(matching: site),
+               let page = WebsiteCatalog.personalPage(site: site, query: query) {
+                NSLog("%@", "Sayline: own-page match for \"\(query)\" -> \(page.absoluteString)")
+                return .openWebsite(label: "\(site.label) — \(query)", url: page)
+            }
             if let pageURL = (arguments["page_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !pageURL.isEmpty, let url = URL(string: pageURL), url.scheme?.hasPrefix("http") == true {
-                return .openDirectPage(url: url, fallbackSite: site, fallbackQuery: query)
+                // The model writes amazon.com and apple.com because it has no
+                // way to know where this Mac is. Correcting it here keeps that
+                // knowledge in one place instead of asking the prompt to carry
+                // a region it cannot see.
+                let regional = WebsiteCatalog.regionalized(url, siteHint: site)
+                if regional != url {
+                    NSLog("%@", "Sayline: region-corrected \(url.absoluteString) -> \(regional.absoluteString)")
+                }
+                return .openDirectPage(url: regional, fallbackSite: site, fallbackQuery: query)
             }
             let wantsPlayback = (arguments["play"] as? Bool) ?? false
             if wantsPlayback, let query, !query.isEmpty,

@@ -28,6 +28,10 @@ enum WebsiteCatalog {
         /// its whole domain per country, Apple changes a path segment, so
         /// this stores complete replacements rather than trying to patch
         /// one part of the URL.
+        /// Pages that belong to the signed-in user, keyed by the bare word
+        /// left after "open my ... on <site>" is stripped down. Paths, not
+        /// full URLs, so the regional home applies to them for free.
+        var personalPages: [String: String] = [:]
         var regional: [String: Variant] = [:]
         /// Separate search tabs, each its own URL. "People from Razorpay"
         /// and "Razorpay jobs" are different pages on LinkedIn, not the
@@ -73,9 +77,20 @@ enum WebsiteCatalog {
         // YouTube for now (2026-08-09). Apple Music was removed — see
         // BACKLOG.md for what that gave up and how to bring it back.
         Site(label: "YouTube", aliases: ["youtube", "you tube", "yt", "music", "apple music", "spotify music"], home: "https://www.youtube.com",
-             searchTemplate: "https://www.youtube.com/results?search_query=%@"),
+             searchTemplate: "https://www.youtube.com/results?search_query=%@",
+             personalPages: [
+                             "subscriptions": "/feed/subscriptions",
+                             "history": "/feed/history",
+                             "watch later": "/playlist?list=WL",
+                             "liked videos": "/playlist?list=LL",
+                             "playlists": "/feed/playlists",
+                            ]),
         Site(label: "Netflix", aliases: ["netflix"], home: "https://www.netflix.com",
-             searchTemplate: "https://www.netflix.com/search?q=%@"),
+             searchTemplate: "https://www.netflix.com/search?q=%@",
+             personalPages: [
+                             "my list": "/browse/my-list",
+                             "list": "/browse/my-list",
+                            ]),
         Site(label: "Spotify", aliases: ["spotify"], home: "https://open.spotify.com",
              searchTemplate: "https://open.spotify.com/search/%@"),
 
@@ -97,6 +112,17 @@ enum WebsiteCatalog {
         // Social
         Site(label: "LinkedIn", aliases: ["linkedin", "linked in"], home: "https://www.linkedin.com",
              searchTemplate: "https://www.linkedin.com/search/results/all/?keywords=%@",
+             personalPages: [
+                             "messages": "/messaging/",
+                             "messaging": "/messaging/",
+                             "inbox": "/messaging/",
+                             "notifications": "/notifications/",
+                             "profile": "/in/me/",
+                             "invitations": "/mynetwork/invitation-manager/",
+                             "network": "/mynetwork/",
+                             "saved jobs": "/my-items/saved-jobs/",
+                             "saved items": "/my-items/",
+                            ],
              verticals: [
                 "people": "https://www.linkedin.com/search/results/people/?keywords=%@",
                 "companies": "https://www.linkedin.com/search/results/companies/?keywords=%@",
@@ -108,12 +134,23 @@ enum WebsiteCatalog {
         Site(label: "Instagram", aliases: ["instagram", "insta"], home: "https://www.instagram.com", searchTemplate: nil),
         Site(label: "Facebook", aliases: ["facebook", "fb"], home: "https://www.facebook.com", searchTemplate: nil),
         Site(label: "Reddit", aliases: ["reddit"], home: "https://www.reddit.com",
-             searchTemplate: "https://www.reddit.com/search/?q=%@"),
+             searchTemplate: "https://www.reddit.com/search/?q=%@",
+             personalPages: [
+                             "saved": "/user/me/saved",
+                             "profile": "/user/me/",
+                            ]),
         Site(label: "WhatsApp Web", aliases: ["whatsapp web", "web whatsapp"], home: "https://web.whatsapp.com", searchTemplate: nil),
 
         // Dev / maker
         Site(label: "GitHub", aliases: ["github", "git hub"], home: "https://github.com",
              searchTemplate: "https://github.com/search?q=%@",
+             personalPages: [
+                             "notifications": "/notifications",
+                             "pull requests": "/pulls",
+                             "issues": "/issues",
+                             "repositories": "/settings/repositories",
+                             "repos": "/settings/repositories",
+                            ],
              verticals: [
                 "repositories": "https://github.com/search?q=%@&type=repositories",
                 "users": "https://github.com/search?q=%@&type=users",
@@ -129,6 +166,13 @@ enum WebsiteCatalog {
              searchTemplate: "https://dribbble.com/search/%@"),
         Site(label: "Amazon", aliases: ["amazon"], home: "https://www.amazon.com",
              searchTemplate: "https://www.amazon.com/s?k=%@",
+             personalPages: [
+                             "orders": "/gp/css/order-history",
+                             "cart": "/gp/cart/view.html",
+                             "basket": "/gp/cart/view.html",
+                             "wishlist": "/hz/wishlist/ls",
+                             "returns": "/spr/returns/list",
+                            ],
              regional: [
                 "IN": Variant(home: "https://www.amazon.in", search: "https://www.amazon.in/s?k=%@"),
                 "GB": Variant(home: "https://www.amazon.co.uk", search: "https://www.amazon.co.uk/s?k=%@"),
@@ -225,6 +269,79 @@ enum WebsiteCatalog {
         return (text, nil)
     }
 
+    /// Words that carry no meaning once we know the site and are looking
+    /// for a bare intent: "open my saved items on LinkedIn" -> "saved items".
+    private static let personalFiller: Set<String> = [
+        "my", "mine", "the", "a", "an", "on", "in", "at", "of", "for", "to",
+        "page", "pages", "tab", "section", "list", "show", "open", "see",
+        "view", "get", "go", "me", "all", "please",
+    ]
+
+    /// The catalog entry for a spoken site name, country word and all.
+    static func site(matching requested: String) -> Site? {
+        let (baseName, _) = splitCountry(requested.trimmingCharacters(in: .whitespacesAndNewlines))
+        let n = normalize(baseName)
+        return sites.first { $0.aliases.contains { normalize($0) == n } }
+            ?? sites.first { normalize($0.label) == n }
+    }
+
+    /// A page belonging to the signed-in user, when the query reduces to a
+    /// bare intent word this site knows.
+    ///
+    /// Exists because the model cannot supply these reliably. It has no
+    /// idea which region this Mac is in, so every URL it offers is
+    /// region-blind — "my Amazon orders" came back as amazon.com. And when
+    /// it offered no URL at all, the query fell through to the ordinary
+    /// search template, which is how "open my LinkedIn messages" ended up
+    /// searching LinkedIn for the phrase "my LinkedIn messages".
+    ///
+    /// Deliberately strict. The query must reduce to a known intent and
+    /// nothing else, so "wireless mouse on Amazon" cannot be captured by
+    /// this table on its way to a perfectly good product search.
+    static func personalPage(site: Site, query: String, region overrideRegion: String? = nil) -> URL? {
+        guard !site.personalPages.isEmpty else { return nil }
+        let siteWords = Set((site.aliases + [site.label]).flatMap {
+            $0.lowercased().split(separator: " ").map(String.init)
+        })
+        let remaining = query.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { !personalFiller.contains($0) && !siteWords.contains($0) }
+            .joined(separator: " ")
+        guard !remaining.isEmpty,
+              let path = site.personalPages[remaining] else { return nil }
+
+        let home = site.regional[overrideRegion ?? region]?.home ?? site.home
+        return URL(string: home + path)
+    }
+
+    /// Moves a URL the model supplied onto the regional domain when the
+    /// site has one. The model writes amazon.com and apple.com because it
+    /// has no way to know better; this is the single place that knowledge
+    /// lives, so it belongs here rather than in the prompt.
+    static func regionalized(_ url: URL, siteHint: String?) -> URL {
+        let absolute = url.absoluteString
+        let candidates = siteHint
+            .map { hint -> [Site] in
+                let (name, _) = splitCountry(hint)
+                let n = normalize(name)
+                return sites.filter { $0.aliases.contains { normalize($0) == n } || normalize($0.label) == n }
+            }
+            .flatMap { $0.isEmpty ? nil : $0 } ?? sites
+        let explicit = siteHint.flatMap { splitCountry($0).region }
+
+        for site in candidates {
+            guard let variant = site.regional[explicit ?? region] else { continue }
+            // Already regional — Apple's variants are path-based, so a naive
+            // prefix swap would produce apple.com/in/in/iphone.
+            guard !absolute.hasPrefix(variant.home) else { return url }
+            guard absolute.hasPrefix(site.home) else { continue }
+            let tail = String(absolute.dropFirst(site.home.count))
+            if let rebuilt = URL(string: variant.home + tail) { return rebuilt }
+        }
+        return url
+    }
+
     static func resolve(_ requested: String, query: String?, vertical: String? = nil) -> Resolution {
         let trimmed = requested.trimmingCharacters(in: .whitespacesAndNewlines)
         let (baseName, explicitRegion) = splitCountry(trimmed)
@@ -240,6 +357,12 @@ enum WebsiteCatalog {
             let template = variant?.search ?? site.searchTemplate
 
             if let query, !query.isEmpty {
+                // The user's own page wins over any search — asking for
+                // "my messages" and getting a search for that phrase is
+                // the failure this table exists to prevent.
+                if let page = personalPage(site: site, query: query, region: explicitRegion) {
+                    return .site(label: "\(site.label) — \(query)", url: page)
+                }
                 // A vertical wins when the site has that tab; otherwise the
                 // ordinary search, which is still a reasonable answer.
                 let chosen = vertical
