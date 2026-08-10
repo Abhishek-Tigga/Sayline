@@ -128,6 +128,17 @@ final class FloatingIndicatorWindow {
     }
 
     func hide() {
+        // A pending question owns the screen until it is answered, escaped
+        // or times out. Without this, a hold too brief to transcribe — or
+        // one into a muted mic — takes the question away while its timer
+        // keeps running, and the next hold silently becomes dictation
+        // again. That is the exact confusion the persistent agent pill
+        // exists to prevent, so the invariant is enforced here rather than
+        // at each of the six call sites.
+        if followUpCompletion != nil {
+            NSLog("Sayline: hide() ignored — a question is still waiting for an answer")
+            return
+        }
         panel?.orderOut(nil)
         panel = nil
         viewModel.setTranscript(nil)
