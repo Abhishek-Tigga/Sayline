@@ -66,7 +66,7 @@ final class AgentRouter {
     var systemPrompt: String {
         // Relative times are meaningless without an anchor — "tomorrow"
         // resolves against nothing. Cheap: one short line per request.
-        let now = ISO8601DateFormatter.saylineLocal.string(from: Date())
+        let now = LocalTimestamp.string(from: Date())
         return """
     Current local time: \(now).
 
@@ -276,7 +276,7 @@ final class AgentRouter {
                         ],
                         "due": [
                             "type": "string",
-                            "description": "When, as local ISO 8601 (2026-08-11T16:00). Resolve relative words against the current time given above. Omit if no time was said — do not invent one.",
+                            "description": "When, as local time yyyy-MM-ddTHH:mm:ss. Resolve relative words against the current time given above. Omit if no time was said — never invent one.",
                         ],
                     ],
                     "required": ["title"],
@@ -782,7 +782,7 @@ final class AgentRouter {
             guard let title = (arguments["title"] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
             let due = (arguments["due"] as? String)
-                .flatMap { ISO8601DateFormatter.saylineLocal.date(from: $0) }
+                .flatMap { LocalTimestamp.parse($0) }
                 .flatMap { Self.sanityChecked($0) }
             if arguments["due"] != nil && due == nil {
                 // The model offered a time we could not use. Dropping it
@@ -854,18 +854,4 @@ private extension String {
     /// Treat an empty or whitespace-only argument as absent. Models return
     /// "" as readily as omitting a field.
     var nilIfEmpty: String? { trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self }
-}
-
-extension ISO8601DateFormatter {
-    /// Local wall-clock ISO, no timezone suffix. The model is told what
-    /// time it is here and answers in the same shape, so nothing has to
-    /// agree about offsets — the one thing most likely to silently put a
-    /// reminder twelve hours out.
-    static let saylineLocal: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime,
-                           .withDashSeparatorInDate]
-        f.timeZone = .current
-        return f
-    }()
 }

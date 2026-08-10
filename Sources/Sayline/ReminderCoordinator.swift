@@ -89,13 +89,17 @@ final class ReminderCoordinator {
             indicator.flashMessage(message(for: title, due: due), duration: 3.4)
         } catch {
             NSLog("Sayline: couldn't save reminder -> \(error.localizedDescription)")
-            indicator.flashMessage("Couldn't save that reminder", duration: 3.0)
+            indicator.flashMessage("Couldn't save that reminder", duration: 3.4)
         }
     }
 
+    /// Says what happened, and says the time back. Reading the time back is
+    /// the only chance to catch a misheard "four" that became sixteen
+    /// hundred hours — after this the reminder is out of sight until it
+    /// fires, or doesn't.
     private func message(for title: String, due: Date?) -> String {
-        guard let due else { return "Reminder saved (no time): \(title)" }
-        return "Reminder: \(title) — \(Self.spoken.string(from: due))"
+        guard let due else { return "Reminder set · \(title) · no time" }
+        return "Reminder set · \(title) · \(Self.spoken.string(from: due))"
     }
 
     // MARK: - Cancel
@@ -148,7 +152,7 @@ final class ReminderCoordinator {
             guard answer == .confirmed else {
                 // Declined, escaped or timed out all mean keep it. Never
                 // guess yes: yes is the irreversible direction.
-                self.indicator.flashMessage("Kept it", duration: 2.0)
+                self.indicator.flashMessage("Kept it — nothing deleted", duration: 2.4)
                 return
             }
             self.delete(id: match.id, title: match.title)
@@ -158,7 +162,7 @@ final class ReminderCoordinator {
     private func delete(id: String, title: String) {
         do {
             try store.delete(id: id)
-            indicator.flashMessage("Deleted: \(title)", duration: 3.0)
+            indicator.flashMessage("Reminder deleted · \(title)", duration: 3.0)
         } catch {
             NSLog("Sayline: couldn't delete reminder -> \(error.localizedDescription)")
             indicator.flashMessage("Couldn't delete that reminder", duration: 3.0)

@@ -341,34 +341,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 let actions = try await agentRouter.route(transcript)
 
                 await MainActor.run {
-                    self.indicatorWindow.hide()
+                    // Deliberately NOT hidden here. Tearing the panel down
+                    // and building a new one milliseconds later is what made
+                    // a follow-up question invisible until the hotkey was
+                    // pressed again — the window server had an orderOut and
+                    // an orderFrontRegardless on the same spot 6ms apart.
+                    // The indicator now lives for the whole agent turn, and
+                    // whoever finishes last puts it away.
                     guard !actions.isEmpty else {
                         NSLog("Sayline: agent could not determine an action for \"\(transcript)\"")
                         self.indicatorWindow.flashMessage("Agent: nothing matched")
                         return
                     }
                     var anyFailed = false
+                    // Set by any action that shows its own message or asks
+                    // its own question. Anything left false means the turn
+                    // finished silently and the pill should go away.
+                    var ownsTheEnding = false
                     for action in actions {
                         NSLog("Sayline: agent executing -> \(action)")
                         if case .answerQuery(let query) = action {
                             let answer = AgentExecutor.answer(query)
                             NSLog("Sayline: agent answered -> \(answer)")
                             self.indicatorWindow.flashMessage(answer, duration: 4.5)
+                            ownsTheEnding = true
                             continue
                         }
                         if case .createReminder(let title, let due) = action {
                             // Owns its own follow-ups and result message,
                             // so it is not part of the anyFailed tally.
+                            ownsTheEnding = true
                             Task { await self.reminders.create(title: title, due: due) }
                             continue
                         }
                         if case .cancelReminder(let name) = action {
+                            ownsTheEnding = true
                             Task { await self.reminders.cancel(name: name) }
                             continue
                         }
                         if case .openedSiteButCouldNotSearch(let label, _, _) = action {
                             AgentExecutor.execute(action)
                             self.indicatorWindow.flashMessage("Opened \(label) — can't search it directly", duration: 3.0)
+                            ownsTheEnding = true
                             continue
                         }
                         if case .unknownWebsite(let requested) = action {
@@ -377,11 +391,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             // would work instead — a bare "couldn't do that"
                             // leaves no way to succeed on the retry.
                             self.indicatorWindow.flashMessage("Say the full address, like \(requested).com", duration: 3.5)
+                            ownsTheEnding = true
                             continue
                         }
                         if case .openSystemSettingsFallback(let requestedPaneName) = action {
                             AgentExecutor.execute(action)
                             self.indicatorWindow.flashMessage("Couldn't find \"\(requestedPaneName)\" settings", duration: 3.0)
+                            ownsTheEnding = true
                             continue
                         }
                         if !AgentExecutor.execute(action) {
@@ -390,6 +406,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     }
                     if anyFailed {
                         self.indicatorWindow.flashMessage("Agent: couldn't complete that")
+                    } else if !ownsTheEnding {
+                        self.indicatorWindow.hide()
                     }
                 }
             } catch {
