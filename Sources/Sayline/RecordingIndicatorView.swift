@@ -42,41 +42,34 @@ enum PillStyle {
     static let cornerRadius: CGFloat = 8
 }
 
-/// The two container treatments being compared.
+/// The container treatment.
 ///
-/// They are not two tints of the same thing — that distinction matters
-/// when judging them. `.liquidGlass` is the real macOS 26 material, which
-/// re-renders itself brighter over light content; that adaptivity is the
-/// source of the known flicker. `.flat` is an ordinary blurred backdrop
-/// under a fixed fill, so it cannot adapt and should not flicker.
+/// `.flat` ships. `.liquidGlass` is PARKED, not dead — kept compiling and
+/// one constant away from returning, on the explicit instruction not to
+/// delete it (2026-08-10).
+///
+/// They were never two tints of the same thing. `.liquidGlass` is the real
+/// macOS 26 material, which re-renders itself brighter over light content;
+/// that adaptivity is the whole look and also the source of the known
+/// flicker, and it reads far louder on a surface the size of the speech
+/// box than it ever did on the pill. `.flat` is an ordinary blurred
+/// backdrop under a fixed fill, so it cannot adapt and does not flicker —
+/// which is what a box holding a question the user has to read needs.
 enum SurfaceStyle: Equatable {
-    /// Real Liquid Glass with a tint over it. Current shipping look:
-    /// true black at 70%.
+    /// PARKED. Real Liquid Glass with a tint over it, true black at 70%.
     case liquidGlass(tint: Color)
     /// Figma node 91:778 — `bg-[rgba(20,20,20,0.75)]` over
     /// `backdrop-blur`. Flat and non-adaptive.
     case flat(fill: Color)
 
-    static let shipping = SurfaceStyle.liquidGlass(
-        tint: PillStyle.tintBase.opacity(PillStyle.defaultTintOpacity)
-    )
-    /// #141414 at 75%.
-    static let flatCandidate = SurfaceStyle.flat(
+    /// What renders. Swap to `parkedGlass` to bring the old look back.
+    static let shipping = SurfaceStyle.flat(
         fill: Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255).opacity(0.75)
     )
-}
-
-/// TEMPORARY — `ui-speech-back` branch only. Renders both surface
-/// treatments side by side so they can be judged against the same live
-/// backdrop in one pass. Judging serially meant a rebuild per value, and
-/// each rebuild costs a re-grant of Accessibility.
-///
-/// Set to `nil` for normal single-stack rendering.
-enum SurfaceComparison {
-    static let variants: [(style: SurfaceStyle, label: String)]? = [
-        (.shipping, "Glass · #000 70%"),
-        (.flatCandidate, "Flat · #141414 75%"),
-    ]
+    /// PARKED — the previous shipping look, kept for a one-line revert.
+    static let parkedGlass = SurfaceStyle.liquidGlass(
+        tint: PillStyle.tintBase.opacity(PillStyle.defaultTintOpacity)
+    )
 }
 
 // MARK: - Top level
@@ -112,22 +105,8 @@ struct RecordingIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
     var body: some View {
-        Group {
-            if let variants = SurfaceComparison.variants {
-                HStack(alignment: .bottom, spacing: 24) {
-                    ForEach(Array(variants.enumerated()), id: \.offset) { _, variant in
-                        IndicatorStack(
-                            viewModel: viewModel,
-                            surface: variant.style,
-                            label: variant.label
-                        )
-                    }
-                }
-            } else {
-                IndicatorStack(viewModel: viewModel, surface: .shipping, label: nil)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        IndicatorStack(viewModel: viewModel, surface: .shipping, label: nil)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 }
 
