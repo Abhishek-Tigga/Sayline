@@ -296,7 +296,7 @@ def run_arm(arm, model, config, transcript, keys):
     if arm == "groq-tools":
         payload = {
             "model": model, "tools": config["tools"], "tool_choice": "auto",
-            "temperature": 0.1,
+            "temperature": 0,
             "messages": [{"role": "system", "content": config["systemPrompt"]},
                          {"role": "user", "content": transcript}],
         }
@@ -306,7 +306,7 @@ def run_arm(arm, model, config, transcript, keys):
         system = config["systemPrompt"] + JSON_MODE_SUFFIX + prose_from_tools(config["tools"])
         payload = {
             "model": model, "response_format": {"type": "json_object"},
-            "temperature": 0.1,
+            "temperature": 0,
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": transcript}],
         }
@@ -315,7 +315,7 @@ def run_arm(arm, model, config, transcript, keys):
     elif arm == "openai":
         payload = {
             "model": model, "tools": openai_strict_tools(config["tools"]),
-            "tool_choice": "auto", "temperature": 0.1,
+            "tool_choice": "auto", "temperature": 0,
             "messages": [{"role": "system", "content": config["systemPrompt"]},
                          {"role": "user", "content": transcript}],
         }
@@ -380,11 +380,16 @@ def page_is_real(url):
     req = urllib.request.Request(url, method="HEAD", headers={
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                       "AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36"})
+    # Mirrors the production rule: only 404/410 prove absence. A 503 from
+    # Amazon or a 403 from LinkedIn is bot-blocking, not a dead page, and
+    # a timeout is unproven rather than absent.
     try:
         with urllib.request.urlopen(req, timeout=4) as r:
-            ok = 200 <= r.status < 400
+            ok = r.status not in (404, 410)
+    except urllib.error.HTTPError as e:
+        ok = e.code not in (404, 410)
     except Exception:
-        ok = False
+        ok = True
     _page_cache[url] = ok
     return ok
 

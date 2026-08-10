@@ -501,12 +501,11 @@
         {
           "action": "openWebsite",
           "args": {
-            "site": "Apple",
             "page_url__contains": "apple.com/in/iphone"
           }
         }
       ],
-      "guards": "NEW: navigation, not search. Wants apple.com/in/iphone rather than a results list. Expected to fail until deep-linking exists."
+      "guards": "Asserts only on the URL. The site label is unused when a page_url validates, and the model returns 'Apple India' or 'Apple' interchangeably — both resolve correctly, so pinning the label made a passing behaviour look like a regression."
     },
     {
       "id": "web-deeplink-notion",

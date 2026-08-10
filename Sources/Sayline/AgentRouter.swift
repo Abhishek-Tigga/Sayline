@@ -411,11 +411,19 @@ final class AgentRouter {
             forHTTPHeaderField: "User-Agent"
         )
 
+        // Only a 404 or 410 is evidence the page isn't there. Treating
+        // everything outside 200-399 as missing threw away correct URLs:
+        // amazon.in/gp/css/order-history answers 503 to any non-browser
+        // request, so "show my Amazon orders" kept degrading to a search.
+        // 403, 429 and 503 mean the server won't talk to *us* — which says
+        // nothing about whether the page exists, and Safari with real
+        // cookies will open it fine. Same for a timeout: unproven is not
+        // the same as absent, so the URL survives.
         let started = Date()
-        var reachable = false
+        var reachable = true
         if let (_, response) = try? await URLSession.shared.data(for: request),
            let http = response as? HTTPURLResponse {
-            reachable = (200..<400).contains(http.statusCode)
+            reachable = ![404, 410].contains(http.statusCode)
             NSLog("%@", "Sayline: page check \(url.absoluteString) -> HTTP \(http.statusCode) in \(Int(Date().timeIntervalSince(started) * 1000))ms")
         } else {
             NSLog("%@", "Sayline: page check \(url.absoluteString) -> unreachable")
@@ -440,9 +448,9 @@ final class AgentRouter {
 
     private func routeWithRetry(_ transcript: String) async throws -> [AgentAction] {
         do {
-            return try await performRoute(transcript, temperature: 0.1)
+            return try await performRoute(transcript, temperature: 0)
         } catch let failure as RetryableToolFailure {
-            // Retry at a higher temperature, NOT the same 0.1. The first
+            // Retry at a higher temperature, NOT the same 0. The first
             // version of this retried identically and was useless:
             // confirmed live (2026-08-09, "Show my screen time") that the
             // retry reproduced a byte-identical malformed generation,
