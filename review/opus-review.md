@@ -2,184 +2,163 @@
 
 Written 2026-08-11 by Claude Opus 5, reviewing code it largely wrote itself
 in the preceding week. That is the main thing to hold against it: I will be
-softer on decisions I made than a stranger would be, and the failures I
-talked myself into are exactly the ones I am least likely to see. Read this
-alongside an independent review, not instead of one.
+softer on decisions I made than a stranger would be, and the things I talked
+myself into are exactly the ones I cannot see. Read this alongside an
+independent review, not instead of one.
 
 Scope: 6,635 lines, 39 Swift files, plus the eval harness. Evidence is from
-running the code and reading the live system, not from memory.
+running the system, not from memory.
+
+Two disclosures about this document specifically. Its first draft was all
+defects and no opportunities — the two largest items in Part 3 were missing
+entirely, including one that serves the top-named pillar. And it did not tag
+findings by pillar or state cost now-versus-later, both of which I had asked
+the other reviewer to do. Fixed here; worth knowing the first pass failed its
+own standard.
 
 ---
 
 ## Part 1 — What this product is judged on
 
-Accuracy and latency are the two named pillars. They are necessary and they
-are not sufficient. Four more decide whether this sells, and three of them
-currently have no owner in the codebase.
+Accuracy and latency are the two named pillars. Necessary, not sufficient.
+Six more decide whether this sells, and three have no owner in the code.
 
 ### 1. Trust — does it work every single time
 
-The pillar above accuracy. A tool that is 98% accurate but fails visibly
-once a day gets uninstalled; one that is 94% accurate and never surprises
-you gets used forever. Dictation is muscle memory, and muscle memory cannot
-survive "did that work?"
+The pillar above accuracy. A tool that is 98% accurate but fails visibly once
+a day gets uninstalled; one that is 94% accurate and never surprises you gets
+used forever. Dictation is muscle memory, and muscle memory cannot survive
+"did that work?"
 
-The specific enemy is **silent failure**. Every serious bug this week was
-one: audio recorded to an empty file, a due date parsed to nil, a question
-shown on a window nobody could see. In each case the app believed it had
-succeeded.
+The enemy is **silent failure**. Every serious bug this week was one: audio
+recorded to an empty file, a due date parsed to nil, a question drawn on a
+window nobody could see. In each case the app believed it had succeeded.
 
-*How you'd know it's healthy:* every failure path produces something the
-user can see and something the log can explain. We are partway there.
+*Owner in code:* partial. Failures are increasingly visible, but there is no
+policy — see finding 6.
 
 ### 2. Privacy — this app hears everything
 
-A dictation tool has microphone access and sees every password field,
-medical note and salary conversation its user speaks near. That is the most
-sensitive permission on the machine, and it is the first thing a serious
-buyer will ask about.
+A dictation tool holds microphone access and sees every password field,
+medical note and salary conversation its user speaks near. It is the most
+sensitive permission on the machine and the first thing a serious buyer asks
+about.
 
-This is currently the weakest pillar. See findings 1 and 2 — they are not
-theoretical.
+*Owner in code:* none, and actively negative. See findings 1 and 2.
 
 ### 3. Activation — surviving the permission gauntlet
 
-macOS asks for Accessibility, Microphone, Reminders and soon Calendar. Each
-prompt is a place someone quits. Nobody churns louder than a user who never
-got the thing working once.
+Accessibility, Microphone, Reminders, soon Calendar. Each prompt is a place
+someone quits, and nobody churns louder than a user who never got it working
+once.
 
-There is no onboarding flow, no permission status screen, and no way for a
-user to see which permissions are missing and why they matter. The
-first-run experience is currently "it silently does nothing".
+*Owner in code:* none. No onboarding, no permission status view, no way to
+see what is missing or why it matters. First run is "it silently does
+nothing".
 
 ### 4. Unit economics — what one user costs
 
-Every dictation is a Whisper call; every agent command is a Whisper call
-plus a router call at ~2,350 prompt tokens. That is a real per-user cost,
-and it determines what you can charge.
+Every dictation is a Whisper call; every agent command is Whisper plus a
+router call at ~2,350 prompt tokens. That determines what you can charge.
 
-Nothing in the codebase measures it. There is no counter, no logging of
-token spend, no way to answer "what does a heavy user cost per month"
-without guessing. You will need that number before you price anything.
+*Owner in code:* none. No counter, no token logging. `PRODUCT.md`'s cost
+model predates agent mode and is now wrong by a large factor.
 
 ### 5. Fix velocity — how fast a mistake stops hurting
 
-Everything is compiled in: the site catalog, the personal-page URLs, the
-settings panes. When LinkedIn moves a URL, the fix is a source change, a
-release, App Store review, and waiting for users to update.
+Site catalog, personal-page URLs, settings panes: all compiled in. When
+LinkedIn moves a URL the fix is a release and an App Store review.
+Competitors shipping server-side config fix the same break in an afternoon.
 
-Competitors solving this with server-delivered config can fix the same
-break in an afternoon. This is a structural disadvantage, and it grows with
-every hardcoded table added.
+*Owner in code:* none, and it worsens with every hardcoded table.
 
 ### 6. Host stability — never break the user's Mac
 
-The freeze. Still unexplained after two disproven theories. An app that
-freezes the machine gets a one-star review that mentions freezing, and no
-amount of accuracy recovers from that.
+The freeze, still unexplained after two disproven theories. An app that
+freezes the machine earns a one-star review that says "freezes", and accuracy
+does not recover from that.
 
-This deserves to be treated as existential rather than as a bug.
+*Owner in code:* one leak probe, left in place. Treat as existential.
 
 ---
 
-## Part 2 — Findings
+## Part 2 — Defects
 
-Ranked by how much more expensive each becomes if left until after meetings
-ships. Not by severity in the abstract.
+Ranked by how much more expensive each gets if left until after meetings
+ships.
 
 ### 1. Every recording ever made is still on disk — 514 MB, unencrypted
+**Pillar: privacy.** Cost now: ~10 lines. Cost later: unchanged, but the
+exposure compounds daily.
 
 `AudioRecorder.start()` writes to `FileManager.default.temporaryDirectory`
 and **nothing ever deletes it**. There is no `removeItem` call anywhere in
 the codebase.
 
-Measured on this machine right now:
-
 ```
 383 files    514 MB    oldest Aug 9, newest Aug 11
 ```
 
-Two days of use. Every word spoken into this app, as raw audio, sitting in
-a directory that is not encrypted beyond the disk itself and is readable by
-any process running as the user.
+Two days. Every word spoken into this app, as raw audio, readable by any
+process running as the user and swept into unencrypted backups.
 
-This is the single worst thing in the codebase. It is also a ten-line fix,
-which is why it ranks first: the cost of fixing it is trivial and the cost
-of shipping it is a headline.
+*Commercially:* this is the difference between a privacy page and a privacy
+incident. It is also the single cheapest fix in this document, which is why
+it ranks first.
 
-**Fix:** delete the file when transcription completes, successfully or not.
-Add a sweep at launch for orphans left by a crash. Consider whether the
-file needs to touch disk at all — `AVAudioFile` is convenient, but an
-in-memory buffer never leaks.
+*Do this:* delete the file in a `defer` at the end of every transcription
+path, success or failure. Sweep `sayline-*.wav` at launch for orphans left by
+a crash. Then ask whether it needs to touch disk at all — `AVAudioFile` is
+convenient, but a file that is never written cannot leak.
 
 ### 2. Transcript history is stored in plain UserDefaults
+**Pillar: privacy.** Cost now: half a day. Cost later: the same, plus every
+user who accumulated history under the old scheme.
 
 ```
 "com.abhishektigga.sayline.history" = {length = 4632, ...}
 ```
 
-That is an unencrypted plist in the user's Library. Everything they have
-dictated, in plaintext, readable by any process running as them and
-included in unencrypted backups.
+An unencrypted plist of everything the user has dictated.
 
-For a personal note-taking app that would be sloppy. For a tool people
-dictate private things into, it is a defect.
+*Commercially:* "where is my dictation stored" is a question you will be
+asked by anyone evaluating this for work. Right now the honest answer is bad.
 
-**Fix:** Keychain for the payload, or an encrypted file, or a documented
-retention limit with an off switch. The right answer depends on a product
-decision nobody has made yet: does history exist for convenience or for
-audit? If convenience, the honest option is to store much less.
+*Do this:* decide first what history is *for*. If convenience, keep 20
+entries, encrypt at rest, and add a clear-history control. If audit, that is
+a different feature with different storage. The current state is the default
+that nobody chose.
 
-### 3. There is no test target
+### 3. Prompt injection becomes real the moment meetings ships
+**Pillar: trust, privacy.** Cost now: a design decision. Cost later: a
+retrofit of a trust boundary, which is the expensive kind.
 
-The checks I added this week — `catalog-checks`, `consent-checks`,
-`timestamp-checks` — are standalone `main.swift` files compiled by hand
-with `swiftc`. They are real tests with real assertions and they have
-caught real bugs, but:
+Today the router only sees the user's own speech — a closed loop, low risk.
 
-- Nothing runs them automatically
-- They are not in the Xcode project, so a refactor can break them silently
-- Each recompiles its dependency from source, so they only work on files
-  with few dependencies. That is why `LocalTimestamp` had to be split out
-  of `AgentRouter` — not for design reasons, but so a test could compile.
+Meetings breaks it. Calendar events carry text written by other people, and
+the design has us reading the notes field for a join link. Anyone who can
+send you an invite can put words in it, and those words would reach a loop
+that opens apps, opens URLs and deletes reminders.
 
-That last point is the tell: **the test setup is already deforming the
-architecture.** That gets worse with every file.
+*Do this, before writing meeting code:* extract links with a regex; never
+hand raw event text to the model. If the model must see event text, it must
+not be able to emit a tool call in the same turn. Write the rule into
+`DESIGN-meetings-reminders.md` now, while it costs a paragraph.
 
-**Fix:** a real XCTest target in `project.yml`. The assertions already
-exist; they need a home.
+This is the finding I most want a second opinion on — it is about code that
+does not exist yet, so a reviewer reading only what is there will miss it.
 
-### 4. Prompt injection is about to become real, and meetings is the door
+### 4. `AppDelegate` is where things go when they have no home
+**Pillar: trust (indirectly — this is where silent bugs breed).** Cost now:
+a day. Cost later: meetings adds cases on both sides of the split, so
+roughly double.
 
-Today the router only ever sees the user's own speech. That is a closed
-loop and the risk is low.
+499 lines owning hotkey wiring, recording lifecycle, transcription,
+cleanup, AX insertion, agent dispatch, a debug harness and two window
+controllers. Thirteen stored properties.
 
-Meetings breaks it. Calendar events contain text written by other people —
-titles, notes, invite descriptions — and the design has us reading the
-notes field to find a join link. The moment any of that reaches the model,
-untrusted text is in a loop that can open apps, open URLs and delete
-reminders.
-
-A calendar invite is trivially attacker-controlled: anyone who can send you
-an invite can put text in it.
-
-**Fix, before meetings ships:** event content is data, never instructions.
-Extract the link with a regex, never hand raw notes to the model. If the
-model must see event text, it must not be able to trigger a tool call from
-the same turn. Decide this before writing the code, because retrofitting a
-trust boundary is much harder than drawing one.
-
-This is the finding I would most want a second opinion on, and the one most
-likely to be missed by a reviewer looking only at what exists today.
-
-### 5. `AppDelegate` is becoming the place things go when they have no home
-
-499 lines, and it owns: hotkey wiring, recording lifecycle, transcription
-orchestration, cleanup, AX insertion, agent dispatch, a debug menu harness,
-and two window controllers. Thirteen stored properties.
-
-The specific smell is in the dispatch loop — a chain of six `if case`
-special cases that run before the generic executor:
+The smell is concrete — six `if case` special cases before the generic
+executor:
 
 ```swift
 if case .createReminder(...)  { ...; continue }
@@ -191,131 +170,228 @@ if case .answerQuery(...)     { ...; continue }
 if !AgentExecutor.execute(action) { anyFailed = true }
 ```
 
-I added two of those this week without noticing the pattern. The generic
-executor handles the actions that need nothing; everything that needs a
-message, a follow-up or async work jumps the queue. **The abstraction is
-wrong** — `AgentExecutor.execute` returning `Bool` cannot express "this
-action talks to the user" or "this action takes time".
+I added two of those this week without noticing the pattern. The generic path
+handles actions that need nothing; anything needing a message, a follow-up or
+async work jumps the queue. **The abstraction is wrong**: `execute -> Bool`
+cannot express "this talks to the user" or "this takes time".
 
-Every new capability adds another `if case`. Meetings adds at least two.
+*Do this:*
 
-**Fix:** let an action's handler own its outcome — result type instead of
-`Bool`, async by default, and one dispatch path instead of two. This is the
-cheapest to do now and the most annoying to do after meetings, because
-meetings will add cases on both sides of the split.
+```swift
+enum ActionOutcome {
+    case done                    // silent success, caller may hide
+    case reported                // handler already showed the user something
+    case awaitingAnswer          // a question is up; do not touch the pill
+    case failed(String)          // message for the user
+}
 
-### 6. `FloatingIndicatorWindow` now does four jobs
+protocol ActionHandler {
+    func run(_ action: AgentAction) async -> ActionOutcome
+}
+```
 
-323 lines owning: `NSPanel` lifecycle, the follow-up state machine
-(question, retry, single-fire guard, timeout), the notice state with its
-own separate timeout, and mouse-event toggling.
+One dispatch path, async by default, outcome decided by the handler. The
+`if case` chain disappears; `ownsTheEnding` — a flag I added today to paper
+over exactly this — disappears with it.
 
-The evidence that this is already a problem is the bug I fixed today: a
-brief hotkey tap called `hide()`, which cleared a pending question, which
-made the next hold silently become dictation. The fix was a guard inside
-`hide()` — correct, but the reason it was needed is that **window
-visibility and conversation state are tangled in one object**.
+### 5. `FloatingIndicatorWindow` does four jobs
+**Pillar: trust.** Cost now: half a day. Cost later: meetings adds a third
+message type.
 
-There are now two message systems that overlap: `flashMessage` puts text in
-the pill, `showNotice` puts text in the box. Nothing says which to use. I
-migrated the reminder flow from one to the other today and left every other
-caller on the old one, so the codebase currently disagrees with itself.
+323 lines owning `NSPanel` lifecycle, the follow-up state machine (question,
+retry, single-fire guard, timeout), the notice state with its own separate
+timeout, and mouse-event toggling.
 
-**Fix:** pull the conversation state machine out of the window. The window
-should render what it is told; something else should decide what is being
-asked and for how long.
+The proof it is already a problem is today's bug: a brief hotkey tap called
+`hide()`, which cleared a pending question, which made the next hold silently
+become dictation. The fix was a guard inside `hide()` — correct, but needed
+only because **window visibility and conversation state live in one object**.
 
-### 7. The eval harness reads Swift by concatenating source files
+There are now two overlapping message systems. `flashMessage` writes to the
+pill, `showNotice` writes to the box, and nothing says which to use. I
+migrated the reminder flow to the second one today and left every other
+caller on the first, so the codebase currently disagrees with itself.
 
-`run_eval.py` builds a temporary Swift program from a hand-maintained list
-of files so it can print the real prompt and tools. Reading from source
-rather than keeping a copy is the right instinct — a duplicated prompt
-would drift immediately.
+*Do this:* extract a `ConversationController` owning pending question,
+retry count, timeouts and the single-fire guard. The window drops to one
+entry point — `render(_ state: IndicatorState)` — and holds no policy. Then
+delete `flashMessage`, or define in one sentence when each is correct.
 
-But the file list is manual, and it broke **twice today**: once when
-`WebsiteCatalog` was needed, once when `LocalTimestamp` lived in a file the
-harness did not compile. Both failed loudly, which is the saving grace, but
-both cost a cycle.
+### 6. Failure handling has no policy
+**Pillar: trust.** Cost now: a day. Cost later: proportional to how many more
+handlers exist.
 
-**Fix:** compile the whole `Sources/Sayline` directory, or better, add a
-tiny `--dump-config` flag to the app itself so the harness asks the real
-binary rather than reconstructing it.
+13 `try?` and 17 `catch` blocks, with no rule about which failures reach the
+user. Some flash a message, some only `NSLog`, some do neither.
 
-### 8. Two execution paths with no rule
+*Do this:* one convention, applied everywhere, so "what does the user see
+when this breaks" is never "depends who wrote it". The pattern that works is
+already here — *fail open, and say what happened* — it just is not general.
 
-Most actions run synchronously in `AgentExecutor`. Reminders run in
-`ReminderCoordinator`, which is `@MainActor`, async, and owns its own UI.
-`AgentExecutor` even has a branch for reminder cases whose only job is to
-log that they should never arrive.
+### 7. There is no test target
+**Pillar: trust.** Cost now: two hours. Cost later: the same, plus everything
+that broke unnoticed meanwhile.
 
-There is no stated rule for which an action uses. Meetings will have to
-pick, and whoever writes it will pick by looking at whichever example they
-happen to open first.
+`catalog-checks`, `consent-checks` and `timestamp-checks` are standalone
+`main.swift` files compiled by hand. Real assertions that caught real bugs,
+but nothing runs them automatically and they are not in the project, so a
+refactor breaks them silently.
 
-**Fix:** state the rule — actions that need permission, async work or a
-conversation go one way, everything else the other — or unify them. Either
-is fine. The current state, where the split exists but is undocumented, is
-the worst of both.
+The tell that this already costs something: each compiles its dependency from
+source, so they only work on files with few dependencies — which is why
+`LocalTimestamp` had to be split out of `AgentRouter`. Not a design decision.
+**The test setup is already deforming the architecture.**
 
-### 9. Nothing measures what a user costs
+*Do this:* an XCTest target in `project.yml`. The assertions exist; they need
+a home.
 
-No token counter, no request counter, no cost estimate. `PRODUCT.md` has a
-cost model from 2026-08-04 that predates agent mode entirely and is now
-wrong by a large factor: the router adds ~2,350 prompt tokens to every
-agent command, which the old model does not account for.
+### 8. The eval harness reconstructs the app instead of asking it
+**Pillar: accuracy.** Cost now: an hour. Cost later: another broken cycle
+each time a file moves.
 
-You cannot price a product whose unit cost you cannot measure.
+`run_eval.py` concatenates a hand-maintained list of Swift files to print the
+real prompt and tools. Reading from source is the right instinct — a copied
+prompt would drift immediately — but the list is manual and broke **twice
+today**.
 
-**Fix:** log tokens and estimated cost per request behind a debug flag, and
-aggregate. Cheap to add now, and it turns pricing from an argument into
-arithmetic.
+*Do this:* add a `--dump-config` flag to the app itself and have the harness
+run the real binary. Removes the file list, and guarantees the eval sees
+exactly what production sends.
 
-### 10. Failure handling is inconsistent, and some of it is silent
+### 9. Two execution paths with no stated rule
+**Pillar: trust.** Cost now: an hour to document, a day to unify. Cost later:
+meetings picks one by coin flip.
 
-13 uses of `try?` and 17 `catch` blocks, with no consistent policy about
-which failures reach the user. Some paths flash a message, some only
-`NSLog`, some do neither.
+Most actions run synchronously in `AgentExecutor`; reminders run in
+`@MainActor` `ReminderCoordinator`. `AgentExecutor` even carries a branch for
+reminder cases whose only job is to log that they should never arrive.
 
-The pattern that works — established this week and worth generalising — is
-*fail open, and say what happened*. It is applied in `AudioRecorder` and in
-`verifiedPage`, and nowhere else deliberately.
-
-**Fix:** a single convention for user-visible failure, applied everywhere,
-so the answer to "what does the user see when this breaks" is never "it
-depends who wrote it".
+Finding 4 dissolves this. If it is not done, write the rule down instead.
 
 ---
 
-## Part 3 — What should not be changed
+## Part 3 — Opportunities
 
-A review that only lists problems is misleading about where the risk is.
+Not defects. Nothing here is broken; each would move a pillar. My first draft
+had none of these, and the first two are the largest items in this document.
 
-**The eval harness is the best thing here.** It reads the real prompt, it
-mirrors production's URL checking, it refuses to record runs where too many
-cases errored, and `results.md` carries the mistakes rather than hiding
-them. It has repeatedly disproven my own confident guesses. Do not let a
-refactor break it.
+### A. Skip the router for commands we can already recognise
+**Pillar: latency — the top named one.** Cost now: a day. Value: immediate.
+
+Every agent command pays a round trip to OpenAI. Measured median **1,220–
+1,352 ms**, and that is the floor, not the tail.
+
+But **18 of 57 test cases are fixed-vocabulary commands**: "Open Safari",
+"Close Finder", "Lock screen", "What's my battery". These need no
+intelligence. The app already owns the vocabulary — the installed app list,
+`SettingsPaneCatalog`, `WebsiteCatalog` — and matches against it *after* the
+model answers.
+
+*Do this:* try a deterministic match first, and only call the router when it
+misses. "Open Safari" becomes roughly instant; anything ambiguous is
+unaffected because it falls through unchanged.
+
+The eval already makes this safe to attempt: run it before and after, and any
+case the fast path steals incorrectly shows up as a regression. **This is the
+single largest latency win available, and it costs nothing per request** —
+the opposite of every other latency lever, which trade accuracy or money.
+
+Do it before meetings. Afterwards there are two more command families to
+teach it.
+
+### B. On-device transcription is 80% built and hidden
+**Pillar: privacy, and unit economics.** Cost now: mostly product work, the
+engine exists.
+
+`WhisperKitTranscriber.swift` is real, integrated, and behind an opt-in
+toggle almost nobody will find. "Your audio never leaves your Mac" is the
+strongest possible answer to the privacy question — and it is already
+written.
+
+*Commercially:* it is a tier. Local for the privacy-conscious and for
+enterprise buyers who cannot send audio anywhere; cloud for speed. It also
+removes the per-dictation Whisper cost for those users, which changes the
+unit economics of your cheapest plan.
+
+*Do this:* measure local accuracy and latency against cloud on the same
+audio — that comparison does not exist today and everything else depends on
+it. Then surface the choice as a product decision rather than a settings
+checkbox.
+
+The risk of leaving it buried is real: a competitor ships "fully local
+dictation" as a headline and you are left explaining that you had it all
+along.
+
+### C. Move the catalogs to server-delivered config
+**Pillar: fix velocity.** Cost now: a day, plus a static file. Cost later:
+grows with every hardcoded table added.
+
+Discussed and agreed as the right eventual shape. The app fetches a JSON
+catalog on launch, caches it, and falls back to its built-in copy if the
+fetch fails. LinkedIn moves a URL, you edit one file, everyone is fixed
+within a day — no release, no review.
+
+You are already building backend infrastructure, so the marginal cost is one
+endpoint. This is most of VoiceOS's plugin advantage without a plugin system
+or its security surface.
+
+*Caveat worth stating:* it makes the app depend on your server for good
+behaviour, and a bad file breaks everyone at once. Keeping the built-in copy
+as fallback covers that, and a version check covers rollback.
+
+### D. Measure what a user costs
+**Pillar: unit economics.** Cost now: two hours.
+
+Log tokens and estimated cost per request behind a debug flag, and aggregate.
+Turns pricing from an argument into arithmetic. You will need the number
+before you can pick a plan price, and it is much easier to add now than to
+backfill from logs that never recorded it.
+
+### E. Give activation an owner
+**Pillar: activation.** Cost now: a few days. Cost later: the same, but every
+user acquired meanwhile hit the current experience.
+
+There is no first-run flow. A user who denies Accessibility gets an app that
+silently does nothing, with no indication why. Meetings will add a fourth
+prompt to a gauntlet that already has three.
+
+*Do this:* a permission status view — what is granted, what is missing, what
+each unlocks, and a button that opens the right pane. The deep links are
+already proven working for Reminders and Calendar. This is the cheapest
+retention work available, because it is entirely about users who wanted the
+product and could not reach it.
+
+---
+
+## Part 4 — What should not be changed
+
+A review listing only problems misleads about where the risk is.
+
+**The eval harness is the best thing here.** It reads the real prompt,
+mirrors production's URL checking, refuses to record runs where too many
+cases errored, and `results.md` carries the mistakes rather than hiding them.
+It has repeatedly disproven my own confident guesses. Finding 8 improves it —
+nothing should break it.
 
 **Deterministic rules over prompt engineering.** Every routing fix by
-rewording the prompt failed or regressed something else; every fix that
-held was code. That pattern is written into `CLAUDE.md` and is worth
-defending.
+rewording the prompt failed or regressed something else; every fix that held
+was code.
 
-**The comments explain rejected alternatives, not just behaviour.** Several
-of them prevented me from re-making a mistake later in the same week. They
-are long, and they earn it.
+**Comments that record rejected alternatives.** Several stopped me re-making
+a mistake later in the same week. They are long and they earn it.
 
 **Fail open.** A silence gate that failed closed ate real dictation; a page
-check that treated 503 as missing threw away correct URLs. Both were fixed
-by letting the uncertain case through.
+check treating 503 as missing threw away correct URLs.
 
 ---
 
-## If only three things get done
+## If only four things get done
 
-1. **Delete the audio files.** Ten lines, and it is the difference between
-   a privacy story and a privacy incident.
-2. **Draw the trust boundary before meetings.** Calendar text is written by
-   other people; decide now that it is data and never instructions.
-3. **Fix the dispatch abstraction.** It is the cheapest it will ever be
-   today, and meetings will double the mess.
+1. **Delete the audio files.** *(privacy)* Ten lines between a privacy page
+   and a privacy incident.
+2. **Draw the trust boundary before meetings.** *(trust)* Calendar text is
+   written by other people. A paragraph now, a retrofit later.
+3. **Fix the dispatch abstraction.** *(trust)* Cheapest it will ever be;
+   meetings doubles the mess.
+4. **Build the deterministic fast path.** *(latency)* The largest win on the
+   top-named pillar, and it costs nothing per request.
