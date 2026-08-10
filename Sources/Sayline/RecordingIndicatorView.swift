@@ -24,9 +24,23 @@ final class IndicatorViewModel: ObservableObject {
     /// lockstep from the same instant.
     @Published var transcriptSetAt: Date = .distantPast
 
+    /// The question currently on screen, if any. See FollowUp.swift.
+    @Published var followUp: FollowUpRequest?
+    /// Anchor for the draining countdown line, same wall-clock approach as
+    /// the dots and the text reveal.
+    @Published var followUpStartedAt: Date = .distantPast
+    /// Called by the buttons. The window owns the single-fire guard and the
+    /// timeout, so the view can stay a plain function of state.
+    var onFollowUpAnswer: ((FollowUpAnswer) -> Void)?
+
     func setTranscript(_ text: String?) {
         transcript = text
         transcriptSetAt = Date()
+    }
+
+    func setFollowUp(_ request: FollowUpRequest?) {
+        followUp = request
+        followUpStartedAt = Date()
     }
 }
 
@@ -119,8 +133,19 @@ private struct IndicatorStack: View {
     let label: String?
 
     var body: some View {
-        VStack(spacing: 8) {
-            if let transcript = viewModel.transcript, !transcript.isEmpty {
+        // Explicitly centred: the box and the pill share one vertical axis
+        // and sit symmetrically one above the other, rather than both
+        // hanging off a left edge.
+        VStack(alignment: .center, spacing: 8) {
+            if let followUp = viewModel.followUp {
+                FollowUpBox(
+                    request: followUp,
+                    startedAt: viewModel.followUpStartedAt,
+                    surface: surface,
+                    onAnswer: { viewModel.onFollowUpAnswer?($0) }
+                )
+                LinearProcessingDots()
+            } else if let transcript = viewModel.transcript, !transcript.isEmpty {
                 SpeechBackBox(
                     text: transcript,
                     setAt: viewModel.transcriptSetAt,
@@ -286,6 +311,137 @@ private struct LinearProcessingDots: View {
         guard phase < 0.32 else { return dimOpacity }
         let bump = (1 - cos(phase / 0.32 * 2 * .pi)) / 2 // 0 -> 1 -> 0
         return dimOpacity + (1 - dimOpacity) * bump
+    }
+}
+
+// MARK: - Follow-up
+
+/// The question box. Shares the speech box's geometry deliberately — this
+/// is the same surface saying something, not a new component.
+///
+/// What distinguishes it is the "Sayline" marker. Without it the question
+/// is indistinguishable from the transcript being read back, and that is
+/// the one ambiguity that must not exist here: someone would answer a
+/// question they thought was their own words echoed at them.
+private struct FollowUpBox: View {
+    let request: FollowUpRequest
+    let startedAt: Date
+    let surface: SurfaceStyle
+    let onAnswer: (FollowUpAnswer) -> Void
+
+    private static let maxWidth: CGFloat = 324
+    private static let horizontalPadding: CGFloat = 16
+    private static let verticalPadding: CGFloat = 12
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            marker
+            Text(request.question)
+                .font(.system(size: SpeechBackBox.fontSize))
+                .foregroundStyle(PillStyle.foreground)
+                .fixedSize(horizontal: false, vertical: true)
+            if let detail = request.detail {
+                Text(detail)
+                    .font(.system(size: SpeechBackBox.fontSize, weight: .semibold))
+                    .foregroundStyle(PillStyle.foreground)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 3)
+            }
+            switch request.kind {
+            case .confirm(let primary, let secondary):
+                buttons(primary: primary, secondary: secondary)
+            case .value(let hint):
+                hintRow(hint)
+            }
+        }
+        .frame(maxWidth: Self.maxWidth - Self.horizontalPadding * 2, alignment: .leading)
+        .padding(.horizontal, Self.horizontalPadding)
+        .padding(.vertical, Self.verticalPadding)
+        .surfaceBackground(surface, cornerRadius: 14)
+        .overlay(alignment: .bottomLeading) { countdown }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var marker: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(PillStyle.foreground)
+                .frame(width: 4, height: 4)
+            Text("SAYLINE")
+                .font(.system(size: 10, weight: .semibold))
+                .kerning(0.6)
+                .foregroundStyle(PillStyle.foreground)
+        }
+        .opacity(0.5)
+        .padding(.bottom, 6)
+    }
+
+    private func buttons(primary: String, secondary: String) -> some View {
+        HStack(spacing: 6) {
+            Button(primary) { onAnswer(.confirmed) }
+                .buttonStyle(FollowUpButtonStyle(role: request.isDestructive ? .destructive : .primary))
+            Button(secondary) { onAnswer(.declined) }
+                .buttonStyle(FollowUpButtonStyle(role: .secondary))
+        }
+        .padding(.top, 11)
+    }
+
+    private func hintRow(_ hint: String) -> some View {
+        HStack(spacing: 6) {
+            Text(hint)
+                .font(.system(size: 11))
+                .foregroundStyle(PillStyle.foreground)
+        }
+        .opacity(0.55)
+        .padding(.top, 9)
+    }
+
+    /// Wall-clock driven, like the dots — no animation transaction, so
+    /// nothing leaks into the surface beneath.
+    private var countdown: some View {
+        TimelineView(.animation) { timeline in
+            let elapsed = timeline.date.timeIntervalSince(startedAt)
+            let remaining = max(0, 1 - elapsed / followUpTimeout)
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(PillStyle.foreground.opacity(0.32))
+                    .frame(width: geo.size.width * remaining, height: 1.5)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct FollowUpButtonStyle: ButtonStyle {
+    enum Role { case primary, secondary, destructive }
+    let role: Role
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(background.opacity(configuration.isPressed ? 0.75 : 1))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private var foreground: Color {
+        switch role {
+        case .primary: return Color(red: 0x16 / 255, green: 0x16 / 255, blue: 0x1A / 255)
+        case .destructive: return Color(red: 0x1A / 255, green: 0x0E / 255, blue: 0x0D / 255)
+        case .secondary: return PillStyle.foreground
+        }
+    }
+
+    private var background: Color {
+        switch role {
+        case .primary: return PillStyle.foreground.opacity(0.92)
+        case .destructive: return Color(red: 1, green: 0x5F / 255, blue: 0x57 / 255).opacity(0.9)
+        case .secondary: return PillStyle.foreground.opacity(0.12)
+        }
     }
 }
 

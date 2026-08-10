@@ -52,6 +52,12 @@ private final class IndicatorPanel: NSPanel {
 final class FloatingIndicatorWindow {
     private var panel: NSPanel?
     private let viewModel = IndicatorViewModel()
+    /// Fires the fallback if nobody answers. Cancelled on any real answer.
+    private var followUpTimer: DispatchWorkItem?
+    /// Guards single-fire. A button press racing the timeout must not
+    /// deliver two answers — the second would act on a reminder the first
+    /// already created.
+    private var followUpCompletion: ((FollowUpAnswer) -> Void)?
 
     // A fixed-size "stage" the small pill centers/bottom-anchors within
     // (via RecordingIndicatorView's own frame alignment) — wider and
@@ -113,7 +119,69 @@ final class FloatingIndicatorWindow {
         panel?.orderOut(nil)
         panel = nil
         viewModel.setTranscript(nil)
+        viewModel.setFollowUp(nil)
         NSLog("Sayline: indicator hidden")
+    }
+
+    // MARK: - Follow-up
+
+    /// Puts a question on screen and calls back exactly once, with an
+    /// answer or `.timedOut`.
+    ///
+    /// The panel is click-through in every other state, so that it can
+    /// never intercept a click meant for the app underneath. Buttons need
+    /// the opposite, so mouse events are enabled only while a question is
+    /// up and switched straight back afterwards. `.nonactivatingPanel` is
+    /// what makes that safe: a click lands on the button without activating
+    /// Sayline, so focus stays in whatever the user was typing into — and
+    /// AX text insertion depends on that focus never moving.
+    func askFollowUp(_ request: FollowUpRequest,
+                     completion: @escaping (FollowUpAnswer) -> Void) {
+        finishFollowUp(.timedOut, reason: "replaced by a new question")
+
+        followUpCompletion = completion
+        viewModel.onFollowUpAnswer = { [weak self] answer in
+            self?.finishFollowUp(answer, reason: "answered")
+        }
+        viewModel.setFollowUp(request)
+
+        let panel = self.panel ?? makePanel()
+        self.panel = panel
+        reposition(panel)
+        panel.ignoresMouseEvents = false
+        panel.orderFrontRegardless()
+        NSLog("%@", "Sayline: asking -> \(request.question)")
+
+        let timer = DispatchWorkItem { [weak self] in
+            self?.finishFollowUp(.timedOut, reason: "no answer in \(Int(followUpTimeout))s")
+        }
+        followUpTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + followUpTimeout, execute: timer)
+    }
+
+    /// Delivers a spoken answer to a `.value` question. Called when the
+    /// next transcript arrives, since that path runs through the normal
+    /// hold-and-speak pipeline rather than anything this window owns.
+    func answerFollowUp(spoken text: String) {
+        finishFollowUp(.spoken(text), reason: "spoken")
+    }
+
+    var isAwaitingSpokenAnswer: Bool {
+        guard let followUp = viewModel.followUp else { return false }
+        if case .value = followUp.kind { return true }
+        return false
+    }
+
+    private func finishFollowUp(_ answer: FollowUpAnswer, reason: String) {
+        guard let completion = followUpCompletion else { return }
+        followUpCompletion = nil
+        followUpTimer?.cancel()
+        followUpTimer = nil
+        viewModel.onFollowUpAnswer = nil
+        viewModel.setFollowUp(nil)
+        panel?.ignoresMouseEvents = true
+        NSLog("%@", "Sayline: follow-up \(reason) -> \(answer)")
+        completion(answer)
     }
 
     private func makePanel() -> NSPanel {

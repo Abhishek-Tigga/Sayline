@@ -373,6 +373,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+#if DEBUG
+    // MARK: - Follow-up test harness
+
+    func debugAskForValue() {
+        indicatorWindow.show(state: .message("Call the bank"))
+        indicatorWindow.askFollowUp(
+            FollowUpRequest(
+                question: "What time should I remind you?",
+                kind: .value(hint: "Hold \(hotkeyOption.shortSymbol) and say a time")
+            )
+        ) { [weak self] answer in
+            self?.indicatorWindow.flashMessage("Answer: \(answer)", duration: 2.4)
+        }
+    }
+
+    func debugAskYesNo() {
+        indicatorWindow.show(state: .message("Join my next meeting"))
+        indicatorWindow.askFollowUp(
+            FollowUpRequest(
+                question: "Calendar access is off. Open System Settings?",
+                kind: .confirm(primary: "Open Settings", secondary: "Not now")
+            )
+        ) { [weak self] answer in
+            self?.indicatorWindow.flashMessage("Answer: \(answer)", duration: 2.4)
+        }
+    }
+
+    func debugAskDestructive() {
+        indicatorWindow.show(state: .message("Cancel the dentist reminder"))
+        indicatorWindow.askFollowUp(
+            FollowUpRequest(
+                question: "3 reminders match \"dentist\". Delete the closest?",
+                detail: "Dentist appointment — Tue 11:00",
+                kind: .confirm(primary: "Delete it", secondary: "Keep it"),
+                isDestructive: true
+            )
+        ) { [weak self] answer in
+            self?.indicatorWindow.flashMessage("Answer: \(answer)", duration: 2.4)
+        }
+    }
+#endif
+
     func requestAccessibilityPermission() {
         AccessibilityPermission.requestIfNeeded()
     }

@@ -127,6 +127,9 @@ asked, and a dictation app should never do that quietly.
 reminder, or a dismissed prompt. Long enough to think, short enough that
 a forgotten pill is not left sitting there.
 
+**The box and the pill are centred on one vertical axis**, symmetrically
+one above the other, rather than both hanging off a left edge.
+
 **The shape of a pill with buttons is not decided here.** It is an
 *ungrillable* question — it cannot be settled by talking, only by looking
 at it. A throwaway HTML prototype comes first, as it did for the pill

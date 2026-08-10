@@ -70,6 +70,19 @@ struct MenuBarContentView: View {
             }
 
             Divider()
+            #if DEBUG
+            // Exercises the follow-up primitive without needing the
+            // reminders work to exist yet. The buttons are the part that
+            // can silently not work — the panel is click-through in every
+            // other state — so this has to be clickable by hand, not just
+            // compiled.
+            Menu("Test a follow-up") {
+                Button("Ask for a value") { appDelegate.debugAskForValue() }
+                Button("Ask yes / no") { appDelegate.debugAskYesNo() }
+                Button("Confirm a delete") { appDelegate.debugAskDestructive() }
+            }
+            Divider()
+            #endif
             Button("History…") {
                 appDelegate.showHistory()
             }
