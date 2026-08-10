@@ -62,5 +62,33 @@ if let back = LocalTimestamp.parse(text), abs(back.timeIntervalSince(now)) < 1 {
     print("  FAIL  \(text) did not round trip"); bad += 1
 }
 
+// ---- plausibleDueDate ---------------------------------------------
+// The router eval scores what the model emits and cannot see this rule.
+// The case that motivated it is here rather than there for that reason.
+func at(_ text: String) -> Date { LocalTimestamp.parse(text)! }
+let fixedNow = at("2026-08-11T04:36:00")
+
+func dueCheck(_ label: String, _ candidate: String, keep: Bool) {
+    let got = LocalTimestamp.plausibleDueDate(at(candidate), now: fixedNow)
+    let held = got != nil
+    if held == keep { print("  ok    \(label)") }
+    else { print("  FAIL  \(label) — \(held ? "kept" : "dropped") \(candidate)"); bad += 1 }
+}
+
+print("\na later day at the current time of day is a bare day, not a time")
+dueCheck("tomorrow, same minute      -> ask", "2026-08-12T04:36:00", keep: false)
+dueCheck("tomorrow, one minute off   -> ask", "2026-08-12T04:37:00", keep: false)
+dueCheck("next week, same minute     -> ask", "2026-08-18T04:35:00", keep: false)
+
+print("\na real time survives, including on a later day")
+dueCheck("tomorrow 9am               -> keep", "2026-08-12T09:00:00", keep: true)
+dueCheck("tomorrow 4:36pm            -> keep", "2026-08-12T16:36:00", keep: true)
+dueCheck("later today, same hour     -> keep", "2026-08-11T04:36:00", keep: true)
+dueCheck("in ten minutes             -> keep", "2026-08-11T04:46:00", keep: true)
+
+print("\nstill rejects the obvious nonsense")
+dueCheck("already gone               -> drop", "2026-08-10T09:00:00", keep: false)
+dueCheck("years out                  -> drop", "2031-08-12T09:00:00", keep: false)
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

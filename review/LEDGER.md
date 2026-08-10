@@ -468,3 +468,75 @@ gone. It has not been observed surviving a real Keychain prompt.
 - **This is the third theory.** Two were disproven. Treat it accordingly.
 
 Commit: see below.
+
+---
+
+## Live results from the user's own testing (Opus recording, 2026-08-11)
+
+Three claims that neither model could exercise are now settled by the user
+running them on a granted build. Evidence is their session log, not either
+model's assertion.
+
+### F3 / O1 · Recordings never deleted
+2026-08-11 · user-verified
+Several dictations and agent commands across the session, then
+`ls .../T/sayline-*.wav` → no matches. Every recording deleted after
+transcription, not merely at launch. The launch sweep was already verified
+separately by Fable.
+
+### F4 · Question queueing
+2026-08-11 · user-verified
+"Remind me to call mom and remind me to email John" produced, in order:
+```
+asking -> What time should I remind you?
+queued a question behind the live one
+[answer]  created reminder "call mom"  due 2026-08-12 09:00
+asking -> What time should I remind you?
+[answer]  created reminder "email John" due 2026-08-12 09:00
+```
+Two questions, one at a time, both reminders created with real times. The
+old behaviour silently created the first one undated.
+
+### F5 · Empty Trash confirmation
+2026-08-11 · user-verified
+"Empty the trash" → `asking -> Empty the Trash?`, user said "No" →
+`follow-up said no -> declined`. The Trash was not emptied. The spoken
+"no" path worked, not just the button.
+
+### F4 · Frozen countdown — still not exercised
+2026-08-11 · unverified
+The fix for the timeout-mid-hold race has still never been run. It needs a
+deliberate brief tap of the hotkey while a question is on screen, which
+nobody has done. Highest remaining value for a live check.
+
+---
+
+## NEW · A bare day is not a time
+2026-08-11 · Opus · claimed-fixed
+
+Found by the user: "remind me to call the bank tomorrow" created a
+reminder for **tomorrow at 4:36am** — the current time of day, on
+tomorrow's date. An hour nobody chose and would sleep through.
+
+Two prompt rewrites failed to stop it. The first was also too strict and
+broke "tomorrow morning", which is specific enough; the second fixed that
+and the bare-day case still came back with a due date. The tool
+description now explains parts of day explicitly, which earned its keep,
+but the bare-day case needed code.
+
+`LocalTimestamp.plausibleDueDate` drops a due date on a later day whose
+clock time matches right now — an unmistakable signature of the model
+reusing "now" — which sends the request to the follow-up question instead.
+
+Deliberately placed in `LocalTimestamp` rather than `AgentRouter`: the
+router eval scores what the model emits and structurally cannot see this
+rule, so the test case was moved out of the LLM eval and into
+`eval/timestamp-checks`, where nine cases now cover it with an injected
+clock. That relocation is worth noting for F-shadow — when our own layer
+is the thing under test, the LLM eval is the wrong instrument, and the
+answer is not to mirror more rules into Python.
+
+Ran: timestamp-checks 9 new cases pass; all three suites pass; eval 58/59
+(98%).
+Not checked: the live sentence. Needs the user to say "remind me to call
+the bank tomorrow" and see the question appear.

@@ -276,7 +276,7 @@ final class AgentRouter {
                         ],
                         "due": [
                             "type": "string",
-                            "description": "When, as local time yyyy-MM-ddTHH:mm:ss. Resolve relative words against the current time given above. Omit if no time was said — never invent one.",
+                            "description": "When, as local time yyyy-MM-ddTHH:mm:ss. Give this when a time of day was said, exactly or roughly: \"at 4pm\", \"in an hour\", \"tonight\", and parts of the day — morning is 09:00, afternoon 14:00, evening 18:00, night 20:00. OMIT it when only a bare day was said with no time of day at all: \"tomorrow\", \"on Friday\", \"next week\" — the app asks for the hour instead. Never reuse the current time of day as the answer.",
                         ],
                     ],
                     "required": ["title"],
@@ -447,15 +447,6 @@ final class AgentRouter {
     /// supplied, so ordinary searches are unaffected. A short timeout
     /// matters more than certainty here — this sits in a hold-to-talk loop,
     /// and falling back to search is a perfectly good outcome.
-    /// Rejects a due date that cannot be what the user meant. The model
-    /// occasionally answers with today's date at a time already gone, or
-    /// with a year that is a transcription artefact.
-    private static func sanityChecked(_ date: Date) -> Date? {
-        let ahead = date.timeIntervalSinceNow
-        guard ahead > -60, ahead < 366 * 24 * 3600 else { return nil }
-        return date
-    }
-
     private func verifiedPage(url: URL, site: String, query: String?) async -> AgentAction {
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
@@ -791,7 +782,7 @@ final class AgentRouter {
                 .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
             let due = (arguments["due"] as? String)
                 .flatMap { LocalTimestamp.parse($0) }
-                .flatMap { Self.sanityChecked($0) }
+                .flatMap { LocalTimestamp.plausibleDueDate($0) }
             if arguments["due"] != nil && due == nil {
                 // The model offered a time we could not use. Dropping it
                 // here rather than passing it on means the coordinator asks,
