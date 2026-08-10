@@ -21,6 +21,10 @@ targets:
       properties:
         LSUIElement: true
         NSMicrophoneUsageDescription: "Sayline needs microphone access to transcribe your speech into text."
+        # Full access rather than write-only: cancelling a reminder by name
+        # has to read the list to find a match.
+        NSRemindersFullAccessUsageDescription: "Sayline needs access to Reminders so you can create and cancel them by voice."
+        NSRemindersUsageDescription: "Sayline needs access to Reminders so you can create and cancel them by voice."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
     settings:

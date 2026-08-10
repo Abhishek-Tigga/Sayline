@@ -57,6 +57,8 @@ TOOL_TO_ACTION = {
     # URL it resolves to is deterministic Swift, tested separately.
     "open_website": ("openWebsite", {"site": "site", "query": "query", "play": "play",
                                      "page_url": "page_url", "vertical": "vertical"}),
+    "create_reminder": ("createReminder", {"title": "title", "due": "due"}),
+    "cancel_reminder": ("cancelReminder", {"name": "name"}),
     "lock_screen": ("lockScreen", {}),
     "set_volume": ("setVolume", {"change": "change"}),
     "set_wifi": ("setWiFi", {"enabled": "enabled"}),
@@ -463,6 +465,16 @@ def case_passes(expected, actual):
             if k.endswith("__contains"):
                 actual = str((act.get("args") or {}).get(k[: -len("__contains")], ""))
                 if str(v).lower() not in actual.lower():
+                    return False
+                continue
+            # Whether an argument was supplied at all is sometimes the whole
+            # question. "Remind me to call the bank" must NOT carry a due
+            # date: an invented time is worse than none, because the
+            # reminder then fires at an hour nobody chose.
+            if k.endswith("__present") or k.endswith("__absent"):
+                bare = k.rsplit("__", 1)[0]
+                supplied = (act.get("args") or {}).get(bare) not in (None, "")
+                if supplied != k.endswith("__present"):
                     return False
                 continue
             if not same_value(v, (act.get("args") or {}).get(k)):

@@ -58,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var isAgentModeThisRecording = false
 
     private let hotkeyManager = HotkeyManager()
+    @MainActor
+    private lazy var reminders = ReminderCoordinator(
+        indicator: indicatorWindow,
+        hotkeySymbol: { [weak self] in self?.hotkeyOption.shortSymbol ?? "⌥" }
+    )
     private let audioRecorder = AudioRecorder()
     private let cloudTranscriber = GroqTranscriber()
     private let localTranscriber = WhisperKitTranscriber()
@@ -349,6 +354,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             let answer = AgentExecutor.answer(query)
                             NSLog("Sayline: agent answered -> \(answer)")
                             self.indicatorWindow.flashMessage(answer, duration: 4.5)
+                            continue
+                        }
+                        if case .createReminder(let title, let due) = action {
+                            // Owns its own follow-ups and result message,
+                            // so it is not part of the anyFailed tally.
+                            Task { await self.reminders.create(title: title, due: due) }
+                            continue
+                        }
+                        if case .cancelReminder(let name) = action {
+                            Task { await self.reminders.cancel(name: name) }
                             continue
                         }
                         if case .openedSiteButCouldNotSearch(let label, _, _) = action {

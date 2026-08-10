@@ -126,9 +126,10 @@ Two cases fail in the eval. If you hit them here, it's expected:
 - **"Open banana settings"** → opens System Settings instead of refusing
   cleanly.
 
-Current eval standing: **45/47 (96%)**, 0 syntax failures, and now
-identical across repeat runs — so a change of even one case from here is
-a real signal rather than noise.
+Current eval standing: **55/57 (96%)**, 0 syntax failures. Repeat runs
+are usually identical now that temperature is 0, but not guaranteed — the
+live URL checks make one or two cases move occasionally. Treat a small
+change as noise unless it repeats.
 
 ## When something fails
 

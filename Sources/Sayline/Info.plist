@@ -27,5 +27,9 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sayline needs microphone access to transcribe your speech into text.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Sayline needs access to Reminders so you can create and cancel them by voice.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Sayline needs access to Reminders so you can create and cancel them by voice.</string>
 </dict>
 </plist>

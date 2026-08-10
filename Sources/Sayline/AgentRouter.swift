@@ -63,7 +63,13 @@ final class AgentRouter {
     /// real prompt instead of keeping its own copy — a duplicated prompt
     /// would drift from this one and quietly make every eval number a
     /// measurement of the wrong thing.
-    let systemPrompt = """
+    var systemPrompt: String {
+        // Relative times are meaningless without an anchor — "tomorrow"
+        // resolves against nothing. Cheap: one short line per request.
+        let now = ISO8601DateFormatter.saylineLocal.string(from: Date())
+        return """
+    Current local time: \(now).
+
     You route spoken requests to macOS automation actions, to websites, \
     or to factual questions about the Mac's current state. The user is \
     either issuing a command ("open Safari", "search headphones on \
@@ -107,6 +113,7 @@ final class AgentRouter {
     wallpaper" -> "Wallpaper", "trackpad settings" -> "Trackpad"): \
     \(SettingsPaneCatalog.panes.map { $0.displayName }.joined(separator: ", ")).
     """
+    }
 
     /// Internal for the same reason as `systemPrompt` above — the eval
     /// harness derives all three arms' request payloads from this array.
@@ -132,7 +139,7 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "find_file",
-                "description": "Searches for a specific file by name in a folder and reveals it in Finder. Use this only when the user names a particular file (or file-ish query like 'resume' or 'invoice PDF') — not for just browsing a folder in general.",
+                "description": "Finds a named file and reveals it in Finder. Only when a particular file is named ('resume', 'invoice PDF') — use open_folder for browsing.",
                 "parameters": [
                     "type": "object",
                     "properties": [
@@ -147,7 +154,7 @@ final class AgentRouter {
                         ],
                         "subpath": [
                             "type": "string",
-                            "description": "Optional nested subfolder path inside `folder` to narrow the search, one or two levels deep, e.g. 'Codex' or 'Projects/Codex'. Leave unset to search the whole top-level folder.",
+                            "description": "Optional subfolder inside `folder`, one or two levels, e.g. 'Projects/Codex'. Unset searches all of it.",
                         ],
                     ],
                     "required": ["query"],
@@ -158,18 +165,18 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "open_folder",
-                "description": "Opens a specific folder directly in Finder, when the user just wants to browse/view the folder itself rather than find a particular file in it (e.g. 'open my Downloads folder', 'show me Documents', 'open the Codex folder inside Documents').",
+                "description": "Opens a folder in Finder, for browsing rather than finding one file. 'open my Downloads folder', 'the Codex folder inside Documents'.",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "folder": [
                             "type": "string",
                             "enum": ["Downloads", "Documents", "Desktop", "Home"],
-                            "description": "Which top-level folder to open, or the top-level folder that contains the target if it's a subfolder.",
+                            "description": "The top-level folder, or the one containing the target.",
                         ],
                         "subpath": [
                             "type": "string",
-                            "description": "Optional nested subfolder path inside `folder`, one or two levels deep, e.g. 'Codex' or 'Projects/Codex'. Leave unset if the target is `folder` itself.",
+                            "description": "Optional subfolder inside `folder`, one or two levels, e.g. 'Projects/Codex'. Unset opens `folder`.",
                         ],
                     ],
                     "required": ["folder"],
@@ -180,7 +187,7 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "close_app",
-                "description": "Quits/closes a currently running macOS application by name (a normal quit, like Cmd+Q — not a force kill).",
+                "description": "Quits a running app by name. A normal quit, not a force kill.",
                 "parameters": [
                     "type": "object",
                     "properties": [
@@ -252,6 +259,44 @@ final class AgentRouter {
                         ],
                     ],
                     "required": ["site"],
+                ],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
+                "name": "create_reminder",
+                "description": "Creates a reminder in Apple Reminders. \"remind me to call the bank at 4\", \"remind me to submit the form tomorrow morning\".",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "title": [
+                            "type": "string",
+                            "description": "What to be reminded of, without the time. \"call the bank\".",
+                        ],
+                        "due": [
+                            "type": "string",
+                            "description": "When, as local ISO 8601 (2026-08-11T16:00). Resolve relative words against the current time given above. Omit if no time was said — do not invent one.",
+                        ],
+                    ],
+                    "required": ["title"],
+                ],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
+                "name": "cancel_reminder",
+                "description": "Deletes a reminder. \"cancel that\", \"undo that reminder\", \"delete the dentist reminder\". A bare \"cancel that\" is in scope: call this with no `name` and it means the one just created.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "name": [
+                            "type": "string",
+                            "description": "Which reminder, as spoken. \"the dentist one\" -> \"dentist\".",
+                        ]
+                    ],
+                    "required": [] as [String],
                 ],
             ],
         ],
@@ -402,6 +447,15 @@ final class AgentRouter {
     /// supplied, so ordinary searches are unaffected. A short timeout
     /// matters more than certainty here — this sits in a hold-to-talk loop,
     /// and falling back to search is a perfectly good outcome.
+    /// Rejects a due date that cannot be what the user meant. The model
+    /// occasionally answers with today's date at a time already gone, or
+    /// with a year that is a transcription artefact.
+    private static func sanityChecked(_ date: Date) -> Date? {
+        let ahead = date.timeIntervalSinceNow
+        guard ahead > -60, ahead < 366 * 24 * 3600 else { return nil }
+        return date
+    }
+
     private func verifiedPage(url: URL, site: String, query: String?) async -> AgentAction {
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
@@ -724,6 +778,22 @@ final class AgentRouter {
             case .unknown(let requested):
                 return .unknownWebsite(requested: requested)
             }
+        case "create_reminder":
+            guard let title = (arguments["title"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else { return nil }
+            let due = (arguments["due"] as? String)
+                .flatMap { ISO8601DateFormatter.saylineLocal.date(from: $0) }
+                .flatMap { Self.sanityChecked($0) }
+            if arguments["due"] != nil && due == nil {
+                // The model offered a time we could not use. Dropping it
+                // here rather than passing it on means the coordinator asks,
+                // which is better than a reminder firing at the wrong hour.
+                NSLog("%@", "Sayline: ignoring unusable due date \(arguments["due"] ?? "nil")")
+            }
+            return .createReminder(title: title, due: due)
+        case "cancel_reminder":
+            return .cancelReminder(name: (arguments["name"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
         case "lock_screen":
             return .lockScreen
         case "set_volume":
@@ -784,4 +854,18 @@ private extension String {
     /// Treat an empty or whitespace-only argument as absent. Models return
     /// "" as readily as omitting a field.
     var nilIfEmpty: String? { trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self }
+}
+
+extension ISO8601DateFormatter {
+    /// Local wall-clock ISO, no timezone suffix. The model is told what
+    /// time it is here and answers in the same shape, so nothing has to
+    /// agree about offsets — the one thing most likely to silently put a
+    /// reminder twelve hours out.
+    static let saylineLocal: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime,
+                           .withDashSeparatorInDate]
+        f.timeZone = .current
+        return f
+    }()
 }

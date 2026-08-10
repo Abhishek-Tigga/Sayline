@@ -17,6 +17,12 @@ enum AgentAction {
     /// doesn't match anything in the live catalog — opens System
     /// Settings itself rather than doing nothing silently.
     case openSystemSettingsFallback(requestedPaneName: String)
+    /// `due` is nil when no time was said. Not a failure — the coordinator
+    /// asks for one, and creates the reminder undated if it never gets a
+    /// usable answer.
+    case createReminder(title: String, due: Date?)
+    /// `name` is nil for "cancel that", meaning the one just created.
+    case cancelReminder(name: String?)
     case lockScreen
     case setVolume(VolumeChange)
     case setWiFi(enabled: Bool)

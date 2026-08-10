@@ -61,6 +61,13 @@ enum AgentExecutor {
                 return openWebsite(label: label, url: url)
             }
             return false
+        case .createReminder, .cancelReminder:
+            // Handled by ReminderCoordinator, which AppDelegate calls before
+            // reaching here — these need permission prompts and follow-up
+            // questions, neither of which belongs in a synchronous executor.
+            // This branch exists only to keep the switch exhaustive.
+            NSLog("Sayline: reminder action reached AgentExecutor — should have been handled earlier")
+            return true
         case .answerQuery(let query):
             // The normal path for this is AppDelegate special-casing
             // .answerQuery before calling execute() at all, so it can

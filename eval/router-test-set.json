@@ -704,6 +704,87 @@
         }
       ],
       "guards": "Negative case for the personal-page table. An ordinary product search must not be captured by it — the table matches only when the query reduces to a bare intent word like 'orders' or 'cart'."
+    },
+    {
+      "id": "reminder-with-time",
+      "transcript": "Remind me to call the bank at 4pm",
+      "expect": [
+        {
+          "action": "createReminder",
+          "args": {
+            "title__contains": "bank",
+            "due__present": true
+          }
+        }
+      ],
+      "guards": "The title must not carry the time. 'call the bank at 4pm' as a title makes a reminder that reads wrong forever, and the time is already in its own field."
+    },
+    {
+      "id": "reminder-no-time",
+      "transcript": "Remind me to call the bank",
+      "expect": [
+        {
+          "action": "createReminder",
+          "args": {
+            "title__contains": "bank",
+            "due__absent": true
+          }
+        }
+      ],
+      "guards": "The model must NOT invent a time. An invented due date is worse than none: the reminder fires at an hour nobody chose, and the follow-up question exists precisely to fill this in."
+    },
+    {
+      "id": "reminder-relative-time",
+      "transcript": "Remind me to submit the form tomorrow morning",
+      "expect": [
+        {
+          "action": "createReminder",
+          "args": {
+            "title__contains": "form",
+            "due__present": true
+          }
+        }
+      ],
+      "guards": "Relative phrasing only resolves because the current local time is in the system prompt. If this regresses, check that line is still being sent."
+    },
+    {
+      "id": "reminder-cancel-that",
+      "transcript": "Cancel that",
+      "expect": [
+        {
+          "action": "cancelReminder",
+          "args": {
+            "name__absent": true
+          }
+        }
+      ],
+      "guards": "No name means the one just created. A name invented here would send the coordinator searching for a reminder nobody mentioned."
+    },
+    {
+      "id": "reminder-cancel-named",
+      "transcript": "Cancel the dentist reminder",
+      "expect": [
+        {
+          "action": "cancelReminder",
+          "args": {
+            "name__contains": "dentist"
+          }
+        }
+      ],
+      "guards": "The word 'reminder' is noise and is stripped before matching, so it may or may not appear in the name — only 'dentist' matters."
+    },
+    {
+      "id": "reminder-not-a-reminder",
+      "transcript": "Remind me what my battery is at",
+      "expect": [
+        {
+          "action": "answerQuery",
+          "args": {
+            "query": "Battery"
+          }
+        }
+      ],
+      "guards": "'Remind me' used conversationally, not as a command. Creating a reminder titled 'what my battery is at' would be a confident misread of a question."
     }
   ]
 }

@@ -26,6 +26,16 @@ generic-sounding bucket — both "banana settings" and "doc settings" started
 resolving to About. Both reverted. The fix that worked was deterministic
 (`AgentRouter.correctedSettingsPane`), not prompt-based.
 
+**Temperature 0 makes the model deterministic, not the run.** Setting
+temperature to 0 did stop the router wandering, and identical results
+across repeat runs is now the normal case. It is not a guarantee: four
+runs at `f0cb0a3` scored 55, 55, 53, 55 out of 57 with no code change
+between them. The variance is `page_is_real`, which makes live HEAD
+requests — a slow or refused response scores a case differently. An
+earlier note here claiming runs are "identical" overstated it. Treat a
+one-or-two case move as noise unless it repeats; the token count, which
+touches no network, is the stable signal.
+
 **Run-to-run variance is real.** `gpt-4o-mini` failed
 `settings-screen-time-implicit` with `Uptime` on one run and `NowPlaying` on
 another, same input. A one-case difference is inside the noise — re-run two
@@ -61,3 +71,9 @@ attempt.
 | 2026-08-10 09:19 UTC | `2f108e5+dirty` | openai | `gpt-4o-mini` | 45/47 (96%) | 0 (0%) | 2237 | 1241 ms |
 | 2026-08-10 09:49 UTC | `106b4b5+dirty` | openai | `gpt-4o-mini` | 48/51 (94%) | 0 (0%) | 2237 | 1400 ms |
 | 2026-08-10 09:53 UTC | `106b4b5+dirty` | openai | `gpt-4o-mini` | 49/51 (96%) | 0 (0%) | 2237 | 1248 ms |
+| 2026-08-10 19:16 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 50/57 (88%) | 0 (0%) | 2420 | 1338 ms |
+| 2026-08-10 19:18 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2444 | 1256 ms |
+| 2026-08-10 19:20 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2353 | 1421 ms |
+| 2026-08-10 19:22 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2353 | 1220 ms |
+| 2026-08-10 19:24 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 53/57 (93%) | 0 (0%) | 2353 | 1257 ms |
+| 2026-08-10 19:26 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2353 | 1352 ms |
