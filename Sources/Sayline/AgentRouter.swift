@@ -686,6 +686,14 @@ final class AgentRouter {
                let site = WebsiteCatalog.site(matching: site),
                let page = WebsiteCatalog.personalPage(site: site, query: query) {
                 NSLog("%@", "Sayline: own-page match for \"\(query)\" -> \(page.absoluteString)")
+                // Deliberately NOT HEAD-verified, unlike a URL the model
+                // supplied. These pages are auth-gated by definition, and our
+                // check carries no cookies: github.com/pulls answers 404 to a
+                // logged-out request and 200 in the browser where it will
+                // actually open. Verifying would send every GitHub own-page
+                // request to the home page instead. eval/url-health.py covers
+                // staleness here, run by a human who can tell a moved URL from
+                // a login wall.
                 return .openWebsite(label: "\(site.label) — \(query)", url: page)
             }
             if let pageURL = (arguments["page_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
