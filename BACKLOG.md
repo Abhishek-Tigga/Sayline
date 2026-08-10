@@ -9,6 +9,49 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **Disambiguate "tomorrow" said late at night** (requested 2026-08-11,
+  parked deliberately — build the rest first).
+
+  Found live at 01:06. Saying "remind me tomorrow at 10am" at one in the
+  morning almost certainly means *nine hours from now*, not thirty-three.
+  We currently take it literally, so the reminder lands a full day after
+  it was wanted — and silently, because a date a day out still looks
+  plausible when it flashes past in the pill.
+
+  The model has no way to get this right on its own. It is told the
+  current time and follows the calendar meaning of the word, which is
+  correct English and the wrong answer. Nothing in the prompt can fix
+  that without also breaking "tomorrow" said at 3pm, where the literal
+  reading is right.
+
+  **The shape it should take:** when the current hour is small — roughly
+  midnight to 5am — and the request says "tomorrow", ask instead of
+  guessing. The follow-up primitive already does this, and the question
+  is a two-button one:
+
+      Sayline
+      Tomorrow at 10:00 — which did you mean?
+      [ Today 10:00 ]  [ Tomorrow 10:00 ]
+
+  Both options are named with their real date, because "today" at 1am is
+  itself ambiguous to read.
+
+  **Open questions for whoever builds it:**
+  - Where is the boundary? Midnight–5am is a guess. The honest version
+    keys off "is the named time still ahead of us today", which handles
+    11pm→"tomorrow morning" too.
+  - Does it apply to "tonight" and "this morning", which are worse? At
+    1am "this morning" has already half happened.
+  - Should it ask, or default to the nearer reading and say which it
+    chose? Asking is safer but costs a turn on something people say
+    often. Reading it back — "reminder set · Today, 10:00 AM" — may be
+    enough on its own, since the message already names the day.
+
+  That last one is worth settling before building: the feedback copy
+  added on 2026-08-11 already says "Today" or "Tomorrow" out loud, so
+  the wrong reading is now visible rather than silent. That may have
+  already fixed the expensive half of this.
+
 - **Agent router eval harness + JSON-mode migration** (agreed
   2026-08-09, harness to be built first). Two linked pieces: a way to
   *measure* the router, then a change to the router that needs
