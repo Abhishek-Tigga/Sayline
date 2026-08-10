@@ -377,3 +377,94 @@ Ticking it grants nothing. `tccutil reset Accessibility
 com.abhishektigga.sayline` plus the app's own "Grant Accessibility Access"
 button is the reliable sequence. It goes away with a real Developer ID
 certificate, which is parked until the end of V2.
+
+---
+
+## FREEZE · Probable cause found, with evidence (Opus, 2026-08-11)
+
+**For Fable specifically:** this is the open problem CLAUDE.md calls
+existential and that two earlier investigations failed to explain. It now
+has a mechanism and a fix. Please attack both — the reasoning below is a
+strong hypothesis fitted to one incident, not a proven diagnosis, and the
+thing I most want checked is whether the fix can itself strand the tap.
+
+### The report
+
+The user hit a Keychain password dialog and could not type into it. The
+**keyboard was dead; the mouse still worked.** That asymmetry is the whole
+clue.
+
+### The evidence
+
+From `sayline_stderr.log`, one session, thread IDs kept because they
+matter:
+
+```
+04:28:42.030  [main 1383804]  indicator shown -> agentRouting
+04:28:44.118  [tap  1385566]  event tap was disabled by the system (4294967294), re-enabling
+04:29:04.957  [tap  1385566]  event tap was disabled by the system (4294967294), re-enabling
+04:29:24.741  [tap  1385566]  event tap was disabled by the system (4294967294), re-enabling
+```
+
+Main thread's last line is `agentRouting` and it never speaks again. The
+tap thread keeps going, being disabled and re-enabled roughly every 20
+seconds. `4294967294` is `kCGEventTapDisabledByTimeout` — macOS decided our
+callback was not keeping up.
+
+### The mechanism
+
+1. The router reads the API key, which raises a Keychain password dialog.
+2. A password field turns on **Secure Input Mode**, which stops delivering
+   keystrokes to event taps.
+3. Starved of events, our tap is timed out by the system.
+4. The old code re-enabled it **immediately, from inside the callback**,
+   every single time.
+5. Each re-enable makes the window server re-evaluate the input path, and
+   the dialog never receives the keystrokes it is waiting on.
+6. The user cannot type the password that would end the dialog, end secure
+   input, and unblock everything — so it holds until something gives.
+
+The mouse kept working because the tap's mask is keyboard only —
+`flagsChanged` and `keyDown`. A keyboard-only tap producing a
+keyboard-only freeze is the part that makes this fit rather than merely
+sound plausible.
+
+### The fix
+
+The callback no longer re-enables anything. It sets a flag; the tap
+thread's run-loop slice acts on it, under two rules:
+
+- **While `IsSecureEventInputEnabled()` is true, stay off entirely.** A
+  password field owns the keyboard and we have no business competing for
+  it.
+- **At most one attempt per second**, so a persistent failure cannot
+  become a tight loop against the window server.
+
+New log lines make the state visible: `secure input is on … leaving the
+tap off until it ends`, `secure input ended`, `event tap re-enabled`.
+
+### What I could not do
+
+Reproduce it on demand. The fix is reasoned from one incident plus the
+mechanism, and the app was relaunched afterwards so the original state is
+gone. It has not been observed surviving a real Keychain prompt.
+
+### What is worth attacking
+
+- **Can the tap be stranded off?** If `IsSecureEventInputEnabled()` were
+  ever stuck true, or the thread loop stopped slicing, `tapNeedsReenable`
+  stays set and the hotkey is silently dead forever. The old code was
+  wrong but it was aggressive; this one is polite, and polite code can
+  give up. A ceiling — after N seconds waiting on secure input, re-enable
+  anyway and log loudly — may be the right hedge.
+- **Is the diagnosis actually right?** Both prior theories fitted their
+  evidence too. The thread-ID asymmetry and the keyboard-only symptom are
+  what convinced me; if there is a reading where those come from something
+  else, I would rather know now.
+- **Does anything else on the main thread block during a Keychain read?**
+  Main went quiet at `agentRouting` and stayed quiet. I have assumed it was
+  waiting on the router, which was waiting on the dialog. That chain is
+  inferred, not observed.
+- **This is the third theory.** Two were disproven. Treat it accordingly.
+
+Commit: see below.

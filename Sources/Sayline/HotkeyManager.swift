@@ -1,3 +1,4 @@
+import Carbon
 import Cocoa
 
 /// Watches for a chosen modifier key (see HotkeyOption) being held
@@ -27,6 +28,11 @@ final class HotkeyManager {
     /// immediately no matter what the app is doing.
     private var tapThread: Thread?
     private var tapDidInstall = false
+    /// Set by the callback, acted on by the thread loop — see
+    /// `reenableTapIfSafe`.
+    private var tapNeedsReenable = false
+    private var lastTapReenable = Date.distantPast
+    private var loggedSecureInputWait = false
     private var isHotkeyActive = false
     /// Guards against keyboard auto-repeat: holding Space sends many
     /// rapid keyDown events, not just one, so without this we'd fire
@@ -64,6 +70,7 @@ final class HotkeyManager {
             // driven in short slices to stay cancellable.
             while !Thread.current.isCancelled {
                 CFRunLoopRunInMode(.defaultMode, 0.25, false)
+                self.reenableTapIfSafe()
             }
             self.uninstallTap()
         }
@@ -130,6 +137,37 @@ final class HotkeyManager {
         tapDidInstall = false
     }
 
+    /// Restores the tap once it is safe to do so. Runs on the tap thread
+    /// between run-loop slices, never from inside the callback.
+    ///
+    /// Two rules, both learned from the freeze described above:
+    /// while Secure Input Mode is on, a password field owns the keyboard
+    /// and we stay out of its way entirely; and even afterwards, attempts
+    /// are spaced so a persistent failure cannot become a tight loop
+    /// against the window server.
+    private func reenableTapIfSafe() {
+        guard tapNeedsReenable, let eventTap else { return }
+
+        if IsSecureEventInputEnabled() {
+            if !loggedSecureInputWait {
+                loggedSecureInputWait = true
+                NSLog("Sayline: secure input is on (a password field has the keyboard) — leaving the tap off until it ends")
+            }
+            return
+        }
+        if loggedSecureInputWait {
+            loggedSecureInputWait = false
+            NSLog("Sayline: secure input ended")
+        }
+
+        let now = Date()
+        guard now.timeIntervalSince(lastTapReenable) >= 1 else { return }
+        lastTapReenable = now
+        tapNeedsReenable = false
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        NSLog("Sayline: event tap re-enabled")
+    }
+
     private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
         switch type {
         case .flagsChanged:
@@ -151,13 +189,28 @@ final class HotkeyManager {
             }
             return Unmanaged.passUnretained(event)
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            // macOS can silently disable an active tap if it decides the
-            // callback isn't keeping up — without this, the hotkey goes
-            // dead with zero indication anything happened.
-            NSLog("Sayline: event tap was disabled by the system (\(type.rawValue)), re-enabling")
-            if let eventTap {
-                CGEvent.tapEnable(tap: eventTap, enable: true)
-            }
+            // macOS silently disables an active tap when it decides the
+            // callback isn't keeping up. Re-enabling is right; re-enabling
+            // *immediately, every time* is what froze a keyboard.
+            //
+            // Observed 2026-08-11: a Keychain password dialog appeared, the
+            // user's keyboard stopped accepting input while the mouse kept
+            // working, and this line logged every ~20s. A password field
+            // turns on Secure Input Mode, which stops delivering keystrokes
+            // to taps; the system then times ours out, we re-enable, and it
+            // times out again. Each cycle re-evaluates the input path, and
+            // the dialog never receives the keystrokes it is waiting for.
+            // The user could not type the password that would have ended
+            // the whole thing.
+            //
+            // The mouse still worked because the tap's mask is keyboard
+            // only — flagsChanged and keyDown — which is exactly the shape
+            // of the symptom reported.
+            //
+            // So: mark it and let the thread loop decide, rather than
+            // fighting the window server from inside the callback.
+            NSLog("Sayline: event tap was disabled by the system (\(type.rawValue))")
+            tapNeedsReenable = true
             return Unmanaged.passUnretained(event)
         default:
             return Unmanaged.passUnretained(event)
