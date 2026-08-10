@@ -590,3 +590,46 @@ created reminder "call the bank" due 2026-08-12 04:30 +0000   (10:00 local)
 The model still supplied 09:00, exactly as it did before; the difference is
 that the sentence-reading rule now catches it. Reminder created at the hour
 the user actually chose.
+
+---
+
+## O-A · Deterministic fast path
+2026-08-11 · Opus · claimed-fixed
+
+Commands the app can already answer no longer wait for a model.
+
+`FastRoute` tries local tables before the router and returns nil for
+anything it is not certain about. It feeds the same `AgentTurnRunner`, so
+nothing downstream changes — Empty Trash still asks for confirmation,
+failures still report.
+
+Two guards, the second at Fable's insistence:
+
+- **Whole utterance only.** "Open Safari" matches; "open Safari and check
+  my battery" falls through. A matcher that fires on part of a sentence
+  eats the rest of it, which is the failure `VoiceCommand` already had
+  when "scratch that idea" scored 0.94 against "scratch that".
+- **Certain or nothing.** Exact matches after normalising, no fuzziness.
+  "Open Spotify" is genuinely ambiguous — an app and a site — so it goes
+  to the model. So does any app not installed here.
+
+Needed `InstalledAppCatalog`, since nothing knew what was installed:
+`openApp` just shelled out to `open -a` and hoped. 217 apps found,
+including CoreServices so "close Finder" works.
+
+Measured, not estimated:
+
+```
+11 of 59 test transcripts answered locally (18%)
+ 0 disagree with what the eval expects of the router
+ 5.37 ms to route all eleven, versus ~1,118 ms each through the model
+```
+
+Router eval unchanged at 57/59 — as expected, since the fast path bypasses
+the router entirely and the eval therefore cannot see it. That is also why
+`eval/fastroute-checks` exists: 21 cases, and the eleven negatives are the
+ones that matter.
+
+Not checked: any of it live. Needs a hold, and this build's Accessibility
+grant is gone again.
+Commit: this one.

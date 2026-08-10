@@ -74,7 +74,15 @@ because it scores what the model emits, not what we do afterwards:
 swiftc -o /tmp/chk Sources/Sayline/WebsiteCatalog.swift eval/catalog-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/FollowUp.swift eval/consent-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/LocalTimestamp.swift eval/timestamp-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCatalog.swift \
+  Sources/Sayline/InstalledAppCatalog.swift Sources/Sayline/FastRoute.swift \
+  eval/fastroute-checks/main.swift && /tmp/chk
 ```
+
+The fast path answers some commands without calling the model at all, so
+the router eval cannot see it — `fastroute-checks` is the only thing that
+can. Its negative cases matter most: a false match there does not give a
+wrong answer, it silently drops the rest of the sentence.
 
 **Live URLs** — the catalog is compiled in, so a moved URL needs a release.
 This detects, it cannot heal:

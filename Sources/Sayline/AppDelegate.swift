@@ -111,6 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AudioRecorder.sweepOrphanedRecordings()
+        InstalledAppCatalog.load()
         hotkeyManager.hotkeyOption = hotkeyOption
         hotkeyManager.onHotkeyDown = { [weak self] in
             DispatchQueue.main.async { self?.beginRecording() }
@@ -389,7 +390,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.indicatorWindow.show(state: .agentRouting)
                 }
 
-                let actions = try await agentRouter.route(transcript)
+                // Try the tables before the model. Anything unambiguous —
+                // "open Safari", "lock the screen", "what's my battery" —
+                // is a lookup this app can already do, and it currently
+                // waits a full round trip for an answer it holds.
+                //
+                // Feeds the same runner, so nothing downstream changes:
+                // Empty Trash still asks, failures still report.
+                let actions: [AgentAction]
+                if let fast = FastRoute.action(for: transcript) {
+                    NSLog("%@", "Sayline: fast path answered \"\(transcript)\" with no round trip -> \(fast)")
+                    actions = [fast]
+                } else {
+                    actions = try await agentRouter.route(transcript)
+                }
 
                 await MainActor.run {
                     // Deliberately NOT hidden here. Tearing the panel down
