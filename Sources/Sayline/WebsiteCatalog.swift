@@ -32,6 +32,14 @@ enum WebsiteCatalog {
         /// left after "open my ... on <site>" is stripped down. Paths, not
         /// full URLs, so the regional home applies to them for free.
         var personalPages: [String: String] = [:]
+        /// Where this site is worth offering. Empty means everywhere.
+        ///
+        /// Only filters the *prompt vocabulary*, never resolution — a site
+        /// still resolves for anyone whose words reach it. The point is
+        /// that a user in Ohio should not spend tokens on Flipkart, and a
+        /// user in Delhi should not have to know that Amazon is the only
+        /// shop we were taught.
+        var regions: Set<String> = []
         var regional: [String: Variant] = [:]
         /// Separate search tabs, each its own URL. "People from Razorpay"
         /// and "Razorpay jobs" are different pages on LinkedIn, not the
@@ -164,6 +172,34 @@ enum WebsiteCatalog {
              searchTemplate: "https://www.producthunt.com/search?q=%@"),
         Site(label: "Dribbble", aliases: ["dribbble", "dribble"], home: "https://dribbble.com",
              searchTemplate: "https://dribbble.com/search/%@"),
+        // India. Added 2026-08-11 after "search for Type-C headphone on
+        // Flipkart" and "search for sunglasses on Meesho" were both refused
+        // — correctly, since neither was in the catalog, which is exactly
+        // the US-centric gap that refusal exposed. Every URL below was
+        // opened in a browser and confirmed to return real results; curl
+        // gets 403 from all of them, which proves nothing either way.
+        Site(label: "Flipkart", aliases: ["flipkart", "flip kart"],
+             home: "https://www.flipkart.com",
+             searchTemplate: "https://www.flipkart.com/search?q=%@",
+             regions: ["IN"]),
+        // "Misho" is what the transcriber actually produces for Meesho, so
+        // it is an alias. A catalog that only knows the correct spelling
+        // does not help someone speaking.
+        Site(label: "Meesho", aliases: ["meesho", "misho", "meso", "mesho"],
+             home: "https://www.meesho.com",
+             searchTemplate: "https://www.meesho.com/search?q=%@",
+             regions: ["IN"]),
+        // Path-based search, not a query parameter: /shirts, not ?q=shirts.
+        // The obvious ?q= form silently searches for the word "search" and
+        // returns 1.5 million items, which looks like it worked.
+        Site(label: "Myntra", aliases: ["myntra", "mintra"],
+             home: "https://www.myntra.com",
+             searchTemplate: "https://www.myntra.com/%@",
+             regions: ["IN"]),
+        Site(label: "Swiggy", aliases: ["swiggy", "swigy"],
+             home: "https://www.swiggy.com",
+             searchTemplate: "https://www.swiggy.com/search?query=%@",
+             regions: ["IN"]),
         Site(label: "Amazon", aliases: ["amazon"], home: "https://www.amazon.com",
              searchTemplate: "https://www.amazon.com/s?k=%@",
              personalPages: [
@@ -206,8 +242,16 @@ enum WebsiteCatalog {
     /// What the router model is offered. It can only pick a name it has
     /// been shown — a lesson from the settings catalog, where a missing
     /// word sent requests to the wrong place entirely.
+    /// The site names offered to the model, narrowed to this Mac's region.
+    ///
+    /// Site names are sent on every single request, so the list is a
+    /// standing latency and cost item — measured at ~73 tokens for 30
+    /// sites. Regional entries let the catalog grow without every user
+    /// paying for every country: an Indian Mac is offered Flipkart and
+    /// Meesho, an American one is not, and neither is billed for the
+    /// other's.
     static var promptVocabulary: [String] {
-        sites.map { $0.label }
+        sites.filter { $0.regions.isEmpty || $0.regions.contains(region) }.map { $0.label }
     }
 
     /// Every vertical any site supports, for the tool schema. The model

@@ -811,6 +811,34 @@
         }
       ],
       "guards": "Same class as settings-volume-synonym. 'brightness' is not in the catalog; Displays is the right answer and shares no word with what was said."
+    },
+    {
+      "id": "web-flipkart",
+      "transcript": "Search for Type-C headphone on Flipkart",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "Flipkart",
+            "query__contains": "headphone"
+          }
+        }
+      ],
+      "guards": "Verbatim from a live session where it was refused. Correct behaviour for an unknown site, and a US-centric gap: the catalog had Amazon and no Flipkart while the user is in India. URL confirmed in a browser — curl gets 403 from every Indian retailer, so a 403 proves nothing."
+    },
+    {
+      "id": "web-meesho-misheard",
+      "transcript": "Search for sunglasses on Misho",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "Meesho",
+            "query__contains": "sunglasses"
+          }
+        }
+      ],
+      "guards": "'Misho' is what the transcriber produces for Meesho, and it is the verbatim live transcript. The model maps it back to Meesho by itself once the site is in the vocabulary; the alias covers the case where it passes the misheard spelling straight through instead. First written with a site__contains matcher of 'isho', which 'Misho' satisfies and 'Meesho' does not — the expectation was wrong, not the routing."
     }
   ]
 }

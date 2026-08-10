@@ -633,3 +633,40 @@ ones that matter.
 Not checked: any of it live. Needs a hold, and this build's Accessibility
 grant is gone again.
 Commit: this one.
+
+## NEW · The site catalog was US-centric
+2026-08-11 · Opus · claimed-fixed
+
+Found live: "search for Type-C headphone on Flipkart" and "search for
+sunglasses on Meesho" were both refused. The refusal itself was correct —
+neither site was in the catalog and guessing a domain is worse than saying
+so — but a catalog holding Amazon and not Flipkart, for a user in India,
+is a gap the refusal made visible rather than a rule working as intended.
+
+Added Flipkart, Meesho, Myntra and Swiggy. Every URL opened in a browser
+and confirmed to return real results; curl gets 403 from all of them, so a
+403 proves nothing either way — the same lesson Amazon's 503 taught in the
+page-verification work.
+
+Two things worth keeping:
+
+**Myntra searches by path, not query.** `/shirts`, not `?q=shirts`. The
+obvious form silently searches for the word "search" and returns 1.5
+million items, which looks like success. Only visible by reading the page.
+
+**"Misho" is an alias for Meesho** because that is what the transcriber
+actually produces. A catalog that knows correct spellings and not spoken
+ones does not help someone speaking.
+
+Site names are sent on every request, so the catalog cannot simply grow —
+measured at ~73 tokens for 30 sites. Sites now carry an optional region,
+and `promptVocabulary` filters by it: an Indian Mac is offered Flipkart,
+an American one is not, and neither pays for the other's. Resolution is
+deliberately not filtered, so a site still resolves for anyone whose words
+reach it.
+
+Ran: browser verification of all four; both spellings resolve; prompt
+vocabulary is 34 sites in region IN and includes Flipkart; eval 59/61.
+One test expectation of mine was wrong and is fixed — `site__contains:
+"isho"` matches "Misho" but not "Meesho", and the model correctly returns
+the latter.
