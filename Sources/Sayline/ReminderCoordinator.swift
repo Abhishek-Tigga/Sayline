@@ -86,20 +86,20 @@ final class ReminderCoordinator {
     private func save(title: String, due: Date?) {
         do {
             try store.create(title: title, due: due)
-            indicator.flashMessage(message(for: title, due: due), duration: 3.4)
+            indicator.showNotice(
+                "Reminder created",
+                detail: due.map { Self.spoken.string(from: $0) } ?? "No time set",
+                pill: title
+            )
         } catch {
             NSLog("Sayline: couldn't save reminder -> \(error.localizedDescription)")
-            indicator.flashMessage("Couldn't save that reminder", duration: 3.4)
+            indicator.showNotice(
+                "Couldn't create that reminder",
+                detail: "Nothing was saved — try again",
+                pill: title,
+                duration: 4.0
+            )
         }
-    }
-
-    /// Says what happened, and says the time back. Reading the time back is
-    /// the only chance to catch a misheard "four" that became sixteen
-    /// hundred hours — after this the reminder is out of sight until it
-    /// fires, or doesn't.
-    private func message(for title: String, due: Date?) -> String {
-        guard let due else { return "Reminder set · \(title) · no time" }
-        return "Reminder set · \(title) · \(Self.spoken.string(from: due))"
     }
 
     // MARK: - Cancel
@@ -115,7 +115,9 @@ final class ReminderCoordinator {
         let matches = await store.search(name: name)
         switch matches.count {
         case 0:
-            indicator.flashMessage("No reminder matching \"\(name)\"", duration: 3.0)
+            indicator.showNotice("No reminder matches that",
+                                 detail: "Nothing called \"\(name)\" in your list",
+                                 pill: name)
         case 1:
             confirmDelete(matches[0], others: 0)
         default:
@@ -130,7 +132,10 @@ final class ReminderCoordinator {
         guard let recent = store.recentlyCreated() else {
             // Outside the five-minute window "that" is genuinely ambiguous.
             // Say what would work instead of guessing at a reminder.
-            indicator.flashMessage("Nothing recent to cancel — say which reminder", duration: 3.4)
+            indicator.showNotice("Nothing recent to cancel",
+                                 detail: "Say which reminder to remove",
+                                 pill: "Cancel that",
+                                 duration: 4.0)
             return
         }
         delete(id: recent.id, title: recent.title)
@@ -152,7 +157,7 @@ final class ReminderCoordinator {
             guard answer == .confirmed else {
                 // Declined, escaped or timed out all mean keep it. Never
                 // guess yes: yes is the irreversible direction.
-                self.indicator.flashMessage("Kept it — nothing deleted", duration: 2.4)
+                self.indicator.showNotice("Kept it", detail: "Nothing was deleted", pill: match.title, duration: 2.6)
                 return
             }
             self.delete(id: match.id, title: match.title)
@@ -162,10 +167,15 @@ final class ReminderCoordinator {
     private func delete(id: String, title: String) {
         do {
             try store.delete(id: id)
-            indicator.flashMessage("Reminder deleted · \(title)", duration: 3.0)
+            indicator.showNotice("Reminder deleted", pill: title)
         } catch {
             NSLog("Sayline: couldn't delete reminder -> \(error.localizedDescription)")
-            indicator.flashMessage("Couldn't delete that reminder", duration: 3.0)
+            indicator.showNotice(
+                "Couldn't delete that reminder",
+                detail: "It's still there",
+                pill: title,
+                duration: 4.0
+            )
         }
     }
 
@@ -179,7 +189,10 @@ final class ReminderCoordinator {
             return true
         case .failed(let message):
             NSLog("Sayline: reminders access failed -> \(message)")
-            indicator.flashMessage("Couldn't reach Reminders", duration: 3.0)
+            indicator.showNotice("Couldn't reach Reminders",
+                                 detail: "Try again in a moment",
+                                 pill: "Reminders",
+                                 duration: 3.6)
             return false
         case .denied:
             offerSettings()

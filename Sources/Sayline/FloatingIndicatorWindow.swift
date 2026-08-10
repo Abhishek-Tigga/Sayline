@@ -64,6 +64,9 @@ final class FloatingIndicatorWindow {
     /// One re-ask only. Past that we take the safe path rather than
     /// looping someone through a question they cannot answer.
     private var followUpDidRetry = false
+    /// Identifies the current notice, so a later one cancels the earlier
+    /// one's dismissal rather than both firing.
+    private var noticeShownAt: Date?
 
     // A fixed-size "stage" the small pill centers/bottom-anchors within
     // (via RecordingIndicatorView's own frame alignment) — wider and
@@ -120,6 +123,31 @@ final class FloatingIndicatorWindow {
         }
     }
 
+    /// Shows a result in the same box a question uses, with the command
+    /// itself in the pill below — the same two-part shape as the question
+    /// that produced it, so an answer does not arrive somewhere new.
+    ///
+    /// Auto-hides. A pending question wins: a result must never take a
+    /// question off screen before it has been answered.
+    func showNotice(_ text: String,
+                    detail: String? = nil,
+                    pill: String,
+                    duration: TimeInterval = 3.6) {
+        guard followUpCompletion == nil else {
+            NSLog("Sayline: notice suppressed — a question is still waiting")
+            return
+        }
+        viewModel.setNotice(text, detail: detail)
+        show(state: .message(pill))
+        let shown = Date()
+        noticeShownAt = shown
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            guard let self, self.noticeShownAt == shown else { return }
+            self.viewModel.setNotice(nil)
+            self.hide()
+        }
+    }
+
     /// Sets the text shown in the speech-back box above the pill. Agent
     /// mode only, and only after transcription returns — there are no words
     /// before that, since Groq Whisper is batch rather than streaming.
@@ -143,6 +171,8 @@ final class FloatingIndicatorWindow {
         panel = nil
         viewModel.setTranscript(nil)
         viewModel.setFollowUp(nil)
+        viewModel.setNotice(nil)
+        noticeShownAt = nil
         NSLog("Sayline: indicator hidden")
     }
 

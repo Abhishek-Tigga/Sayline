@@ -26,6 +26,9 @@ final class IndicatorViewModel: ObservableObject {
 
     /// The question currently on screen, if any. See FollowUp.swift.
     @Published var followUp: FollowUpRequest?
+    /// Something Sayline is telling the user, in the same box a question
+    /// would use. Not a question — nothing to answer, no countdown.
+    @Published var notice: (text: String, detail: String?)?
     /// Anchor for the draining countdown line, same wall-clock approach as
     /// the dots and the text reveal.
     @Published var followUpStartedAt: Date = .distantPast
@@ -43,6 +46,10 @@ final class IndicatorViewModel: ObservableObject {
     func setFollowUp(_ request: FollowUpRequest?) {
         followUp = request
         followUpStartedAt = Date()
+    }
+
+    func setNotice(_ text: String?, detail: String? = nil) {
+        notice = text.map { ($0, detail) }
     }
 }
 
@@ -147,6 +154,9 @@ private struct IndicatorStack: View {
                     onAnswer: { viewModel.onFollowUpAnswer?($0) },
                     hotkeySymbol: viewModel.hotkeySymbol
                 )
+                LinearProcessingDots()
+            } else if let notice = viewModel.notice {
+                NoticeBox(text: notice.text, detail: notice.detail, surface: surface)
                 LinearProcessingDots()
             } else if let transcript = viewModel.transcript, !transcript.isEmpty {
                 SpeechBackBox(
@@ -317,6 +327,64 @@ private struct LinearProcessingDots: View {
     }
 }
 
+// MARK: - Notice
+
+/// Sayline saying something, in the box a question would have used.
+///
+/// Shares FollowUpBox's geometry and marker on purpose: the box means
+/// "this is Sayline talking" whether it wants an answer or not, and a
+/// result arriving in a different-looking surface than the question that
+/// produced it would read as a different thing happening.
+///
+/// Deliberately plain for now — no countdown, nothing to press. A proper
+/// result surface is still to be designed.
+private struct NoticeBox: View {
+    let text: String
+    let detail: String?
+    let surface: SurfaceStyle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SaylineMarker()
+            Text(text)
+                .font(.system(size: SpeechBackBox.fontSize, weight: .semibold))
+                .foregroundStyle(PillStyle.foreground)
+                .fixedSize(horizontal: false, vertical: true)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: SpeechBackBox.fontSize))
+                    .foregroundStyle(PillStyle.foreground)
+                    .opacity(0.75)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 3)
+            }
+        }
+        .frame(maxWidth: 324 - 32, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .surfaceBackground(surface, cornerRadius: 14)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+/// Marks a box as Sayline speaking rather than the user's own words read
+/// back. Shared so a notice and a question are unmistakably the same voice.
+private struct SaylineMarker: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(PillStyle.foreground)
+                .frame(width: 4, height: 4)
+            Text("SAYLINE")
+                .font(.system(size: 10, weight: .semibold))
+                .kerning(0.6)
+                .foregroundStyle(PillStyle.foreground)
+        }
+        .opacity(0.5)
+        .padding(.bottom, 6)
+    }
+}
+
 // MARK: - Follow-up
 
 /// The question box. Shares the speech box's geometry deliberately — this
@@ -341,7 +409,7 @@ private struct FollowUpBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            marker
+            SaylineMarker()
             Text(request.question)
                 .font(.system(size: SpeechBackBox.fontSize))
                 .foregroundStyle(PillStyle.foreground)
@@ -364,20 +432,6 @@ private struct FollowUpBox: View {
         .surfaceBackground(surface, cornerRadius: 14)
         .overlay(alignment: .bottomLeading) { countdown }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private var marker: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(PillStyle.foreground)
-                .frame(width: 4, height: 4)
-            Text("SAYLINE")
-                .font(.system(size: 10, weight: .semibold))
-                .kerning(0.6)
-                .foregroundStyle(PillStyle.foreground)
-        }
-        .opacity(0.5)
-        .padding(.bottom, 6)
     }
 
     @ViewBuilder
