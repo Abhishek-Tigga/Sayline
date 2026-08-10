@@ -32,6 +32,8 @@ final class IndicatorViewModel: ObservableObject {
     /// Called by the buttons. The window owns the single-fire guard and the
     /// timeout, so the view can stay a plain function of state.
     var onFollowUpAnswer: ((FollowUpAnswer) -> Void)?
+    /// The configured hotkey, for the "hold ⌥ and say…" hint.
+    @Published var hotkeySymbol: String = "⌥" 
 
     func setTranscript(_ text: String?) {
         transcript = text
@@ -142,7 +144,8 @@ private struct IndicatorStack: View {
                     request: followUp,
                     startedAt: viewModel.followUpStartedAt,
                     surface: surface,
-                    onAnswer: { viewModel.onFollowUpAnswer?($0) }
+                    onAnswer: { viewModel.onFollowUpAnswer?($0) },
+                    hotkeySymbol: viewModel.hotkeySymbol
                 )
                 LinearProcessingDots()
             } else if let transcript = viewModel.transcript, !transcript.isEmpty {
@@ -328,6 +331,9 @@ private struct FollowUpBox: View {
     let startedAt: Date
     let surface: SurfaceStyle
     let onAnswer: (FollowUpAnswer) -> Void
+    /// Passed in rather than read here — the hotkey is user-configurable,
+    /// and a hint naming the wrong key is worse than no hint.
+    let hotkeySymbol: String
 
     private static let maxWidth: CGFloat = 324
     private static let horizontalPadding: CGFloat = 16
@@ -347,12 +353,10 @@ private struct FollowUpBox: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 3)
             }
-            switch request.kind {
-            case .confirm(let primary, let secondary):
-                buttons(primary: primary, secondary: secondary)
-            case .value(let hint):
-                hintRow(hint)
-            }
+            // Buttons and voice on every question, not one or the other.
+            // Hands on the trackpad click; hands elsewhere talk.
+            actions
+            hintRow(hint)
         }
         .frame(maxWidth: Self.maxWidth - Self.horizontalPadding * 2, alignment: .leading)
         .padding(.horizontal, Self.horizontalPadding)
@@ -376,24 +380,43 @@ private struct FollowUpBox: View {
         .padding(.bottom, 6)
     }
 
-    private func buttons(primary: String, secondary: String) -> some View {
+    @ViewBuilder
+    private var actions: some View {
         HStack(spacing: 6) {
-            Button(primary) { onAnswer(.confirmed) }
-                .buttonStyle(FollowUpButtonStyle(role: request.isDestructive ? .destructive : .primary))
-            Button(secondary) { onAnswer(.declined) }
-                .buttonStyle(FollowUpButtonStyle(role: .secondary))
+            if case .confirm(let primary, let secondary) = request.kind {
+                Button(primary) { onAnswer(.confirmed) }
+                    .buttonStyle(FollowUpButtonStyle(
+                        role: request.isDestructive ? .destructive : .primary))
+                Button(secondary) { onAnswer(.declined) }
+                    .buttonStyle(FollowUpButtonStyle(role: .secondary))
+            }
+            // A quick choice delivers exactly what saying it would, so the
+            // caller parses one thing rather than branching on how the
+            // answer arrived.
+            ForEach(request.quickChoices, id: \.label) { choice in
+                Button(choice.label) { onAnswer(.spoken(choice.spoken)) }
+                    .buttonStyle(FollowUpButtonStyle(role: .secondary))
+            }
         }
         .padding(.top, 11)
     }
 
-    private func hintRow(_ hint: String) -> some View {
-        HStack(spacing: 6) {
-            Text(hint)
-                .font(.system(size: 11))
-                .foregroundStyle(PillStyle.foreground)
+    /// Names the key on every question. Nothing else on screen says the
+    /// microphone is closed, and without it people talk into a mic that
+    /// isn't listening.
+    private var hint: String {
+        switch request.kind {
+        case .confirm: return "Hold \(hotkeySymbol) and say yes or no"
+        case .value(let hint): return hint
         }
-        .opacity(0.55)
-        .padding(.top, 9)
+    }
+
+    private func hintRow(_ hint: String) -> some View {
+        Text(hint)
+            .font(.system(size: 11))
+            .foregroundStyle(PillStyle.foreground)
+            .opacity(0.55)
+            .padding(.top, 9)
     }
 
     /// Wall-clock driven, like the dots — no animation transaction, so

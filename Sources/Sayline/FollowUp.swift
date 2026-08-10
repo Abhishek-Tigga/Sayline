@@ -16,6 +16,15 @@ import Foundation
 /// after a question. It reads better on paper and would have removed the
 /// keyboard hint entirely, but it means Sayline starts listening without
 /// being asked. A dictation app should never do that quietly.
+
+/// A button that stands in for something the user could have said. Click
+/// and speech deliver the same `.spoken` answer, so callers parse one
+/// thing rather than branching on how the answer arrived.
+struct QuickChoice: Equatable {
+    let label: String
+    let spoken: String
+}
+
 struct FollowUpRequest: Equatable {
     enum Kind: Equatable {
         /// Two buttons. `primary` is the affirmative and is styled as the
@@ -34,16 +43,67 @@ struct FollowUpRequest: Equatable {
     /// rather than after.
     let detail: String?
     let kind: Kind
+    /// Shown as buttons alongside whatever the kind provides. Every
+    /// question is answerable both ways — by voice when your hands are
+    /// elsewhere, by click when they are on the trackpad.
+    let quickChoices: [QuickChoice]
     /// Styles the primary button as destructive. EventKit deletion is
     /// permanent and "cancel that" only covers the last thing *created*,
     /// so a delete needs to look different from an open.
     let isDestructive: Bool
 
-    init(question: String, detail: String? = nil, kind: Kind, isDestructive: Bool = false) {
+    init(question: String,
+         detail: String? = nil,
+         kind: Kind,
+         quickChoices: [QuickChoice] = [],
+         isDestructive: Bool = false) {
         self.question = question
         self.detail = detail
         self.kind = kind
+        self.quickChoices = quickChoices
         self.isDestructive = isDestructive
+    }
+}
+
+/// Reads yes or no out of a spoken sentence.
+///
+/// Negatives are tested before affirmatives on purpose. "Yes, but not now"
+/// contains both, and the safe direction is the one that does not delete a
+/// reminder or open a settings pane nobody asked for. Anything genuinely
+/// unreadable comes back `.unclear`, which costs one more question rather
+/// than a guess.
+enum SpokenConsent {
+    case affirmative, negative, unclear
+
+    private static let no = [
+        "never mind", "nevermind", "forget it", "not now", "no thanks",
+        "do not", "don't", "keep it", "leave it", "cancel", "stop", "skip",
+        "dismiss", "close", "later", "nope", "nah", "no",
+    ]
+    private static let yes = [
+        "go ahead", "do it", "yes please", "delete it", "open it",
+        "open settings", "sounds good", "that's right", "thats right",
+        "confirm", "correct", "sure", "okay", "yeah", "yep", "yup", "ok",
+        "alright", "please", "yes",
+    ]
+
+    static func read(_ text: String) -> SpokenConsent {
+        let normalized = text.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber && $0 != "'" })
+            .joined(separator: " ")
+        guard !normalized.isEmpty else { return .unclear }
+        if no.contains(where: { contains(normalized, $0) }) { return .negative }
+        if yes.contains(where: { contains(normalized, $0) }) { return .affirmative }
+        return .unclear
+    }
+
+    /// Whole-phrase match. Substring matching would read "no" out of "now"
+    /// and decline something the user agreed to.
+    private static func contains(_ haystack: String, _ phrase: String) -> Bool {
+        haystack == phrase
+            || haystack.hasPrefix(phrase + " ")
+            || haystack.hasSuffix(" " + phrase)
+            || haystack.contains(" " + phrase + " ")
     }
 }
 

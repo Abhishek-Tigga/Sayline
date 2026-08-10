@@ -58,6 +58,12 @@ final class FloatingIndicatorWindow {
     /// deliver two answers — the second would act on a reminder the first
     /// already created.
     private var followUpCompletion: ((FollowUpAnswer) -> Void)?
+    /// The question as asked, kept so an unclear spoken answer can be
+    /// re-asked without the caller rebuilding it.
+    private var followUpRequest: FollowUpRequest?
+    /// One re-ask only. Past that we take the safe path rather than
+    /// looping someone through a question they cannot answer.
+    private var followUpDidRetry = false
 
     // A fixed-size "stage" the small pill centers/bottom-anchors within
     // (via RecordingIndicatorView's own frame alignment) — wider and
@@ -101,6 +107,12 @@ final class FloatingIndicatorWindow {
         }
     }
 
+    /// Keeps the "hold ⌥ and say…" hint naming the key that is actually
+    /// bound. A hint pointing at the wrong key is worse than no hint.
+    func updateHotkeySymbol(_ symbol: String) {
+        viewModel.hotkeySymbol = symbol
+    }
+
     func updateAgentMode(_ isAgentMode: Bool) {
         viewModel.isAgentMode = isAgentMode
         if isAgentMode {
@@ -140,9 +152,17 @@ final class FloatingIndicatorWindow {
         finishFollowUp(.timedOut, reason: "replaced by a new question")
 
         followUpCompletion = completion
+        followUpRequest = request
+        followUpDidRetry = false
         viewModel.onFollowUpAnswer = { [weak self] answer in
             self?.finishFollowUp(answer, reason: "answered")
         }
+        // Agent styling stays on for the whole exchange, not just the
+        // recording that started it. While a question is up the next hold
+        // of the hotkey is an answer rather than dictation, and the pill is
+        // the only thing that says so — a dictation-looking pill whose next
+        // hold gets eaten as an answer is a genuinely confusing bug.
+        viewModel.isAgentMode = true
         viewModel.setFollowUp(request)
 
         let panel = self.panel ?? makePanel()
@@ -152,6 +172,51 @@ final class FloatingIndicatorWindow {
         panel.orderFrontRegardless()
         NSLog("%@", "Sayline: asking -> \(request.question)")
 
+        restartTimeout()
+    }
+
+    /// Delivers a spoken answer. Called when the next transcript arrives,
+    /// since answering runs through the normal hold-and-speak pipeline
+    /// rather than anything this window owns.
+    ///
+    /// A yes/no question is read here, because "yes" and "no" mean the same
+    /// thing whatever asked them. A value question is passed through
+    /// untouched — only the caller knows whether "half past four" parses.
+    func answerFollowUp(spoken text: String) {
+        guard let request = followUpRequest else { return }
+        guard case .confirm = request.kind else {
+            finishFollowUp(.spoken(text), reason: "spoken")
+            return
+        }
+        switch SpokenConsent.read(text) {
+        case .affirmative:
+            finishFollowUp(.confirmed, reason: "said yes")
+        case .negative:
+            finishFollowUp(.declined, reason: "said no")
+        case .unclear where !followUpDidRetry:
+            followUpDidRetry = true
+            NSLog("%@", "Sayline: couldn't read yes or no from \"\(text)\" — asking once more")
+            viewModel.setFollowUp(request) // restarts the countdown
+            restartTimeout()
+        case .unclear:
+            // Safe path. Never guess yes: yes is the irreversible direction.
+            finishFollowUp(.declined, reason: "still unclear, taking the safe path")
+        }
+    }
+
+    /// True while any question is on screen — every kind can be answered by
+    /// voice, so the next hold is always an answer rather than dictation.
+    var isAwaitingSpokenAnswer: Bool { viewModel.followUp != nil }
+
+    /// Escape, from the event tap. Same outcome as the secondary button:
+    /// declined is the safe path for a confirm, and "no time given" for a
+    /// value, which still creates the reminder undated.
+    func dismissFollowUp() {
+        finishFollowUp(.declined, reason: "escape")
+    }
+
+    private func restartTimeout() {
+        followUpTimer?.cancel()
         let timer = DispatchWorkItem { [weak self] in
             self?.finishFollowUp(.timedOut, reason: "no answer in \(Int(followUpTimeout))s")
         }
@@ -159,22 +224,11 @@ final class FloatingIndicatorWindow {
         DispatchQueue.main.asyncAfter(deadline: .now() + followUpTimeout, execute: timer)
     }
 
-    /// Delivers a spoken answer to a `.value` question. Called when the
-    /// next transcript arrives, since that path runs through the normal
-    /// hold-and-speak pipeline rather than anything this window owns.
-    func answerFollowUp(spoken text: String) {
-        finishFollowUp(.spoken(text), reason: "spoken")
-    }
-
-    var isAwaitingSpokenAnswer: Bool {
-        guard let followUp = viewModel.followUp else { return false }
-        if case .value = followUp.kind { return true }
-        return false
-    }
-
     private func finishFollowUp(_ answer: FollowUpAnswer, reason: String) {
         guard let completion = followUpCompletion else { return }
         followUpCompletion = nil
+        followUpRequest = nil
+        followUpDidRetry = false
         followUpTimer?.cancel()
         followUpTimer = nil
         viewModel.onFollowUpAnswer = nil

@@ -34,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         didSet {
             UserDefaults.standard.set(hotkeyOption.rawValue, forKey: Self.hotkeyOptionDefaultsKey)
             hotkeyManager.hotkeyOption = hotkeyOption
+        indicatorWindow.updateHotkeySymbol(hotkeyOption.shortSymbol)
+            indicatorWindow.updateHotkeySymbol(hotkeyOption.shortSymbol)
         }
     }
     @Published var useLocalTranscription: Bool = {
@@ -94,6 +96,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         hotkeyManager.onHotkeyUp = { [weak self] in
             DispatchQueue.main.async { self?.handleHotkeyUp() }
+        }
+        // Escape dismisses a pending question. Observed on the tap rather
+        // than handled by the panel, which never becomes key window — and
+        // deliberately not consumed, so the key still reaches whatever the
+        // user is actually working in.
+        hotkeyManager.onEscapePressed = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, self.indicatorWindow.isAwaitingSpokenAnswer else { return }
+                self.indicatorWindow.dismissFollowUp()
+            }
         }
         hotkeyManager.onAgentModeRequested = { [weak self] in
             DispatchQueue.main.async {
@@ -197,6 +209,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             return
         }
 
+        // A pending question claims the next hold, whichever way it was
+        // started. Requiring the agent chord again would mean forgetting
+        // Space pastes an answer as text into whatever is focused.
+        if indicatorWindow.isAwaitingSpokenAnswer {
+            handleSpokenFollowUpAnswer(url: url)
+            return
+        }
+
         if isAgentModeThisRecording {
             handleAgentModeHotkeyUp(url: url)
             return
@@ -263,6 +283,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.indicatorWindow.hide()
                     NSLog("Sayline: transcription failed -> \(error.localizedDescription)")
                 }
+            }
+        }
+    }
+
+    /// Transcribes a hold made while a question is on screen, and hands the
+    /// words to the window rather than pasting them.
+    ///
+    /// Nothing is ever inserted from this path. Someone answering "yes" to
+    /// "delete the dentist reminder?" must not have the word typed into
+    /// whatever they had focused.
+    private func handleSpokenFollowUpAnswer(url: URL) {
+        indicatorWindow.show(state: .transcribing)
+        Task {
+            let text = try? await activeTranscriber.transcribe(fileURL: url)
+            await MainActor.run {
+                guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    NSLog("Sayline: follow-up answer was empty — leaving the question up")
+                    return
+                }
+                NSLog("%@", "Sayline: follow-up answer heard -> \(text)")
+                self.indicatorWindow.answerFollowUp(spoken: text)
             }
         }
     }
@@ -381,7 +422,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.askFollowUp(
             FollowUpRequest(
                 question: "What time should I remind you?",
-                kind: .value(hint: "Hold \(hotkeyOption.shortSymbol) and say a time")
+                kind: .value(hint: "Hold \(hotkeyOption.shortSymbol) and say a time"),
+                quickChoices: [
+                    QuickChoice(label: "Tomorrow 9am", spoken: "tomorrow at 9am"),
+                    QuickChoice(label: "No time", spoken: "no time"),
+                ]
             )
         ) { [weak self] answer in
             self?.indicatorWindow.flashMessage("Answer: \(answer)", duration: 2.4)

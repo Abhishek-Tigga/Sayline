@@ -5,6 +5,7 @@ import Cocoa
 /// Accessibility permission to be granted before `start()` will succeed.
 final class HotkeyManager {
     private static let agentModeKeyCode: Int64 = 49 // kVK_Space
+    private static let escapeKeyCode: Int64 = 53 // kVK_Escape
 
     /// Changeable at runtime — the tap watches all flagsChanged events
     /// regardless of key, so switching which one we treat as "the
@@ -39,6 +40,12 @@ final class HotkeyManager {
     /// Per-hold, not a persistent toggle: each new hold defaults back to
     /// dictation unless Space is pressed again during that hold.
     var onAgentModeRequested: (() -> Void)?
+    /// Escape, while a follow-up question is on screen. Observed rather
+    /// than consumed: the panel never becomes key window, so this tap is
+    /// the only way to hear the key at all — but swallowing it would eat a
+    /// press the app underneath may be waiting for. Dismissing our overlay
+    /// is not worth breaking someone's dialog.
+    var onEscapePressed: (() -> Void)?
 
     /// Spins up the tap thread and waits briefly for it to report whether
     /// the tap was created, so callers keep the synchronous success/failure
@@ -130,6 +137,10 @@ final class HotkeyManager {
             return Unmanaged.passUnretained(event)
         case .keyDown:
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            if keyCode == Self.escapeKeyCode {
+                onEscapePressed?()
+                return Unmanaged.passUnretained(event) // pass through, always
+            }
             if isHotkeyActive && keyCode == Self.agentModeKeyCode {
                 if !agentModeAlreadyRequestedThisHold {
                     agentModeAlreadyRequestedThisHold = true
