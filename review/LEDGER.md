@@ -577,3 +577,16 @@ Ran: 15 new cases in `eval/timestamp-checks`, including "remind me to call
 Not checked: the live sentence, again. This is the third fix for one bug
 and the first two both looked right at this point, so it is worth saying
 plainly that nobody has yet heard it ask.
+
+2026-08-11 · user-verified
+Third attempt confirmed live, whole chain in one session log:
+```
+transcript -> Remind me to call the bank tomorrow
+no time of day in "..." — dropping the model's 2026-08-12 03:30 and asking
+asking -> What time should I remind you?
+follow-up answer heard -> tomorrow 10 a.m
+created reminder "call the bank" due 2026-08-12 04:30 +0000   (10:00 local)
+```
+The model still supplied 09:00, exactly as it did before; the difference is
+that the sentence-reading rule now catches it. Reminder created at the hour
+the user actually chose.
