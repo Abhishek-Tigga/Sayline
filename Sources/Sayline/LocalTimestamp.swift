@@ -93,3 +93,48 @@ extension LocalTimestamp {
         return date
     }
 }
+
+extension LocalTimestamp {
+    /// Did the speaker actually name a time of day?
+    ///
+    /// The question the timestamp cannot answer. Asked to remind someone
+    /// "tomorrow", the model first answered with tomorrow at the current
+    /// time of day; told that a bare day is not a time and that morning
+    /// means 09:00, it answered with tomorrow at 09:00 instead. Both are
+    /// invented, and the second is indistinguishable from a genuine
+    /// "tomorrow morning" by looking at the timestamp — which is why two
+    /// prompt rewrites and a clock-comparison rule all failed.
+    ///
+    /// The evidence lives in the sentence, and we have the sentence. If
+    /// nothing in it names an hour or a part of the day, any time the model
+    /// supplies is its own invention and the app should ask instead.
+    ///
+    /// Errs toward believing a time was said: a false positive keeps the
+    /// model's answer, which is the behaviour we already had, while a false
+    /// negative costs one unnecessary question.
+    static func namesATimeOfDay(_ transcript: String) -> Bool {
+        let text = transcript.lowercased()
+
+        // "at 4", "4pm", "4:30", "16:00", "half past four"
+        let patterns = [
+            #"\b\d{1,2}\s*[:.]\s*\d{2}\b"#,
+            #"\b\d{1,2}\s*(am|pm|a\.m|p\.m)\b"#,
+            #"\bat\s+\d{1,2}\b"#,
+            #"\bin\s+(a|an|\d+)\s+(minute|minutes|hour|hours|min|mins)\b"#,
+            #"\b(half|quarter)\s+(past|to)\b"#,
+            #"\d{1,2}\s*o'?clock\b"#,
+        ]
+        for pattern in patterns where text.range(of: pattern, options: .regularExpression) != nil {
+            return true
+        }
+
+        let words: Set<String> = [
+            "morning", "afternoon", "evening", "night", "tonight", "noon",
+            "midday", "midnight", "lunchtime", "breakfast", "dinner",
+            "dawn", "dusk", "sunrise", "sunset", "now", "shortly", "soon",
+            "later", "o'clock", "oclock",
+        ]
+        let spoken = Set(text.split(whereSeparator: { !$0.isLetter }).map(String.init))
+        return !spoken.isDisjoint(with: words)
+    }
+}

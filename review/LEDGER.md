@@ -540,3 +540,40 @@ Ran: timestamp-checks 9 new cases pass; all three suites pass; eval 58/59
 (98%).
 Not checked: the live sentence. Needs the user to say "remind me to call
 the bank tomorrow" and see the question appear.
+
+### NEW · A bare day is not a time — third attempt, and the first that works
+2026-08-11 · Opus · claimed-fixed
+
+Two earlier attempts are recorded above. Both failed, and the second
+failed *because of* the first.
+
+1. Prompt: "a bare day is not a time". The model kept supplying one, and
+   the wording also broke "tomorrow morning", which is specific enough.
+2. Prompt, refined with parts of day spelled out — morning is 09:00. Fixed
+   "tomorrow morning". Then "remind me to call the bank tomorrow" came
+   back with **09:00**, because I had just taught it that a morning is
+   nine o'clock and it applied that to a bare day.
+3. Code: drop a due date on a later day whose clock time matches now.
+   Caught attempt 1's signature and was blind to attempt 2's — 09:00 looks
+   nothing like 04:55.
+
+The mistake common to all three: trying to judge an invented time from the
+timestamp. A model-invented 09:00 and a requested "tomorrow morning" are
+byte-identical there. The difference only exists in the sentence, and we
+have the sentence.
+
+`LocalTimestamp.namesATimeOfDay` reads the transcript for an hour or a
+part of the day — clock times, am/pm, "at 4", "in an hour", "half past",
+morning, tonight, noon. If nothing names a time, any due date the model
+supplies is its own and gets dropped, which routes to the follow-up
+question.
+
+Errs toward believing a time was said: a false positive keeps today's
+behaviour, a false negative costs one question.
+
+Ran: 15 new cases in `eval/timestamp-checks`, including "remind me to call
+911 tomorrow" — a digit that is not a time. All three suites pass, eval
+57/59.
+Not checked: the live sentence, again. This is the third fix for one bug
+and the first two both looked right at this point, so it is worth saying
+plainly that nobody has yet heard it ask.

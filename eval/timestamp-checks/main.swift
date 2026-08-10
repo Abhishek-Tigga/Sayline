@@ -90,5 +90,31 @@ print("\nstill rejects the obvious nonsense")
 dueCheck("already gone               -> drop", "2026-08-10T09:00:00", keep: false)
 dueCheck("years out                  -> drop", "2031-08-12T09:00:00", keep: false)
 
+// ---- namesATimeOfDay ----------------------------------------------
+// The rule that finally worked, after two prompt rewrites and a
+// clock-comparison rule all failed. Asked to remind someone "tomorrow",
+// the model answered first with the current time of day, then — once told
+// morning means 09:00 — with 09:00. Both invented, and the second is
+// identical to a real "tomorrow morning" in the timestamp. The sentence is
+// the only place the difference exists.
+func says(_ text: String, _ expected: Bool) {
+    let got = LocalTimestamp.namesATimeOfDay(text)
+    if got == expected { print("  ok    \"\(text)\" -> \(got)") }
+    else { print("  FAIL  \"\(text)\" -> \(got), expected \(expected)"); bad += 1 }
+}
+
+print("\na time of day was named — keep whatever the model resolved")
+for t in ["remind me to call the bank tomorrow at 4pm",
+          "remind me tomorrow morning", "remind me tonight",
+          "remind me at 4", "remind me in an hour", "remind me in 20 minutes",
+          "remind me at 16:30", "remind me at half past four",
+          "remind me at noon", "remind me to call mom this evening"] { says(t, true) }
+
+print("\nno time of day — the model invented it, ask instead")
+for t in ["remind me to call the bank tomorrow",
+          "remind me to call the bank", "remind me to submit the form on friday",
+          "remind me to renew the passport next week",
+          "remind me to call 911 tomorrow"] { says(t, false) }
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

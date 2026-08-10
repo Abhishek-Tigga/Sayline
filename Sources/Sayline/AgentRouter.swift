@@ -604,7 +604,8 @@ final class AgentRouter {
             return []
         }
 
-        return correctedSettingsPane(toolCalls.compactMap(parseAction), transcript: transcript)
+        let parsed = correctedSettingsPane(toolCalls.compactMap(parseAction), transcript: transcript)
+        return droppingInventedDueDates(parsed, transcript: transcript)
     }
 
     /// Deterministic correction for "<X> settings" where X names a real
@@ -652,6 +653,21 @@ final class AgentRouter {
 
         NSLog("Sayline: transcript said \"\(phrase) settings\" but the model opened System Settings itself — routing to the \(phrase) pane instead")
         return [.openSystemSetting(paneName: phrase, bundleID: bundleID)]
+    }
+
+    /// Strips a due date the speaker never gave.
+    ///
+    /// Applied on the transcript rather than inside `parseAction`, which
+    /// only sees the tool call and therefore cannot tell an invented 09:00
+    /// from a requested one. See `LocalTimestamp.namesATimeOfDay` for why
+    /// the timestamp alone is not enough.
+    private func droppingInventedDueDates(_ actions: [AgentAction], transcript: String) -> [AgentAction] {
+        guard !LocalTimestamp.namesATimeOfDay(transcript) else { return actions }
+        return actions.map { action in
+            guard case .createReminder(let title, let due) = action, due != nil else { return action }
+            NSLog("%@", "Sayline: no time of day in \"\(transcript)\" — dropping the model's \(due!) and asking")
+            return .createReminder(title: title, due: nil)
+        }
     }
 
     /// The words sitting between a lead-in ("open", "show", "my", …) and
