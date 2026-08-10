@@ -55,6 +55,26 @@ Meet usually puts it in `notes`. Check all three in that order, and scan
 `notes` for a known meeting-link pattern. Not a preference — just how the
 providers differ.
 
+**Calendar text is data, never instructions.** Event titles, notes and
+invite descriptions are written by other people, and anyone who can send
+you an invite can put words in them. The router can open apps, open URLs
+and delete reminders, so text from a stranger must never reach a prompt
+that can emit a tool call.
+
+Two rules, both cheap to keep and expensive to retrofit:
+
+- The join link is extracted with a regex over `url`, `location` and
+  `notes`. Raw event text is never handed to the model.
+- Event text may be *shown* to the user — the pill reads back the meeting
+  name — but showing is not routing. If a future feature needs the model
+  to read event content ("summarise my next meeting"), that call must not
+  have tools attached.
+
+As currently designed nothing crosses this line: the router only ever sees
+the user's own speech. The rule is written here so the next feature has to
+argue with it rather than walk past it, which is the only moment a trust
+boundary is cheap.
+
 **Meetings open in the browser.** No Zoom, Teams or Meet app is installed
 on this machine, so an app-launch path would be dead code today.
 

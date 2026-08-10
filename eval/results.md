@@ -26,6 +26,15 @@ generic-sounding bucket — both "banana settings" and "doc settings" started
 resolving to About. Both reverted. The fix that worked was deterministic
 (`AgentRouter.correctedSettingsPane`), not prompt-based.
 
+**The prompt now contains the current time, so no two runs share an input.**
+Added 2026-08-10 so the model can resolve "tomorrow at 3". It also means
+temperature 0 can no longer produce identical runs even in principle — the
+system prompt differs on every call. Runs at `ab09a17` scored 54 then 55
+out of 57 with no code change; the case that moved was `reminder-no-time`,
+where the model invented a due date it usually omits. Treat a one-case move
+as noise. This is a better explanation than the network one below, which is
+also true but smaller.
+
 **Temperature 0 makes the model deterministic, not the run.** Setting
 temperature to 0 did stop the router wandering, and identical results
 across repeat runs is now the normal case. It is not a guarantee: four
@@ -77,3 +86,5 @@ attempt.
 | 2026-08-10 19:22 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2353 | 1220 ms |
 | 2026-08-10 19:24 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 53/57 (93%) | 0 (0%) | 2353 | 1257 ms |
 | 2026-08-10 19:26 UTC | `d2ad9d6+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2353 | 1352 ms |
+| 2026-08-10 21:35 UTC | `ab09a17+dirty` | openai | `gpt-4o-mini` | 54/57 (95%) | 0 (0%) | 2345 | 1290 ms |
+| 2026-08-10 21:37 UTC | `ab09a17+dirty` | openai | `gpt-4o-mini` | 55/57 (96%) | 0 (0%) | 2345 | 1208 ms |

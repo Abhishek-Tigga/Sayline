@@ -140,6 +140,7 @@ def swift_helper(mode, stdin_text=""):
         (SRC / "SettingsPaneCatalog.swift").read_text(),
         (SRC / "WebsiteCatalog.swift").read_text(),
         (SRC / "YouTubeSearch.swift").read_text(),
+        (SRC / "LocalTimestamp.swift").read_text(),
         (SRC / "AgentRouter.swift").read_text(),
         SWIFT_STUBS,
         SWIFT_MAIN,

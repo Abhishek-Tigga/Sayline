@@ -28,6 +28,41 @@ final class AudioRecorder {
     /// Whisper invented out of silence — see `WhisperHallucination`.
     private(set) var lastRecordingPeak: Float = 0
 
+    /// Deletes the finished recording.
+    ///
+    /// Nothing did this until 2026-08-11, and by then 390 files totalling
+    /// 514 MB had accumulated on the developer's own machine — a rolling
+    /// archive of every word ever spoken into the app, unencrypted, in a
+    /// directory macOS only clears sporadically. For a product whose pitch
+    /// includes privacy that is not a bug, it is the story.
+    ///
+    /// Callers invoke this when transcription finishes, success or failure.
+    /// `start()` also clears the previous file, so a caller that forgets
+    /// leaks exactly one recording until the next hold rather than all of
+    /// them — the lifecycle belongs to whoever creates the file, not to
+    /// whoever happens to consume it.
+    func discardLastRecording() {
+        guard let url = lastRecordingURL else { return }
+        lastRecordingURL = nil
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Clears recordings left behind by a crash, or by every version before
+    /// this one. Runs at launch; failures are ignored because a file we
+    /// cannot delete is not worth blocking startup over.
+    static func sweepOrphanedRecordings() {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(
+            at: fm.temporaryDirectory, includingPropertiesForKeys: nil
+        ) else { return }
+        let orphans = files.filter {
+            $0.lastPathComponent.hasPrefix("sayline-") && $0.pathExtension == "wav"
+        }
+        guard !orphans.isEmpty else { return }
+        for url in orphans { try? fm.removeItem(at: url) }
+        NSLog("Sayline: swept \(orphans.count) leftover recording(s) from previous runs")
+    }
+
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
@@ -48,6 +83,10 @@ final class AudioRecorder {
     /// whatever macOS currently considers default.
     func start(preferredDeviceUID: String? = nil) {
         guard !isRecording else { return }
+
+        // Safety net for the lifecycle above: even if a consumer forgot to
+        // discard, the previous recording dies here.
+        discardLastRecording()
 
         let input = engine.inputNode
 

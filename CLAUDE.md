@@ -52,8 +52,14 @@ Four layers, all cheap, none of them optional when touching what they cover.
 and tools out of `AgentRouter.swift`, never its own copy:
 
 ```bash
+python3 eval/run_eval.py --arm openai --dry-run          # compiles only, no API calls
 python3 eval/run_eval.py --arm openai --model gpt-4o-mini
 ```
+
+Run the `--dry-run` line after **any** change to which files `AgentRouter`
+depends on. The harness compiles a hand-maintained list, and splitting
+`LocalTimestamp` out of `AgentRouter` broke it for a day without anyone
+noticing — the eval only runs when a human runs it.
 
 **Deterministic logic** — the half the router eval structurally cannot see,
 because it scores what the model emits, not what we do afterwards:

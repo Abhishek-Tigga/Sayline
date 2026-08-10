@@ -95,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AudioRecorder.sweepOrphanedRecordings()
         hotkeyManager.hotkeyOption = hotkeyOption
         hotkeyManager.onHotkeyDown = { [weak self] in
             DispatchQueue.main.async { self?.beginRecording() }
@@ -192,7 +193,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             indicatorWindow.hide()
             return
         }
-        lastRecordingPath = url.path
+        // Name only. The file is deleted as soon as it has been
+        // transcribed, so showing a path would point at nothing.
+        lastRecordingPath = url.lastPathComponent
 
         // Caught before the silence check because it is a different failure
         // with a different fix. Sending a zero-frame file to Groq returns
@@ -235,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.show(state: .transcribing)
         Task {
             do {
+                defer { self.audioRecorder.discardLastRecording() }
                 let rawText = try await activeTranscriber.transcribe(fileURL: url)
                 NSLog("Sayline: raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
@@ -301,6 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func handleSpokenFollowUpAnswer(url: URL) {
         indicatorWindow.show(state: .transcribing)
         Task {
+            defer { self.audioRecorder.discardLastRecording() }
             let text = try? await activeTranscriber.transcribe(fileURL: url)
             await MainActor.run {
                 guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -319,6 +324,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.show(state: .transcribing)
         Task {
             do {
+                defer { self.audioRecorder.discardLastRecording() }
                 let transcript = try await activeTranscriber.transcribe(fileURL: url)
                 NSLog("Sayline: agent transcript -> \(transcript)")
 

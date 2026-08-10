@@ -39,7 +39,7 @@ struct MenuBarContentView: View {
             }
 
             if let path = appDelegate.lastRecordingPath {
-                Text("Last recording: \((path as NSString).lastPathComponent)")
+                Text("Last recording: \(path)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
