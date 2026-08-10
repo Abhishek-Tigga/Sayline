@@ -396,6 +396,17 @@ enum AgentExecutor {
     /// mode above, granted separately per target app. Permanently
     /// deletes whatever's in the Trash; that's the Trash's whole job,
     /// but worth noting since it's the one irreversible action here.
+    /// How many items the Trash holds, or nil if Finder won't say.
+    ///
+    /// Used only to tell the user what they are about to destroy. Nil is a
+    /// fine answer — the confirmation still asks, it just cannot count.
+    static func trashItemCount() -> Int? {
+        guard let output = runAppleScriptReturningString(
+            "tell application \"Finder\" to count items of trash"
+        ) else { return nil }
+        return Int(output.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
     @discardableResult
     private static func emptyTrash() -> Bool {
         let succeeded = runAppleScript("tell application \"Finder\" to empty trash")
@@ -427,6 +438,19 @@ enum AgentExecutor {
             NSLog("Sayline: agent failed to take screenshot -> \(error.localizedDescription)")
             return false
         }
+    }
+
+    /// Same as `runAppleScript` but keeps the result. Used where the answer
+    /// is the point rather than the side effect.
+    private static func runAppleScriptReturningString(_ source: String) -> String? {
+        guard let script = NSAppleScript(source: source) else { return nil }
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+        if let error {
+            NSLog("Sayline: agent AppleScript failed -> \(error)")
+            return nil
+        }
+        return result.stringValue
     }
 
     private static func runAppleScript(_ source: String) -> Bool {

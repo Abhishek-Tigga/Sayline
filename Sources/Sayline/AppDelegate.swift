@@ -55,9 +55,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     /// Per-hold, not a persistent toggle — reset false on every
     /// hotkey-down, set true only if Space is pressed during that hold.
+    /// Decided at hotkey-DOWN, not at release.
+    ///
+    /// The old check ran at hotkey-up, while the question's twenty-second
+    /// countdown kept running through the hold. If it expired mid-sentence,
+    /// the answer was no longer an answer: "yes, delete it" went down the
+    /// dictation path and was typed into whatever app was focused — the one
+    /// outcome the design says must never happen. The hold now claims the
+    /// question at the moment it starts.
+    private var isAnsweringFollowUpThisRecording = false
     private var isAgentModeThisRecording = false
 
     private let hotkeyManager = HotkeyManager()
+    @MainActor
+    private lazy var turnRunner = AgentTurnRunner(
+        indicator: indicatorWindow,
+        reminders: reminders
+    )
     @MainActor
     private lazy var reminders = ReminderCoordinator(
         indicator: indicatorWindow,
@@ -177,18 +191,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         isRecording = true
         transcriptionError = nil
         isAgentModeThisRecording = false
+        isAnsweringFollowUpThisRecording = indicatorWindow.isAwaitingSpokenAnswer
+        // A hold is the opposite of an absent user, and the timeout exists
+        // for absence. Stop the clock until they let go.
+        indicatorWindow.pauseFollowUpTimeout()
         let appInfo = FocusedAppReader.current()
         capturedFocusedAppInfo = appInfo
         NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
         audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID)
         indicatorWindow.show(state: .recording)
-        indicatorWindow.updateAgentMode(false)
+        // Answering a question is still part of the agent exchange, so the
+        // pill keeps its agent styling. Resetting it here made the pill
+        // claim to be plain dictation while the next hold was, in fact,
+        // going to be routed as an answer.
+        if !isAnsweringFollowUpThisRecording {
+            indicatorWindow.updateAgentMode(false)
+        }
     }
 
     private func handleHotkeyUp() {
         SoundEffectPlayer.shared.playHotkeyUp()
         isRecording = false
         audioRecorder.stop()
+        // The countdown stopped when the hold began. Every path out of here
+        // except a delivered answer has to start it again, or a question
+        // paused by a stray keypress waits forever with a frozen timer bar.
+        // handleSpokenFollowUpAnswer restarts it itself if it hears nothing.
+        if !isAnsweringFollowUpThisRecording {
+            indicatorWindow.resumeFollowUpTimeout()
+        }
         guard let url = audioRecorder.lastRecordingURL else {
             indicatorWindow.hide()
             return
@@ -217,10 +248,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             return
         }
 
-        // A pending question claims the next hold, whichever way it was
-        // started. Requiring the agent chord again would mean forgetting
-        // Space pastes an answer as text into whatever is focused.
-        if indicatorWindow.isAwaitingSpokenAnswer {
+        // Decided at hotkey-down, so a timeout expiring mid-hold cannot
+        // turn an answer into dictation. Requiring the agent chord again
+        // would mean forgetting Space pastes an answer as text.
+        if isAnsweringFollowUpThisRecording {
             handleSpokenFollowUpAnswer(url: url)
             return
         }
@@ -309,7 +340,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             let text = try? await activeTranscriber.transcribe(fileURL: url)
             await MainActor.run {
                 guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    // Nothing usable came back. The question stays, so give
+                    // it its clock back — otherwise it sits there forever.
                     NSLog("Sayline: follow-up answer was empty — leaving the question up")
+                    self.indicatorWindow.resumeFollowUpTimeout()
                     return
                 }
                 NSLog("%@", "Sayline: follow-up answer heard -> \(text)")
@@ -350,71 +384,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     // Deliberately NOT hidden here. Tearing the panel down
                     // and building a new one milliseconds later is what made
                     // a follow-up question invisible until the hotkey was
-                    // pressed again — the window server had an orderOut and
-                    // an orderFrontRegardless on the same spot 6ms apart.
-                    // The indicator now lives for the whole agent turn, and
-                    // whoever finishes last puts it away.
+                    // pressed again. The indicator lives for the whole agent
+                    // turn, and the runner decides how it ends.
                     guard !actions.isEmpty else {
                         NSLog("Sayline: agent could not determine an action for \"\(transcript)\"")
                         self.indicatorWindow.flashMessage("Agent: nothing matched")
                         return
                     }
-                    var anyFailed = false
-                    // Set by any action that shows its own message or asks
-                    // its own question. Anything left false means the turn
-                    // finished silently and the pill should go away.
-                    var ownsTheEnding = false
-                    for action in actions {
-                        NSLog("Sayline: agent executing -> \(action)")
-                        if case .answerQuery(let query) = action {
-                            let answer = AgentExecutor.answer(query)
-                            NSLog("Sayline: agent answered -> \(answer)")
-                            self.indicatorWindow.flashMessage(answer, duration: 4.5)
-                            ownsTheEnding = true
-                            continue
-                        }
-                        if case .createReminder(let title, let due) = action {
-                            // Owns its own follow-ups and result message,
-                            // so it is not part of the anyFailed tally.
-                            ownsTheEnding = true
-                            Task { await self.reminders.create(title: title, due: due) }
-                            continue
-                        }
-                        if case .cancelReminder(let name) = action {
-                            ownsTheEnding = true
-                            Task { await self.reminders.cancel(name: name) }
-                            continue
-                        }
-                        if case .openedSiteButCouldNotSearch(let label, _, _) = action {
-                            AgentExecutor.execute(action)
-                            self.indicatorWindow.flashMessage("Opened \(label) — can't search it directly", duration: 3.0)
-                            ownsTheEnding = true
-                            continue
-                        }
-                        if case .unknownWebsite(let requested) = action {
-                            AgentExecutor.execute(action)
-                            // Refuse rather than guess a TLD, and say what
-                            // would work instead — a bare "couldn't do that"
-                            // leaves no way to succeed on the retry.
-                            self.indicatorWindow.flashMessage("Say the full address, like \(requested).com", duration: 3.5)
-                            ownsTheEnding = true
-                            continue
-                        }
-                        if case .openSystemSettingsFallback(let requestedPaneName) = action {
-                            AgentExecutor.execute(action)
-                            self.indicatorWindow.flashMessage("Couldn't find \"\(requestedPaneName)\" settings", duration: 3.0)
-                            ownsTheEnding = true
-                            continue
-                        }
-                        if !AgentExecutor.execute(action) {
-                            anyFailed = true
-                        }
-                    }
-                    if anyFailed {
-                        self.indicatorWindow.flashMessage("Agent: couldn't complete that")
-                    } else if !ownsTheEnding {
-                        self.indicatorWindow.hide()
-                    }
+                    self.turnRunner.run(actions)
                 }
             } catch {
                 await MainActor.run {

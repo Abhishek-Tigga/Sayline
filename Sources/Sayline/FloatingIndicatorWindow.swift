@@ -67,6 +67,20 @@ final class FloatingIndicatorWindow {
     /// Identifies the current notice, so a later one cancels the earlier
     /// one's dismissal rather than both firing.
     private var noticeShownAt: Date?
+    /// When the live question runs out, or nil while paused. Kept so the
+    /// countdown can stop for the length of a hold and resume with the
+    /// time that was actually left.
+    private var followUpDeadline: Date?
+    /// Questions waiting their turn.
+    ///
+    /// One utterance can produce two conversational actions — "remind me to
+    /// call mom and remind me to email John" — and actions are dispatched in
+    /// parallel by design. Before this, the second question finished the
+    /// first as `.timedOut`, and the time-question's timeout fallback
+    /// creates the reminder undated: the user watched one question and
+    /// silently got a reminder they never confirmed. Queueing serialises
+    /// only the conversations, leaving everything else parallel.
+    private var queued: [(request: FollowUpRequest, completion: (FollowUpAnswer) -> Void)] = []
 
     // A fixed-size "stage" the small pill centers/bottom-anchors within
     // (via RecordingIndicatorView's own frame alignment) — wider and
@@ -190,8 +204,19 @@ final class FloatingIndicatorWindow {
     /// AX text insertion depends on that focus never moving.
     func askFollowUp(_ request: FollowUpRequest,
                      completion: @escaping (FollowUpAnswer) -> Void) {
-        finishFollowUp(.timedOut, reason: "replaced by a new question")
+        // Never displace a live question. The one on screen is the one the
+        // user is looking at; taking it away mid-read and answering it on
+        // their behalf is how a reminder gets created that nobody agreed to.
+        guard followUpCompletion == nil else {
+            queued.append((request, completion))
+            NSLog("%@", "Sayline: queued a question behind the live one -> \(request.question)")
+            return
+        }
+        present(request, completion: completion)
+    }
 
+    private func present(_ request: FollowUpRequest,
+                         completion: @escaping (FollowUpAnswer) -> Void) {
         followUpCompletion = completion
         followUpRequest = request
         followUpDidRetry = false
@@ -256,13 +281,42 @@ final class FloatingIndicatorWindow {
         finishFollowUp(.declined, reason: "escape")
     }
 
+    private var followUpRemaining: TimeInterval?
+
     private func restartTimeout() {
         followUpTimer?.cancel()
         let timer = DispatchWorkItem { [weak self] in
             self?.finishFollowUp(.timedOut, reason: "no answer in \(Int(followUpTimeout))s")
         }
         followUpTimer = timer
+        followUpDeadline = Date().addingTimeInterval(followUpTimeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + followUpTimeout, execute: timer)
+    }
+
+    /// Stops the countdown for the length of a hold.
+    ///
+    /// The timeout exists to clear a question nobody is answering. Someone
+    /// holding the hotkey is the opposite of absent, and letting the clock
+    /// run through a hold is what sent a spoken "yes, delete it" down the
+    /// dictation path to be typed into whatever they had focused.
+    func pauseFollowUpTimeout() {
+        guard followUpCompletion != nil, let deadline = followUpDeadline else { return }
+        followUpTimer?.cancel()
+        followUpTimer = nil
+        followUpRemaining = max(1, deadline.timeIntervalSinceNow)
+        followUpDeadline = nil
+    }
+
+    func resumeFollowUpTimeout() {
+        guard followUpCompletion != nil, followUpDeadline == nil else { return }
+        let remaining = followUpRemaining ?? followUpTimeout
+        followUpRemaining = nil
+        let timer = DispatchWorkItem { [weak self] in
+            self?.finishFollowUp(.timedOut, reason: "no answer in time")
+        }
+        followUpTimer = timer
+        followUpDeadline = Date().addingTimeInterval(remaining)
+        DispatchQueue.main.asyncAfter(deadline: .now() + remaining, execute: timer)
     }
 
     private func finishFollowUp(_ answer: FollowUpAnswer, reason: String) {
@@ -272,11 +326,19 @@ final class FloatingIndicatorWindow {
         followUpDidRetry = false
         followUpTimer?.cancel()
         followUpTimer = nil
+        followUpDeadline = nil
+        followUpRemaining = nil
         viewModel.onFollowUpAnswer = nil
         viewModel.setFollowUp(nil)
         panel?.ignoresMouseEvents = true
         NSLog("%@", "Sayline: follow-up \(reason) -> \(answer)")
         completion(answer)
+
+        // Whoever was waiting gets the screen now.
+        if !queued.isEmpty {
+            let next = queued.removeFirst()
+            present(next.request, completion: next.completion)
+        }
     }
 
     private func makePanel() -> NSPanel {

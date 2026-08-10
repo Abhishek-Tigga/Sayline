@@ -104,8 +104,15 @@ if mode == "dump-config" {
     while let line = readLine(strippingNewline: true) {
         if line.isEmpty { continue }
         guard let phrase = AgentRouter.panePhrase(in: line) else { continue }
+        // Report the phrase even when the catalog rejects it. A rejected
+        // phrase is exactly what AgentRouter.rejectInventedPane keys off —
+        // omitting it left the harness unable to see that a pane was named
+        // at all, so it scored "banana settings" as whatever the model
+        // invented.
         if let id = SettingsPaneCatalog.bundleID(forPaneName: phrase) {
             out[line] = ["phrase": phrase, "displayName": byID[id] ?? id]
+        } else {
+            out[line] = ["phrase": phrase]
         }
     }
     let data = try! JSONSerialization.data(withJSONObject: out, options: [.sortedKeys])
@@ -441,9 +448,27 @@ def normalize(raw_calls, pane_resolutions, correction=None):
              and str(only["args"].get("name", "")).lower() == "system settings")
             or only["action"] == "openSystemSettingsFallback"
         )
-        if punted:
+        if punted and "displayName" in correction:
             return [{"action": "openSystemSetting",
                      "args": {"pane": correction["displayName"]}}]
+
+    # Mirrors AgentRouter.rejectInventedPane: the user named a pane the
+    # catalog rejects, and the model answered with a real pane sharing no
+    # word with what was said. It invented a plausible answer; refusing is
+    # the honest outcome. Same narrow conditions as the Swift.
+    if correction and "displayName" not in correction and len(actions) == 1:
+        only = actions[0]
+        if only["action"] == "openSystemSetting":
+            def words(text):
+                return {w for w in re.split(r"[^a-z0-9]+", str(text).lower()) if len(w) > 1}
+            # Mirrors AgentRouter.sharesRoot — a shared prefix counts as
+            # related, so "doc" does not get refused against "Dock".
+            spoken = words(correction["phrase"])
+            offered = words(only["args"].get("pane", ""))
+            related = any(x == y or x.startswith(y) or y.startswith(x)
+                          for x in spoken for y in offered)
+            if not related:
+                return [{"action": "openSystemSettingsFallback", "args": {}}]
     return actions
 
 
