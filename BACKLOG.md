@@ -9,6 +9,43 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **Country-scoped site catalogs, served rather than compiled in**
+  (raised 2026-08-11, parked until after meetings ships).
+
+  The idea as put: detect the country at install, download only that
+  country's config, and send only that during tool calling so the model
+  processes fewer tokens.
+
+  Half of it already exists as of today. Sites carry an optional region and
+  `promptVocabulary` filters by it, so an Indian Mac is offered Flipkart
+  and an American one is not — the token saving is already banked, with no
+  download involved.
+
+  **What the download would actually buy is different, and worth being
+  precise about.** The catalog is compiled in, so a moved URL needs an App
+  Store release. Serving it is a *fix velocity* change, not a token one.
+  That distinction matters because it changes what to build: a static file
+  the app fetches on launch and caches, falling back to the built-in copy,
+  rather than an install-time country download.
+
+  **One correction to the shape.** Downloading only one country's file
+  would mean a user cannot reach any other country's sites at all. Region
+  detection is a guess — `Locale.current.region` is the keyboard region,
+  not where someone is — and people travel, and plenty of people shop
+  across borders. The size argument does not hold either: the whole
+  catalog is 24 KB of text, so shipping every country costs nothing worth
+  measuring.
+
+  So: **ship all countries, filter the prompt by region, serve the file for
+  updates.** Same token saving, no cliff when the guess is wrong.
+
+  Also on this thread: make the per-country lists exhaustive. India
+  currently has four entries added reactively after two live refusals.
+  Ajio, Nykaa, Zomato, BookMyShow, IRCTC and MakeMyTrip were all left out
+  because curl could not verify them — every Indian retailer 403s — and
+  guessing a URL is what this catalog exists to avoid. They need browser
+  verification, one at a time.
+
 - **A synonym layer for settings panes** (raised 2026-08-11 by a review
   pass, not yet built).
 

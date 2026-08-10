@@ -670,3 +670,47 @@ vocabulary is 34 sites in region IN and includes Flipkart; eval 59/61.
 One test expectation of mine was wrong and is fixed — `site__contains:
 "isho"` matches "Misho" but not "Meesho", and the model correctly returns
 the latter.
+
+---
+
+## State at end of day, 2026-08-11
+
+**Closed and verified**
+
+| Finding | Verified by |
+|---|---|
+| F3 / O1 · recordings never deleted | Fable (sweep), user (per-recording) |
+| F2 · eval harness dead at HEAD | Fable |
+| F1 / O4 · dispatch ladder | Fable |
+| F4 · question queueing | user |
+| F5 · Empty Trash unconfirmed | user |
+| new · invented due date | user, after three attempts |
+| new · Accessibility grant never re-checked | Opus, live |
+| O-A · deterministic fast path | Opus, measured — not yet live |
+| new · US-centric site catalog | Opus, browser-verified |
+
+**Still open, deliberately parked until after meetings ships** — the
+user's call, 2026-08-11. Carried here so nobody has to re-derive it:
+
+| # | Item | Pillar |
+|---|---|---|
+| F4 | Frozen countdown — fixed, never exercised live | trust |
+| F6 | Test target with the named freezes: `TranscriptCleanupValidator`, `VoiceCommand`, pane matcher | accuracy, trust |
+| F7 | Tool-description trim with before/after numbers | latency |
+| F8 | Persistent file log + main-thread stall watchdog | host stability |
+| F9 | Invented pane, substitute door — needs the synonym layer first | trust |
+| F-shadow | Harness `parse-actions` mode, to delete the Python mirror | accuracy |
+| O2 | History storage — decide what it is for, then encrypt or drop | privacy |
+| O-B | On-device transcription as a tier | privacy |
+| O-C | Served catalogs — see BACKLOG, reframed as fix velocity not tokens | fix velocity |
+| O-D | Token and cost counter | unit economics |
+| O-E | Permission status view | activation |
+
+**The freeze** has a third theory with evidence and a fix, and has not
+recurred since. It is not closed.
+
+**Next up:** meetings. Both models plan the architecture independently,
+then compare, then build the better one — the same shape that made today
+work. `DESIGN-meetings-reminders.md` already holds 21 settled decisions
+about meetings from a grilling session; a plan that re-litigates them is a
+plan that wasted its round.
