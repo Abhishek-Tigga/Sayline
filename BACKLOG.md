@@ -73,6 +73,28 @@ and [CHANGELOG.md](CHANGELOG.md).
   the backend exists. Building OAuth before the backend exists risks
   building it twice.
 
+  **Probe of the Apple Calendar route (2026-08-11, ~10 minutes — treat as
+  leads, not conclusions).**
+
+  - `tell application "Calendar" to reload calendars` is a real command in
+    Calendar.app's scripting dictionary and returns cleanly. **Confirmed
+    that it returns, NOT that it pulls from the server** — the difference
+    is the entire reason to use it, and it was not tested.
+  - It launches Calendar.app *visibly*. A dictation app that opens Calendar
+    every time someone asks about meetings is worse than the staleness it
+    fixes, so this cannot run on every query. The shape that might work:
+    offer it only when staleness is already suspected — the
+    `suspiciouslyEmpty` case already exists — via the follow-up primitive,
+    so nothing appears unasked.
+  - A "Refresh Calendars" item exists under the View menu and is drivable
+    through Accessibility, as a fallback if scripting is ever blocked.
+  - No refresh interval was found in `com.apple.iCal`, so the 15-minute
+    default does not appear to be a writable preference.
+  - `~/Library/Accounts` is TCC-protected and reads as empty. `dataaccessd`
+    performs the CalDAV sync and is private-framework territory.
+  - No public API was found for adding a CalDAV account programmatically.
+    Not an exhaustive search.
+
 - **Country-scoped site catalogs, served rather than compiled in**
   (raised 2026-08-11, parked until after meetings ships).
 
