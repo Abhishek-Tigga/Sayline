@@ -51,17 +51,37 @@ struct FollowUpRequest: Equatable {
     /// permanent and "cancel that" only covers the last thing *created*,
     /// so a delete needs to look different from an open.
     let isDestructive: Bool
+    /// What silence means.
+    ///
+    /// Everywhere else in the app it means no, because everywhere else the
+    /// irreversible direction is yes — deleting a reminder, emptying the
+    /// Trash. Joining a meeting inverts that: the cost of joining one you
+    /// did not want is leaving it, and the cost of *not* joining is missing
+    /// the meeting you asked for. So there, and only there, silence means
+    /// go.
+    ///
+    /// Stated as its own field rather than hidden in a caller, because
+    /// "never guess yes" is a rule this codebase relies on and an exception
+    /// to it should be visible at the call site.
+    let timeoutMeans: TimeoutOutcome
+    /// Overrides the default window. A confirmation that will act on its
+    /// own wants less time than one that will quietly go away.
+    let timeout: TimeInterval
 
     init(question: String,
          detail: String? = nil,
          kind: Kind,
          quickChoices: [QuickChoice] = [],
-         isDestructive: Bool = false) {
+         isDestructive: Bool = false,
+         timeoutMeans: TimeoutOutcome = .declined,
+         timeout: TimeInterval = followUpTimeout) {
         self.question = question
         self.detail = detail
         self.kind = kind
         self.quickChoices = quickChoices
         self.isDestructive = isDestructive
+        self.timeoutMeans = timeoutMeans
+        self.timeout = timeout
     }
 }
 
@@ -105,6 +125,14 @@ enum SpokenConsent {
             || haystack.hasSuffix(" " + phrase)
             || haystack.contains(" " + phrase + " ")
     }
+}
+
+enum TimeoutOutcome: Equatable {
+    /// Silence is a no. The default, and right for anything irreversible.
+    case declined
+    /// Silence is a yes, and the countdown is a grace period rather than a
+    /// deadline. Only for actions where doing nothing is the worse outcome.
+    case confirmed
 }
 
 enum FollowUpAnswer: Equatable {

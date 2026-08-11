@@ -933,3 +933,50 @@ opened, no permission prompt seen. The Accessibility grant is stale from
 these rebuilds, and the calendar grant has never been asked for at all.
 Step 4 is the whole live pass, and the F4 frozen-countdown tap is first on
 that list.
+
+### MEETINGS · Live pass, and a confirmation before joining
+2026-08-11 · user-verified (the three commands) / Opus · claimed-fixed (the confirmation)
+
+All three commands ran live. From the session log:
+
+```
+13:57:51  transcript -> Remind me to call the bank
+13:58:02  asking -> What time should I remind you?
+13:58:12  follow-up answer heard -> Today at 5 pm
+13:59:33  fast path answered "join my next meeting" with no round trip
+13:59:33  calendar query returned 2 event(s) in 5ms
+13:59:33  joining "Sayline test — Meet design review"
+14:00:12  fast path answered "What's my next meeting?" — no round trip
+```
+
+The calendar query is 4–5 ms, so join is genuinely a local command: no
+model, no network, browser open. The permission prompt appeared on the
+first attempt and the retry-after-grant path worked as designed — the
+first query returned 0 events while the dialog was up.
+
+**The change: joining now confirms first.** The user's words — "very fast
+but also very abrupt, it does not give me a mental break to think about".
+The name was already announced, but only as the browser opened, which is
+too late to be a decision. It now appears in front of the action with ten
+seconds of grace.
+
+This required the first inversion of a rule the app leans on. Every other
+confirmation times out to *no*, because everywhere else the irreversible
+direction is yes. Joining is the opposite: the cost of joining a meeting
+you did not want is leaving it, and the cost of not joining is missing the
+meeting you just asked for. So silence here means go.
+
+The inversion is a declared field on the request rather than a special
+case inside the window, so it is visible at the call site — "never guess
+yes" is load-bearing enough that an exception should be readable. Guarded
+by two new consent-checks cases: the default must stay `.declined`, since
+flipping it would make deleting a reminder and emptying the Trash both
+auto-accept on timeout with nothing looking different.
+
+The hint line changes too. The draining bar is identical in both modes,
+and the same picture must not silently mean "this disappears" in one place
+and "this happens" in another — so an opt-out question reads "Continuing
+automatically — hold ⌥ and say no to stop".
+
+Ran: all five suites; build; relaunched; fresh test events created.
+Not checked: the confirmation itself, and the 10-second grace expiring.

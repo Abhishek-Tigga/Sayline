@@ -285,12 +285,28 @@ final class FloatingIndicatorWindow {
 
     private func restartTimeout() {
         followUpTimer?.cancel()
-        let timer = DispatchWorkItem { [weak self] in
-            self?.finishFollowUp(.timedOut, reason: "no answer in \(Int(followUpTimeout))s")
-        }
+        let window = followUpRequest?.timeout ?? followUpTimeout
+        let timer = DispatchWorkItem { [weak self] in self?.timeoutFired() }
         followUpTimer = timer
-        followUpDeadline = Date().addingTimeInterval(followUpTimeout)
-        DispatchQueue.main.asyncAfter(deadline: .now() + followUpTimeout, execute: timer)
+        followUpDeadline = Date().addingTimeInterval(window)
+        DispatchQueue.main.asyncAfter(deadline: .now() + window, execute: timer)
+    }
+
+    /// What running out of time means, which is not always "no".
+    ///
+    /// The default is decline, because everywhere else in this app the
+    /// irreversible direction is yes — deleting a reminder, emptying the
+    /// Trash. A request can invert it, and joining a meeting does: not
+    /// joining the meeting you just asked for is the worse failure, so
+    /// silence there means go.
+    private func timeoutFired() {
+        guard let request = followUpRequest else { return }
+        switch request.timeoutMeans {
+        case .declined:
+            finishFollowUp(.timedOut, reason: "no answer in \(Int(request.timeout))s")
+        case .confirmed:
+            finishFollowUp(.confirmed, reason: "grace period elapsed, proceeding")
+        }
     }
 
     /// Stops the countdown for the length of a hold.
@@ -312,7 +328,7 @@ final class FloatingIndicatorWindow {
         let remaining = followUpRemaining ?? followUpTimeout
         followUpRemaining = nil
         let timer = DispatchWorkItem { [weak self] in
-            self?.finishFollowUp(.timedOut, reason: "no answer in time")
+            self?.timeoutFired()
         }
         followUpTimer = timer
         followUpDeadline = Date().addingTimeInterval(remaining)

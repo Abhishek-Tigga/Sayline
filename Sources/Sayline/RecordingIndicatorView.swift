@@ -458,7 +458,14 @@ private struct FollowUpBox: View {
     /// Names the key on every question. Nothing else on screen says the
     /// microphone is closed, and without it people talk into a mic that
     /// isn't listening.
+    ///
+    /// When silence means go, the hint says so instead. The draining bar
+    /// looks identical either way, and the same picture must not silently
+    /// mean "this disappears" in one place and "this happens" in another.
     private var hint: String {
+        if request.timeoutMeans == .confirmed {
+            return "Continuing automatically — hold \(hotkeySymbol) and say no to stop"
+        }
         switch request.kind {
         case .confirm: return "Hold \(hotkeySymbol) and say yes or no"
         case .value(let hint): return hint
@@ -478,7 +485,7 @@ private struct FollowUpBox: View {
     private var countdown: some View {
         TimelineView(.animation) { timeline in
             let elapsed = timeline.date.timeIntervalSince(startedAt)
-            let remaining = max(0, 1 - elapsed / followUpTimeout)
+            let remaining = max(0, 1 - elapsed / request.timeout)
             GeometryReader { geo in
                 Rectangle()
                     .fill(PillStyle.foreground.opacity(0.32))
