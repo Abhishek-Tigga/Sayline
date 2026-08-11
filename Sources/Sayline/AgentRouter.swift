@@ -447,7 +447,7 @@ final class AgentRouter {
             } else if case .site(let label, let url) = WebsiteCatalog.resolve("YouTube", query: query) {
                 // Key missing, quota gone or network flaky — the search page
                 // is exactly what this did before, so degrade to that.
-                NSLog("Sayline: couldn't resolve a video, opening YouTube search for \"\(query)\" instead")
+                SaylineLog.log("couldn't resolve a video, opening YouTube search for \"\(query)\" instead")
                 resolved.append(.openWebsite(label: label, url: url))
             }
         }
@@ -485,9 +485,9 @@ final class AgentRouter {
         if let (_, response) = try? await URLSession.shared.data(for: request),
            let http = response as? HTTPURLResponse {
             reachable = ![404, 410].contains(http.statusCode)
-            NSLog("%@", "Sayline: page check \(url.absoluteString) -> HTTP \(http.statusCode) in \(Int(Date().timeIntervalSince(started) * 1000))ms")
+            SaylineLog.log("page check \(url.absoluteString) -> HTTP \(http.statusCode) in \(Int(Date().timeIntervalSince(started) * 1000))ms")
         } else {
-            NSLog("%@", "Sayline: page check \(url.absoluteString) -> unreachable")
+            SaylineLog.log("page check \(url.absoluteString) -> unreachable")
         }
 
         if reachable {
@@ -517,7 +517,7 @@ final class AgentRouter {
             // retry reproduced a byte-identical malformed generation,
             // because at 0.1 the model is near-deterministic — same input,
             // same broken output. Sampling differently is the whole point.
-            NSLog("Sayline: agent router tool call malformed, retrying at higher temperature -> \(failure.message)")
+            SaylineLog.log("agent router tool call malformed, retrying at higher temperature -> \(failure.message)")
             do {
                 return try await performRoute(transcript, temperature: 0.6)
             } catch let secondFailure as RetryableToolFailure {
@@ -616,7 +616,7 @@ final class AgentRouter {
         }
 
         guard let toolCalls = message["tool_calls"] as? [[String: Any]], !toolCalls.isEmpty else {
-            NSLog("Sayline: agent router did not match a known action")
+            SaylineLog.log("agent router did not match a known action")
             return []
         }
 
@@ -663,11 +663,11 @@ final class AgentRouter {
             // last looked at, which reads as an answer rather than a miss.
             // The fallback opens the same window and says what it could not
             // find, which is the honest version of the same outcome.
-            NSLog("%@", "Sayline: transcript said \"\(phrase) settings\", catalog has no such pane and the model punted — using the visible fallback")
+            SaylineLog.log("transcript said \"\(phrase) settings\", catalog has no such pane and the model punted — using the visible fallback")
             return [.openSystemSettingsFallback(requestedPaneName: phrase)]
         }
 
-        NSLog("Sayline: transcript said \"\(phrase) settings\" but the model opened System Settings itself — routing to the \(phrase) pane instead")
+        SaylineLog.log("transcript said \"\(phrase) settings\" but the model opened System Settings itself — routing to the \(phrase) pane instead")
         return [.openSystemSetting(paneName: phrase, bundleID: bundleID)]
     }
 
@@ -681,7 +681,7 @@ final class AgentRouter {
         guard !LocalTimestamp.namesATimeOfDay(transcript) else { return actions }
         return actions.map { action in
             guard case .createReminder(let title, let due) = action, due != nil else { return action }
-            NSLog("%@", "Sayline: no time of day in \"\(transcript)\" — dropping the model's \(due!) and asking")
+            SaylineLog.log("no time of day in \"\(transcript)\" — dropping the model's \(due!) and asking")
             return .createReminder(title: title, due: nil)
         }
     }
@@ -746,7 +746,7 @@ final class AgentRouter {
             // prompt to always steer the model to open_app, since it
             // demonstrably doesn't.
             if SettingsPaneCatalog.meansSystemSettingsApp(paneRaw) {
-                NSLog("Sayline: agent router read pane \"\(paneRaw)\" as the System Settings app itself — opening the app")
+                SaylineLog.log("agent router read pane \"\(paneRaw)\" as the System Settings app itself — opening the app")
                 return .openApp(name: "System Settings")
             }
             // Doesn't match anything in the live catalog even after fuzzy
@@ -754,7 +754,7 @@ final class AgentRouter {
             // a specific message in AppDelegate) rather than silently
             // dropping the action, per the "fail visibly" principle the
             // dynamic catalog was built around.
-            NSLog("Sayline: agent router returned unmatched settings pane \"\(paneRaw)\" — no catalog match")
+            SaylineLog.log("agent router returned unmatched settings pane \"\(paneRaw)\" — no catalog match")
             return .openSystemSettingsFallback(requestedPaneName: paneRaw)
         case "open_website":
             // No site named means a plain web question; Google is the agreed
@@ -771,7 +771,7 @@ final class AgentRouter {
             if let query, !query.isEmpty,
                let site = WebsiteCatalog.site(matching: site),
                let page = WebsiteCatalog.personalPage(site: site, query: query) {
-                NSLog("%@", "Sayline: own-page match for \"\(query)\" -> \(page.absoluteString)")
+                SaylineLog.log("own-page match for \"\(query)\" -> \(page.absoluteString)")
                 // Deliberately NOT HEAD-verified, unlike a URL the model
                 // supplied. These pages are auth-gated by definition, and our
                 // check carries no cookies: github.com/pulls answers 404 to a
@@ -792,7 +792,7 @@ final class AgentRouter {
                 // search. Rebuilding it from site+query puts it back through
                 // the region and vertical handling it had skipped.
                 if let decomposed = WebsiteCatalog.searchDecomposition(of: url) {
-                    NSLog("%@", "Sayline: page_url was \(decomposed.site)'s own search URL — treating as a search for \"\(decomposed.query)\"")
+                    SaylineLog.log("page_url was \(decomposed.site)'s own search URL — treating as a search for \"\(decomposed.query)\"")
                     switch WebsiteCatalog.resolve(decomposed.site, query: decomposed.query, vertical: vertical) {
                     case .site(let label, let rebuilt):
                         return .openWebsite(label: "\(label) — \(decomposed.query)", url: rebuilt)
@@ -802,7 +802,7 @@ final class AgentRouter {
                 }
                 let regional = WebsiteCatalog.regionalized(url, siteHint: site)
                 if regional != url {
-                    NSLog("%@", "Sayline: region-corrected \(url.absoluteString) -> \(regional.absoluteString)")
+                    SaylineLog.log("region-corrected \(url.absoluteString) -> \(regional.absoluteString)")
                 }
                 return .openDirectPage(url: regional, fallbackSite: site, fallbackQuery: query)
             }
@@ -831,7 +831,7 @@ final class AgentRouter {
                 // The model offered a time we could not use. Dropping it
                 // here rather than passing it on means the coordinator asks,
                 // which is better than a reminder firing at the wrong hour.
-                NSLog("%@", "Sayline: ignoring unusable due date \(arguments["due"] ?? "nil")")
+                SaylineLog.log("ignoring unusable due date \(arguments["due"] ?? "nil")")
             }
             return .createReminder(title: title, due: due)
         case "cancel_reminder":
@@ -846,7 +846,7 @@ final class AgentRouter {
         case "set_volume":
             let changeRaw = arguments["change"] as? String
             guard let change = Self.fuzzyMatch(changeRaw, as: AgentAction.VolumeChange.self) else {
-                NSLog("Sayline: agent router returned unmatched volume change \(changeRaw ?? "nil")")
+                SaylineLog.log("agent router returned unmatched volume change \(changeRaw ?? "nil")")
                 return nil
             }
             return .setVolume(change)
@@ -863,12 +863,12 @@ final class AgentRouter {
         case "answer_system_query":
             let queryRaw = arguments["query"] as? String
             guard let query = Self.fuzzyMatch(queryRaw, as: AgentAction.SystemQuery.self) else {
-                NSLog("Sayline: agent router returned unmatched system query \(queryRaw ?? "nil")")
+                SaylineLog.log("agent router returned unmatched system query \(queryRaw ?? "nil")")
                 return nil
             }
             return .answerQuery(query)
         default:
-            NSLog("Sayline: agent router returned unknown tool \(name)")
+            SaylineLog.log("agent router returned unknown tool \(name)")
             return nil
         }
     }

@@ -60,7 +60,7 @@ final class AudioRecorder {
         }
         guard !orphans.isEmpty else { return }
         for url in orphans { try? fm.removeItem(at: url) }
-        NSLog("Sayline: swept \(orphans.count) leftover recording(s) from previous runs")
+        SaylineLog.log("swept \(orphans.count) leftover recording(s) from previous runs")
     }
 
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
@@ -101,7 +101,7 @@ final class AudioRecorder {
         do {
             audioFile = try AVAudioFile(forWriting: url, settings: format.settings)
         } catch {
-            NSLog("Sayline: failed to create audio file: \(error)")
+            SaylineLog.log("failed to create audio file: \(error)")
             return
         }
 
@@ -112,7 +112,7 @@ final class AudioRecorder {
                 try file.write(from: buffer)
                 self.framesWritten += AVAudioFramePosition(buffer.frameLength)
             } catch {
-                NSLog("Sayline: failed writing audio buffer: \(error)")
+                SaylineLog.log("failed writing audio buffer: \(error)")
             }
         }
 
@@ -127,9 +127,9 @@ final class AudioRecorder {
             // actually on a Bluetooth device. Logging the format too, because
             // 16 kHz on a device that should do 48 kHz is the tell.
             lastInputDeviceName = currentInputDeviceName()
-            NSLog("Sayline: recording started on \(lastInputDeviceName) at \(Int(format.sampleRate)) Hz -> \(url.path)")
+            SaylineLog.log("recording started on \(lastInputDeviceName) at \(Int(format.sampleRate)) Hz -> \(url.path)")
         } catch {
-            NSLog("Sayline: failed to start audio engine: \(error)")
+            SaylineLog.log("failed to start audio engine: \(error)")
             input.removeTap(onBus: 0)
             audioFile = nil
         }
@@ -142,7 +142,7 @@ final class AudioRecorder {
         audioFile = nil
         isRecording = false
         lastRecordingDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
-        NSLog("Sayline: recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s frames: \(framesWritten)")
+        SaylineLog.log("recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s frames: \(framesWritten)")
     }
 
     /// True only if the just-finished recording is an accidental hotkey tap
@@ -165,7 +165,7 @@ final class AudioRecorder {
     func isTooShortOrSilent() -> Bool {
         // A hold this brief is a mis-tap, not a word.
         if lastRecordingDuration < 0.4 {
-            NSLog("Sayline: recording \(lastRecordingDuration)s — too short to be speech, skipping")
+            SaylineLog.log("recording \(lastRecordingDuration)s — too short to be speech, skipping")
             return true
         }
 
@@ -176,7 +176,7 @@ final class AudioRecorder {
               (try? file.read(into: buffer)) != nil,
               let channelData = buffer.floatChannelData,
               buffer.frameLength > 0 else {
-            NSLog("Sayline: couldn't measure audio level — transcribing anyway")
+            SaylineLog.log("couldn't measure audio level — transcribing anyway")
             lastRecordingPeak = 0
             return false // fail open
         }
@@ -192,13 +192,13 @@ final class AudioRecorder {
         // 0.001–0.005; even quiet speech peaks well above 0.05. Logged so
         // the threshold can be tuned against real numbers instead of guesses.
         let isSilent = peak < 0.01
-        NSLog("Sayline: audio peak \(peak) over \(lastRecordingDuration)s -> \(isSilent ? "silent, skipping" : "has speech")")
+        SaylineLog.log("audio peak \(peak) over \(lastRecordingDuration)s -> \(isSilent ? "silent, skipping" : "has speech")")
         return isSilent
     }
 
     private func setInputDevice(_ deviceID: AudioDeviceID, on node: AVAudioInputNode) {
         guard let audioUnit = node.audioUnit else {
-            NSLog("Sayline: no audio unit available to set preferred input device")
+            SaylineLog.log("no audio unit available to set preferred input device")
             return
         }
         var mutableDeviceID = deviceID
@@ -211,7 +211,7 @@ final class AudioRecorder {
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
         if status != noErr {
-            NSLog("Sayline: failed to set preferred input device -> status \(status)")
+            SaylineLog.log("failed to set preferred input device -> status \(status)")
         }
     }
 

@@ -8,10 +8,10 @@ import ApplicationServices
 enum TextInjector {
     static func insert(_ text: String) {
         if insertViaAccessibility(text) {
-            NSLog("Sayline: inserted text via Accessibility API")
+            SaylineLog.log("inserted text via Accessibility API")
             return
         }
-        NSLog("Sayline: AX insertion unavailable, falling back to clipboard paste")
+        SaylineLog.log("AX insertion unavailable, falling back to clipboard paste")
         pasteViaClipboard(text)
     }
 
@@ -63,7 +63,7 @@ enum TextInjector {
         // report success without the write actually reaching the rendered UI.
         // Read the field back and only trust it if our text is really there.
         guard let after = stringValue(of: element), after.contains(text) else {
-            NSLog("Sayline: AX set reported success but text not found on readback — treating as failed")
+            SaylineLog.log("AX set reported success but text not found on readback — treating as failed")
             return false
         }
         return true

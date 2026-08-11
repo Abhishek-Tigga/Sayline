@@ -41,12 +41,12 @@ enum AgentExecutor {
         case .openWebsite(let label, let url):
             return openWebsite(label: label, url: url)
         case .openedSiteButCouldNotSearch(let label, let url, let query):
-            NSLog("%@", "Sayline: no search URL for \(label) — opened it and dropped the query \"\(query)\"")
+            SaylineLog.log("no search URL for \(label) — opened it and dropped the query \"\(query)\"")
             return openWebsite(label: label, url: url)
         case .unknownWebsite(let requested):
             // Handled visibly in AppDelegate, which flashes the "say the
             // full address" hint. Nothing to do here but report failure.
-            NSLog("Sayline: agent doesn't know the site \"\(requested)\" and won't guess a domain")
+            SaylineLog.log("agent doesn't know the site \"\(requested)\" and won't guess a domain")
             return false
         case .openDirectPage(let url, _, _):
             // AgentRouter verifies and replaces this before execution;
@@ -66,7 +66,7 @@ enum AgentExecutor {
             // reaching here — these need permission prompts and follow-up
             // questions, neither of which belongs in a synchronous executor.
             // This branch exists only to keep the switch exhaustive.
-            NSLog("Sayline: conversational action reached AgentExecutor — should have been handled earlier")
+            SaylineLog.log("conversational action reached AgentExecutor — should have been handled earlier")
             return true
         case .answerQuery(let query):
             // The normal path for this is AppDelegate special-casing
@@ -74,7 +74,7 @@ enum AgentExecutor {
             // display the answer — this branch only exists so the
             // switch stays exhaustive if execute() is ever called
             // directly with a query action.
-            NSLog("Sayline: agent answered -> \(answer(query))")
+            SaylineLog.log("agent answered -> \(answer(query))")
             return true
         }
     }
@@ -242,11 +242,11 @@ enum AgentExecutor {
                 .filter { $0.activationPolicy == .regular }
                 .compactMap { $0.localizedName }
                 .joined(separator: ", ")
-            NSLog("Sayline: agent could not find a running app named \"\(name)\" to close — running: [\(names)]")
+            SaylineLog.log("agent could not find a running app named \"\(name)\" to close — running: [\(names)]")
             return false
         }
         let didTerminate = app.terminate()
-        NSLog("Sayline: agent closed app -> \(app.localizedName ?? name) (requested: \(didTerminate))")
+        SaylineLog.log("agent closed app -> \(app.localizedName ?? name) (requested: \(didTerminate))")
         return didTerminate
     }
 
@@ -267,7 +267,7 @@ enum AgentExecutor {
     private static func openSystemSetting(paneName: String, bundleID: String) -> Bool {
         guard let url = URL(string: "x-apple.systempreferences:\(bundleID)") else { return false }
         let opened = NSWorkspace.shared.open(url)
-        NSLog("Sayline: agent opened system setting -> \(paneName) [\(bundleID)] (success: \(opened))")
+        SaylineLog.log("agent opened system setting -> \(paneName) [\(bundleID)] (success: \(opened))")
         return opened
     }
 
@@ -281,7 +281,7 @@ enum AgentExecutor {
     /// now. Returns false so the caller reports it as a real failure.
     @discardableResult
     private static func openSystemSettingsFallback(requestedPaneName: String) -> Bool {
-        NSLog("Sayline: agent could not match settings pane \"\(requestedPaneName)\" in the catalog — doing nothing, flashing a message instead")
+        SaylineLog.log("agent could not match settings pane \"\(requestedPaneName)\" in the catalog — doing nothing, flashing a message instead")
         return false
     }
 
@@ -291,7 +291,7 @@ enum AgentExecutor {
     @discardableResult
     private static func openWebsite(label: String, url: URL) -> Bool {
         let opened = NSWorkspace.shared.open(url)
-        NSLog("%@", "Sayline: agent opened website -> \(label) \(url.absoluteString) (success: \(opened))")
+        SaylineLog.log("agent opened website -> \(label) \(url.absoluteString) (success: \(opened))")
         return opened
     }
 
@@ -302,7 +302,7 @@ enum AgentExecutor {
     @discardableResult
     private static func lockScreen() -> Bool {
         simulateKeyCombo(keyCode: 12, flags: [.maskCommand, .maskControl]) // kVK_ANSI_Q
-        NSLog("Sayline: agent locked screen")
+        SaylineLog.log("agent locked screen")
         return true
     }
 
@@ -329,14 +329,14 @@ enum AgentExecutor {
         case .down: script = "set volume output volume ((output volume of (get volume settings)) - 10)"
         }
         let succeeded = runAppleScript(script)
-        NSLog("Sayline: agent set volume -> \(change.rawValue) (success: \(succeeded))")
+        SaylineLog.log("agent set volume -> \(change.rawValue) (success: \(succeeded))")
         return succeeded
     }
 
     @discardableResult
     private static func setWiFi(enabled: Bool) -> Bool {
         guard let device = wifiDeviceName() else {
-            NSLog("Sayline: agent could not determine the Wi-Fi device name")
+            SaylineLog.log("agent could not determine the Wi-Fi device name")
             return false
         }
         let process = Process()
@@ -346,10 +346,10 @@ enum AgentExecutor {
             try process.run()
             process.waitUntilExit()
             let succeeded = process.terminationStatus == 0
-            NSLog("Sayline: agent set Wi-Fi \(enabled ? "on" : "off") (success: \(succeeded))")
+            SaylineLog.log("agent set Wi-Fi \(enabled ? "on" : "off") (success: \(succeeded))")
             return succeeded
         } catch {
-            NSLog("Sayline: agent failed to set Wi-Fi -> \(error.localizedDescription)")
+            SaylineLog.log("agent failed to set Wi-Fi -> \(error.localizedDescription)")
             return false
         }
     }
@@ -388,7 +388,7 @@ enum AgentExecutor {
     private static func setDarkMode(enabled: Bool) -> Bool {
         let script = "tell application \"System Events\" to tell appearance preferences to set dark mode to \(enabled)"
         let succeeded = runAppleScript(script)
-        NSLog("Sayline: agent set dark mode -> \(enabled) (success: \(succeeded))")
+        SaylineLog.log("agent set dark mode -> \(enabled) (success: \(succeeded))")
         return succeeded
     }
 
@@ -410,7 +410,7 @@ enum AgentExecutor {
     @discardableResult
     private static func emptyTrash() -> Bool {
         let succeeded = runAppleScript("tell application \"Finder\" to empty trash")
-        NSLog("Sayline: agent emptied trash (success: \(succeeded))")
+        SaylineLog.log("agent emptied trash (success: \(succeeded))")
         return succeeded
     }
 
@@ -432,10 +432,10 @@ enum AgentExecutor {
             try process.run()
             process.waitUntilExit()
             let succeeded = process.terminationStatus == 0
-            NSLog("Sayline: agent took screenshot -> \(destination.path) (success: \(succeeded))")
+            SaylineLog.log("agent took screenshot -> \(destination.path) (success: \(succeeded))")
             return succeeded
         } catch {
-            NSLog("Sayline: agent failed to take screenshot -> \(error.localizedDescription)")
+            SaylineLog.log("agent failed to take screenshot -> \(error.localizedDescription)")
             return false
         }
     }
@@ -447,7 +447,7 @@ enum AgentExecutor {
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         if let error {
-            NSLog("Sayline: agent AppleScript failed -> \(error)")
+            SaylineLog.log("agent AppleScript failed -> \(error)")
             return nil
         }
         return result.stringValue
@@ -458,7 +458,7 @@ enum AgentExecutor {
         var error: NSDictionary?
         script.executeAndReturnError(&error)
         if let error {
-            NSLog("Sayline: agent AppleScript failed -> \(error)")
+            SaylineLog.log("agent AppleScript failed -> \(error)")
             return false
         }
         return true
@@ -467,11 +467,11 @@ enum AgentExecutor {
     @discardableResult
     private static func openFolder(_ folder: AgentAction.SearchFolder, subpath: String?) -> Bool {
         guard let folderURL = resolvedURL(for: folder, subpath: subpath) else {
-            NSLog("Sayline: agent could not resolve folder \(folder.rawValue)/\(subpath ?? "")")
+            SaylineLog.log("agent could not resolve folder \(folder.rawValue)/\(subpath ?? "")")
             return false
         }
         let opened = NSWorkspace.shared.open(folderURL)
-        NSLog("Sayline: agent opened folder -> \(folderURL.path) (success: \(opened))")
+        SaylineLog.log("agent opened folder -> \(folderURL.path) (success: \(opened))")
         return opened
     }
 
@@ -491,10 +491,10 @@ enum AgentExecutor {
             try process.run()
             process.waitUntilExit()
             let succeeded = process.terminationStatus == 0
-            NSLog("Sayline: agent opened app -> \(name) (success: \(succeeded))")
+            SaylineLog.log("agent opened app -> \(name) (success: \(succeeded))")
             return succeeded
         } catch {
-            NSLog("Sayline: agent failed to open app \(name) -> \(error.localizedDescription)")
+            SaylineLog.log("agent failed to open app \(name) -> \(error.localizedDescription)")
             return false
         }
     }
@@ -514,18 +514,18 @@ enum AgentExecutor {
         // instead of leaving a user's very first request looking broken
         // for a reason that has nothing to do with whether the file
         // actually exists.
-        NSLog("Sayline: agent search came up empty, retrying once")
+        SaylineLog.log("agent search came up empty, retrying once")
         if searchOnce(query: query, in: folder, subpath: subpath) {
             return true
         }
 
-        NSLog("Sayline: agent found no file matching \"\(query)\" in \(folder.rawValue) or any other known folder, even after retry")
+        SaylineLog.log("agent found no file matching \"\(query)\" in \(folder.rawValue) or any other known folder, even after retry")
         return false
     }
 
     private static func searchOnce(query: String, in folder: AgentAction.SearchFolder, subpath: String?) -> Bool {
         if let match = bestMatch(for: query, in: folder, subpath: subpath) {
-            NSLog("Sayline: agent found file -> \(match.path)")
+            SaylineLog.log("agent found file -> \(match.path)")
             NSWorkspace.shared.activateFileViewerSelecting([match])
             return true
         }
@@ -555,7 +555,7 @@ enum AgentExecutor {
             return false
         }
 
-        NSLog("Sayline: agent found file in fallback folder -> \(match.url.path)")
+        SaylineLog.log("agent found file in fallback folder -> \(match.url.path)")
         NSWorkspace.shared.activateFileViewerSelecting([match.url])
         return true
     }

@@ -27,7 +27,7 @@ final class SoundEffectPlayer {
         do {
             try engine.start()
         } catch {
-            NSLog("Sayline: sound engine failed to start -> \(error.localizedDescription)")
+            SaylineLog.log("sound engine failed to start -> \(error.localizedDescription)")
         }
     }
 

@@ -36,7 +36,7 @@ enum InstalledAppCatalog {
                 namesByNormalized[normalize(name)] = name
             }
         }
-        NSLog("Sayline: found \(namesByNormalized.count) installed apps")
+        SaylineLog.log("found \(namesByNormalized.count) installed apps")
     }
 
     /// The app's real name for a spoken one, or nil if nothing matches.

@@ -151,7 +151,7 @@ final class MeetingStore {
         let sources = store.calendars(for: .event)
             .map { $0.source?.title ?? "?" }
         let accounts = Set(sources).sorted().joined(separator: ", ")
-        NSLog("%@", "Sayline: calendar query returned \(events.count) event(s) in \(elapsed)ms "
+        SaylineLog.log("calendar query returned \(events.count) event(s) in \(elapsed)ms "
               + "from \(sources.count) calendar(s) [\(accounts.isEmpty ? "none" : accounts)]")
 
         // Titles and last-modified, because a count cannot show staleness.
@@ -163,7 +163,7 @@ final class MeetingStore {
         // store has not pulled, whatever else is true.
         for event in events {
             let modified = event.lastModifiedDate.map { Self.stamp.string(from: $0) } ?? "?"
-            NSLog("%@", "Sayline:   · \"\(event.title ?? "")\" "
+            SaylineLog.log("  · \"\(event.title ?? "")\" "
                   + "starts \(Self.stamp.string(from: event.startDate)) "
                   + "modified \(modified) [\(event.calendar.source?.title ?? "?")]")
         }

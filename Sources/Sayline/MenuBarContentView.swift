@@ -81,9 +81,13 @@ struct MenuBarContentView: View {
                 Button("Ask yes / no") { appDelegate.debugAskYesNo() }
                 Button("Confirm a delete") { appDelegate.debugAskDestructive() }
                 Button("Show calendar setup again") { CalendarSetupState.reset() }
+                Button("Stall main thread 3s") { appDelegate.debugStallMainThread() }
             }
             Divider()
             #endif
+            Button("Reveal Log File") {
+                NSWorkspace.shared.activateFileViewerSelecting([SaylineLog.fileURL])
+            }
             Button("History…") {
                 appDelegate.showHistory()
             }

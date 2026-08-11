@@ -16,6 +16,11 @@ xcodegen generate
 xcodebuild -project Sayline.xcodeproj -scheme Sayline -configuration Debug build
 ```
 
+**There is a persistent log now** — `~/Library/Logs/Sayline/sayline.log`,
+written with no redirect and reachable from the menu bar via *Reveal Log
+File*. It is what a user can actually hand over. The stderr redirect below
+is still useful for watching live.
+
 Relaunching with logs visible — the app is a menu-bar agent, so `NSLog`
 output only reaches you through the redirect:
 
@@ -139,10 +144,19 @@ answered by talking — build the disposable version and look at it.
 
 ## Open problems
 
-- **The Mac freezes during use, cause unknown.** Two theories tested and
-  disproven — event-tap starvation, and an `NSPanel` leak (14 created, 14
-  deallocated). Not fixed, not reproduced on demand. The event tap is the
-  most-suspected component; treat changes there as higher risk.
+- **The Mac freezes during use, cause unknown. Four incidents, three
+  theories, all disproven** — event-tap starvation, an `NSPanel` leak (14
+  created, 14 deallocated), and Secure Input contention. The fourth
+  incident on 2026-08-11 took the user's keyboard until the app was killed,
+  with the tap enabled and secure input off, which the third theory
+  explicitly did not cover.
+  Two things now exist that did not during those investigations: a circuit
+  breaker that switches the tap off after four disables in two minutes
+  rather than fighting for the keyboard, and `StallWatchdog`, which records
+  whether the main thread was alive at the moment the tap was disabled —
+  the single fact that separates "our callback is blocked" from "the system
+  refused us". Next incident, read `~/Library/Logs/Sayline/sayline.log` for
+  `MAIN THREAD STALLED` next to the disable lines.
 - **Meetings are designed and unbuilt.** No EventKit calendar code exists.
 - **~2s latency on every agent command** — the router round trip. Real, and
   currently unaddressed.

@@ -78,6 +78,10 @@ final class HotkeyManager {
             while !Thread.current.isCancelled {
                 CFRunLoopRunInMode(.defaultMode, 0.25, false)
                 self.reenableTapIfSafe()
+                // This thread wakes every 250ms anyway, so it is the
+                // cheapest place to notice the main thread going quiet —
+                // and it keeps running even when main is the thing stuck.
+                StallWatchdog.shared.checkFromBackgroundThread()
             }
             self.uninstallTap()
         }
@@ -112,7 +116,7 @@ final class HotkeyManager {
             },
             userInfo: selfPointer
         ) else {
-            NSLog("Sayline: failed to create event tap — is Accessibility permission granted?")
+            SaylineLog.log("failed to create event tap — is Accessibility permission granted?")
             return false
         }
 
@@ -121,7 +125,7 @@ final class HotkeyManager {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        NSLog("Sayline: hotkey listener started on its own thread (hold \(hotkeyOption.displayName))")
+        SaylineLog.log("hotkey listener started on its own thread (hold \(hotkeyOption.displayName))")
         return true
     }
 
@@ -169,7 +173,7 @@ final class HotkeyManager {
             tappedOut = true
             tapNeedsReenable = false
             if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: false) }
-            NSLog("Sayline: the system disabled the event tap \(recentDisables.count) times in two minutes — "
+            SaylineLog.log("the system disabled the event tap \(recentDisables.count) times in two minutes — "
                   + "giving up rather than fighting for the keyboard. Hotkey is off until relaunch.")
             onTapGaveUp?()
             return
@@ -192,13 +196,13 @@ final class HotkeyManager {
         if IsSecureEventInputEnabled() {
             if !loggedSecureInputWait {
                 loggedSecureInputWait = true
-                NSLog("Sayline: secure input is on (a password field has the keyboard) — leaving the tap off until it ends")
+                SaylineLog.log("secure input is on (a password field has the keyboard) — leaving the tap off until it ends")
             }
             return
         }
         if loggedSecureInputWait {
             loggedSecureInputWait = false
-            NSLog("Sayline: secure input ended")
+            SaylineLog.log("secure input ended")
         }
 
         let now = Date()
@@ -206,7 +210,7 @@ final class HotkeyManager {
         lastTapReenable = now
         tapNeedsReenable = false
         CGEvent.tapEnable(tap: eventTap, enable: true)
-        NSLog("Sayline: event tap re-enabled")
+        SaylineLog.log("event tap re-enabled")
     }
 
     private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
@@ -223,7 +227,7 @@ final class HotkeyManager {
             if isHotkeyActive && keyCode == Self.agentModeKeyCode {
                 if !agentModeAlreadyRequestedThisHold {
                     agentModeAlreadyRequestedThisHold = true
-                    NSLog("Sayline: agent mode requested")
+                    SaylineLog.log("agent mode requested")
                     onAgentModeRequested?()
                 }
                 return nil // swallow Space while dictating so it isn't typed
@@ -250,7 +254,12 @@ final class HotkeyManager {
             //
             // So: mark it and let the thread loop decide, rather than
             // fighting the window server from inside the callback.
-            NSLog("Sayline: event tap was disabled by the system (\(type.rawValue))")
+            // The main thread's state at this instant is the fact three
+            // investigations lacked. Alive means our callback is not
+            // blocked by the app and the refusal came from outside the
+            // process; stalled means it is ours to find.
+            SaylineLog.log("event tap was disabled by the system (\(type.rawValue)) — "
+                           + StallWatchdog.shared.snapshot)
             noteDisable()
             return Unmanaged.passUnretained(event)
         default:
@@ -266,11 +275,11 @@ final class HotkeyManager {
         if isPressed && !isHotkeyActive {
             isHotkeyActive = true
             agentModeAlreadyRequestedThisHold = false
-            NSLog("Sayline: hotkey DOWN")
+            SaylineLog.log("hotkey DOWN")
             onHotkeyDown?()
         } else if !isPressed && isHotkeyActive {
             isHotkeyActive = false
-            NSLog("Sayline: hotkey UP")
+            SaylineLog.log("hotkey UP")
             onHotkeyUp?()
         }
     }

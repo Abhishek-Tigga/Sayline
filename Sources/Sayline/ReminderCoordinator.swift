@@ -72,12 +72,12 @@ final class ReminderCoordinator {
             if let due = await resolveTime(from: text) {
                 save(title: title, due: due)
             } else if !wasRetry {
-                NSLog("%@", "Sayline: couldn't read a time from \"\(text)\" — asking once more")
+                SaylineLog.log("couldn't read a time from \"\(text)\" — asking once more")
                 askForTime(title: title, isRetry: true)
             } else {
                 // Asked twice, still unreadable. Create it undated and say
                 // so, rather than dropping it after making someone answer.
-                NSLog("%@", "Sayline: still no usable time from \"\(text)\" — creating it undated")
+                SaylineLog.log("still no usable time from \"\(text)\" — creating it undated")
                 save(title: title, due: nil)
             }
         }
@@ -92,7 +92,7 @@ final class ReminderCoordinator {
                 pill: title
             )
         } catch {
-            NSLog("Sayline: couldn't save reminder -> \(error.localizedDescription)")
+            SaylineLog.log("couldn't save reminder -> \(error.localizedDescription)")
             indicator.showNotice(
                 "Couldn't create that reminder",
                 detail: "Nothing was saved — try again",
@@ -169,7 +169,7 @@ final class ReminderCoordinator {
             try store.delete(id: id)
             indicator.showNotice("Reminder deleted", pill: title)
         } catch {
-            NSLog("Sayline: couldn't delete reminder -> \(error.localizedDescription)")
+            SaylineLog.log("couldn't delete reminder -> \(error.localizedDescription)")
             indicator.showNotice(
                 "Couldn't delete that reminder",
                 detail: "It's still there",
@@ -188,7 +188,7 @@ final class ReminderCoordinator {
         case .granted:
             return true
         case .failed(let message):
-            NSLog("Sayline: reminders access failed -> \(message)")
+            SaylineLog.log("reminders access failed -> \(message)")
             indicator.showNotice("Couldn't reach Reminders",
                                  detail: "Try again in a moment",
                                  pill: "Reminders",
@@ -237,7 +237,7 @@ final class ReminderCoordinator {
         guard let match = detector.firstMatch(in: text, range: range),
               let date = match.date else { return nil }
         guard date.timeIntervalSinceNow > -60 else {
-            NSLog("%@", "Sayline: \"\(text)\" resolved to \(date), which is in the past — asking again")
+            SaylineLog.log("\"\(text)\" resolved to \(date), which is in the past — asking again")
             return nil
         }
         // A year out is not a reminder, it is a typo in speech.

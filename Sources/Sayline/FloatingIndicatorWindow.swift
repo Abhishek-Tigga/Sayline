@@ -40,12 +40,12 @@ private final class IndicatorPanel: NSPanel {
 
     static func noteCreated() {
         liveCount += 1
-        NSLog("Sayline: [panel-leak-probe] created — \(liveCount) alive")
+        SaylineLog.log("[panel-leak-probe] created — \(liveCount) alive")
     }
 
     deinit {
         IndicatorPanel.liveCount -= 1
-        NSLog("Sayline: [panel-leak-probe] deallocated — \(IndicatorPanel.liveCount) alive")
+        SaylineLog.log("[panel-leak-probe] deallocated — \(IndicatorPanel.liveCount) alive")
     }
 }
 
@@ -110,7 +110,7 @@ final class FloatingIndicatorWindow {
         self.panel = panel
         reposition(panel)
         panel.orderFrontRegardless()
-        NSLog("Sayline: indicator shown -> \(state)")
+        SaylineLog.log("indicator shown -> \(state)")
     }
 
     /// Shows a short-lived failure/status message, then auto-hides —
@@ -133,7 +133,7 @@ final class FloatingIndicatorWindow {
     func updateAgentMode(_ isAgentMode: Bool) {
         viewModel.isAgentMode = isAgentMode
         if isAgentMode {
-            NSLog("Sayline: agent mode flagged for this recording")
+            SaylineLog.log("agent mode flagged for this recording")
         }
     }
 
@@ -157,7 +157,7 @@ final class FloatingIndicatorWindow {
         reposition(panel)
         panel.ignoresMouseEvents = false
         panel.orderFrontRegardless()
-        NSLog("%@", "Sayline: showing calendar setup card (\(card.step))")
+        SaylineLog.log("showing calendar setup card (\(card.step))")
     }
 
     func dismissSetupCard() {
@@ -179,7 +179,7 @@ final class FloatingIndicatorWindow {
                     pill: String,
                     duration: TimeInterval = 3.6) {
         guard followUpCompletion == nil else {
-            NSLog("Sayline: notice suppressed — a question is still waiting")
+            SaylineLog.log("notice suppressed — a question is still waiting")
             return
         }
         viewModel.setNotice(text, detail: detail)
@@ -213,7 +213,7 @@ final class FloatingIndicatorWindow {
         // exists to prevent, so the invariant is enforced here rather than
         // at each of the six call sites.
         if followUpCompletion != nil {
-            NSLog("Sayline: hide() ignored — a question is still waiting for an answer")
+            SaylineLog.log("hide() ignored — a question is still waiting for an answer")
             return
         }
         // The setup card asks the user to go and do something in another
@@ -223,7 +223,7 @@ final class FloatingIndicatorWindow {
         if viewModel.setupCard != nil {
             viewModel.setNotice(nil)
             noticeShownAt = nil
-            NSLog("Sayline: hide() kept the setup card — it leaves on dismissal only")
+            SaylineLog.log("hide() kept the setup card — it leaves on dismissal only")
             return
         }
         panel?.orderOut(nil)
@@ -232,7 +232,7 @@ final class FloatingIndicatorWindow {
         viewModel.setFollowUp(nil)
         viewModel.setNotice(nil)
         noticeShownAt = nil
-        NSLog("Sayline: indicator hidden")
+        SaylineLog.log("indicator hidden")
     }
 
     // MARK: - Follow-up
@@ -254,7 +254,7 @@ final class FloatingIndicatorWindow {
         // their behalf is how a reminder gets created that nobody agreed to.
         guard followUpCompletion == nil else {
             queued.append((request, completion))
-            NSLog("%@", "Sayline: queued a question behind the live one -> \(request.question)")
+            SaylineLog.log("queued a question behind the live one -> \(request.question)")
             return
         }
         present(request, completion: completion)
@@ -281,7 +281,7 @@ final class FloatingIndicatorWindow {
         reposition(panel)
         panel.ignoresMouseEvents = false
         panel.orderFrontRegardless()
-        NSLog("%@", "Sayline: asking -> \(request.question)")
+        SaylineLog.log("asking -> \(request.question)")
 
         restartTimeout()
     }
@@ -306,7 +306,7 @@ final class FloatingIndicatorWindow {
             finishFollowUp(.declined, reason: "said no")
         case .unclear where !followUpDidRetry:
             followUpDidRetry = true
-            NSLog("%@", "Sayline: couldn't read yes or no from \"\(text)\" — asking once more")
+            SaylineLog.log("couldn't read yes or no from \"\(text)\" — asking once more")
             viewModel.setFollowUp(request) // restarts the countdown
             restartTimeout()
         case .unclear:
@@ -392,7 +392,7 @@ final class FloatingIndicatorWindow {
         viewModel.onFollowUpAnswer = nil
         viewModel.setFollowUp(nil)
         panel?.ignoresMouseEvents = true
-        NSLog("%@", "Sayline: follow-up \(reason) -> \(answer)")
+        SaylineLog.log("follow-up \(reason) -> \(answer)")
         completion(answer)
 
         // Whoever was waiting gets the screen now.

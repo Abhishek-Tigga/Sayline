@@ -47,7 +47,7 @@ enum VoiceCommand {
 
         if let best {
             let scoreString = String(format: "%.2f", best.score)
-            NSLog("Sayline: voice command matched \"\(normalized)\" ~ \"\(best.phrase)\" (similarity: \(scoreString)) -> \(best.command)")
+            SaylineLog.log("voice command matched \"\(normalized)\" ~ \"\(best.phrase)\" (similarity: \(scoreString)) -> \(best.command)")
         }
         return best?.command
     }

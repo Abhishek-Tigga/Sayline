@@ -39,9 +39,9 @@ final class WhisperKitTranscriber: Transcriber {
         }
 
         let task = Task<WhisperKit, Error> {
-            NSLog("Sayline: loading local WhisperKit model (\(Self.modelName)) — first run downloads it…")
+            SaylineLog.log("loading local WhisperKit model (\(Self.modelName)) — first run downloads it…")
             let pipe = try await WhisperKit(WhisperKitConfig(model: Self.modelName))
-            NSLog("Sayline: local WhisperKit model ready")
+            SaylineLog.log("local WhisperKit model ready")
             return pipe
         }
         loadTask = task

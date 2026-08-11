@@ -148,7 +148,7 @@ final class TranscriptCleaner {
         // TranscriptCleanupValidator and BACKLOG.md for the full design.
         let validated = TranscriptCleanupValidator.validate(raw: rawText, cleaned: cleaned)
         if validated != cleaned {
-            NSLog("Sayline: cleanup validator reverted disallowed edits. raw=\(rawText) llm=\(cleaned) validated=\(validated)")
+            SaylineLog.log("cleanup validator reverted disallowed edits. raw=\(rawText) llm=\(cleaned) validated=\(validated)")
         }
         return validated
     }

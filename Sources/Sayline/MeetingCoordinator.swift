@@ -85,7 +85,7 @@ final class MeetingCoordinator {
     }
 
     private func open(_ url: URL, for meeting: Meeting) {
-        NSLog("%@", "Sayline: joining \"\(meeting.spokenName)\" -> \(url.absoluteString)")
+        SaylineLog.log("joining \"\(meeting.spokenName)\" -> \(url.absoluteString)")
         if NSWorkspace.shared.open(url) {
             indicator.showNotice(
                 "Joining \(meeting.spokenName)",
@@ -136,7 +136,7 @@ final class MeetingCoordinator {
     private func reportEmpty(now: Date, pill: String) {
         switch store.diagnoseEmptiness(around: now) {
         case .noCalendarsConfigured:
-            NSLog("Sayline: no event calendars are configured on this Mac")
+            SaylineLog.log("no event calendars are configured on this Mac")
             indicator.askFollowUp(
                 FollowUpRequest(
                     question: "No calendars are set up on this Mac",
@@ -154,7 +154,7 @@ final class MeetingCoordinator {
             // Calendars exist and hold nothing for a whole day either side.
             // Possible, and also what an unsynced account looks like — so
             // say both rather than pick one.
-            NSLog("Sayline: calendars exist but hold no events for 24h either side — possible sync gap")
+            SaylineLog.log("calendars exist but hold no events for 24h either side — possible sync gap")
             indicator.showNotice(
                 "No meetings found",
                 detail: "If a meeting is missing it may not have synced. Calendar → Settings → Accounts → Refresh Calendars can be set to Every minute.",
@@ -219,7 +219,7 @@ final class MeetingCoordinator {
     private func finishSetup() {
         CalendarSetupState.markDismissed()
         indicator.dismissSetupCard()
-        NSLog("Sayline: calendar setup card dismissed — it will not be offered again")
+        SaylineLog.log("calendar setup card dismissed — it will not be offered again")
     }
 
     // MARK: - Access
@@ -229,7 +229,7 @@ final class MeetingCoordinator {
         case .granted:
             return true
         case .failed(let message):
-            NSLog("Sayline: calendar access failed -> \(message)")
+            SaylineLog.log("calendar access failed -> \(message)")
             indicator.showNotice("Couldn't reach your calendar",
                                  detail: "Try again in a moment",
                                  pill: "Calendar", duration: 3.6)

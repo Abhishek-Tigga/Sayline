@@ -92,7 +92,7 @@ final class ReminderStore {
         lastCreatedID = reminder.calendarItemIdentifier
         lastCreatedTitle = title
         lastCreatedAt = Date()
-        NSLog("%@", "Sayline: created reminder \"\(title)\"\(due.map { " due \($0)" } ?? " with no time")")
+        SaylineLog.log("created reminder \"\(title)\"\(due.map { " due \($0)" } ?? " with no time")")
         return reminder.calendarItemIdentifier
     }
 
@@ -151,7 +151,7 @@ final class ReminderStore {
         let title = reminder.title ?? "reminder"
         try store.remove(reminder, commit: true)
         if id == lastCreatedID { lastCreatedID = nil }
-        NSLog("%@", "Sayline: deleted reminder \"\(title)\"")
+        SaylineLog.log("deleted reminder \"\(title)\"")
     }
 
     // MARK: - Matching

@@ -49,7 +49,7 @@ final class AgentTurnRunner {
         var ownsTheEnding = false
 
         for action in actions {
-            NSLog("Sayline: agent executing -> \(action)")
+            SaylineLog.log("agent executing -> \(action)")
             switch outcome(for: action) {
             case .done:
                 continue
@@ -71,7 +71,7 @@ final class AgentTurnRunner {
         switch action {
         case .answerQuery(let query):
             let answer = AgentExecutor.answer(query)
-            NSLog("Sayline: agent answered -> \(answer)")
+            SaylineLog.log("agent answered -> \(answer)")
             indicator.flashMessage(answer, duration: 4.5)
             return .reported
 

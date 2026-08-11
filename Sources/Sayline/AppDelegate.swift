@@ -100,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                NSLog("Sayline: failed to toggle launch at login -> \(error.localizedDescription)")
+                SaylineLog.log("failed to toggle launch at login -> \(error.localizedDescription)")
             }
         }
     }
@@ -113,6 +113,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        SaylineLog.startSession()
+        StallWatchdog.shared.start()
+        #if DEBUG
+        // SAYLINE_TEST_STALL=3 blocks main for 3s shortly after launch, so
+        // the watchdog can be seen firing rather than assumed to work.
+        if let seconds = ProcessInfo.processInfo.environment["SAYLINE_TEST_STALL"].flatMap(Double.init) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                SaylineLog.log("[test] blocking the main thread for \(seconds)s on purpose")
+                Thread.sleep(forTimeInterval: seconds)
+                SaylineLog.log("[test] main thread released")
+            }
+        }
+        #endif
         AudioRecorder.sweepOrphanedRecordings()
         InstalledAppCatalog.load()
         hotkeyManager.hotkeyOption = hotkeyOption
@@ -214,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.pauseFollowUpTimeout()
         let appInfo = FocusedAppReader.current()
         capturedFocusedAppInfo = appInfo
-        NSLog("Sayline: focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
+        SaylineLog.log("focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
         audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID)
         indicatorWindow.show(state: .recording)
         // Answering a question is still part of the agent exchange, so the
@@ -260,7 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // when the real cause is that their input device gave us nothing.
         guard !audioRecorder.capturedNoAudio else {
             let device = audioRecorder.lastInputDeviceName
-            NSLog("Sayline: no audio captured from \(device) over \(audioRecorder.lastRecordingDuration)s — check the input device")
+            SaylineLog.log("no audio captured from \(device) over \(audioRecorder.lastRecordingDuration)s — check the input device")
             indicatorWindow.show(state: .message("No audio from \(device)"))
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [weak self] in
                 self?.indicatorWindow.hide()
@@ -269,7 +282,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
 
         guard !audioRecorder.isTooShortOrSilent() else {
-            NSLog("Sayline: recording too short/silent (\(audioRecorder.lastRecordingDuration)s) -> skipping transcription")
+            SaylineLog.log("recording too short/silent (\(audioRecorder.lastRecordingDuration)s) -> skipping transcription")
             indicatorWindow.hide()
             return
         }
@@ -298,10 +311,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             do {
                 defer { self.audioRecorder.discardLastRecording() }
                 let rawText = try await activeTranscriber.transcribe(fileURL: url)
-                NSLog("Sayline: raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
+                SaylineLog.log("raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
                 if WhisperHallucination.isLikelyHallucinated(rawText, audioPeak: audioRecorder.lastRecordingPeak) {
-                    NSLog("Sayline: discarded \"\(rawText)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
+                    SaylineLog.log("discarded \"\(rawText)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
                     await MainActor.run {
                         self.isTranscribing = false
                         self.indicatorWindow.hide()
@@ -313,7 +326,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 }
 
                 if let command = VoiceCommand.detect(in: rawText) {
-                    NSLog("Sayline: voice command detected -> \(command)")
+                    SaylineLog.log("voice command detected -> \(command)")
                     await MainActor.run {
                         self.isTranscribing = false
                         self.indicatorWindow.hide()
@@ -331,9 +344,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 var finalText = rawText
                 do {
                     finalText = try await cleaner.clean(rawText, context: context)
-                    NSLog("Sayline: cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
+                    SaylineLog.log("cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
                 } catch {
-                    NSLog("Sayline: cleanup failed, using raw transcript -> \(error.localizedDescription)")
+                    SaylineLog.log("cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }
 
                 await MainActor.run {
@@ -348,7 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.isTranscribing = false
                     self.transcriptionError = error.localizedDescription
                     self.indicatorWindow.hide()
-                    NSLog("Sayline: transcription failed -> \(error.localizedDescription)")
+                    SaylineLog.log("transcription failed -> \(error.localizedDescription)")
                 }
             }
         }
@@ -369,11 +382,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     // Nothing usable came back. The question stays, so give
                     // it its clock back — otherwise it sits there forever.
-                    NSLog("Sayline: follow-up answer was empty — leaving the question up")
+                    SaylineLog.log("follow-up answer was empty — leaving the question up")
                     self.indicatorWindow.resumeFollowUpTimeout()
                     return
                 }
-                NSLog("%@", "Sayline: follow-up answer heard -> \(text)")
+                SaylineLog.log("follow-up answer heard -> \(text)")
                 self.indicatorWindow.answerFollowUp(spoken: text)
             }
         }
@@ -387,10 +400,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             do {
                 defer { self.audioRecorder.discardLastRecording() }
                 let transcript = try await activeTranscriber.transcribe(fileURL: url)
-                NSLog("Sayline: agent transcript -> \(transcript)")
+                SaylineLog.log("agent transcript -> \(transcript)")
 
                 if WhisperHallucination.isLikelyHallucinated(transcript, audioPeak: audioRecorder.lastRecordingPeak) {
-                    NSLog("Sayline: discarded agent transcript \"\(transcript)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
+                    SaylineLog.log("discarded agent transcript \"\(transcript)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
                     await MainActor.run {
                         self.isTranscribing = false
                         self.indicatorWindow.hide()
@@ -414,7 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 // Empty Trash still asks, failures still report.
                 let actions: [AgentAction]
                 if let fast = FastRoute.action(for: transcript) {
-                    NSLog("%@", "Sayline: fast path answered \"\(transcript)\" with no round trip -> \(fast)")
+                    SaylineLog.log("fast path answered \"\(transcript)\" with no round trip -> \(fast)")
                     actions = [fast]
                 } else {
                     actions = try await agentRouter.route(transcript)
@@ -427,7 +440,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     // pressed again. The indicator lives for the whole agent
                     // turn, and the runner decides how it ends.
                     guard !actions.isEmpty else {
-                        NSLog("Sayline: agent could not determine an action for \"\(transcript)\"")
+                        SaylineLog.log("agent could not determine an action for \"\(transcript)\"")
                         self.indicatorWindow.flashMessage("Agent: nothing matched")
                         return
                     }
@@ -437,7 +450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 await MainActor.run {
                     self.isTranscribing = false
                     self.transcriptionError = error.localizedDescription
-                    NSLog("Sayline: agent transcription/routing failed -> \(error.localizedDescription)")
+                    SaylineLog.log("agent transcription/routing failed -> \(error.localizedDescription)")
                     self.indicatorWindow.flashMessage("Agent: request failed")
                 }
             }
@@ -487,11 +500,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     /// the moment the tap installs.
     private func startWatchingForAccessibility() {
         guard accessibilityWatchdog == nil else { return }
-        NSLog("Sayline: not trusted for Accessibility — watching for the grant")
+        SaylineLog.log("not trusted for Accessibility — watching for the grant")
         accessibilityWatchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self else { return }
             guard AccessibilityPermission.isTrusted else { return }
-            NSLog("Sayline: Accessibility granted — starting the hotkey listener")
+            SaylineLog.log("Accessibility granted — starting the hotkey listener")
             self.isAccessibilityTrusted = true
             self.hotkeyManager.start()
             self.stopWatchingForAccessibility()
@@ -504,6 +517,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
 #if DEBUG
+    /// Blocks the main thread on purpose, to prove the watchdog detects it.
+    /// A stall detector that has never been seen to fire is not evidence of
+    /// anything.
+    func debugStallMainThread() {
+        SaylineLog.log("[test] blocking the main thread for 3s on purpose")
+        Thread.sleep(forTimeInterval: 3)
+        SaylineLog.log("[test] main thread released")
+    }
+
     // MARK: - Follow-up test harness
 
     func debugAskForValue() {

@@ -197,7 +197,7 @@ enum SettingsPaneCatalog {
     private static func scan() -> [Pane] {
         let extensionsDir = "/System/Library/ExtensionKit/Extensions"
         guard let entries = try? FileManager.default.contentsOfDirectory(atPath: extensionsDir) else {
-            NSLog("Sayline: settings pane catalog scan failed — no panes available, open_system_setting will always fall back")
+            SaylineLog.log("settings pane catalog scan failed — no panes available, open_system_setting will always fall back")
             return []
         }
 

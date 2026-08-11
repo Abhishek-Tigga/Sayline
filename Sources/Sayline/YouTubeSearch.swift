@@ -22,7 +22,7 @@ enum YouTubeSearch {
     /// The top video for a query, or nil if anything at all goes wrong.
     static func topVideoURL(for query: String) async -> URL? {
         guard let key = APIKeyProvider.youTubeAPIKey else {
-            NSLog("Sayline: no YouTube API key — falling back to the search page")
+            SaylineLog.log("no YouTube API key — falling back to the search page")
             return nil
         }
         guard var components = URLComponents(string: endpoint) else { return nil }
@@ -46,7 +46,7 @@ enum YouTubeSearch {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 let body = String(data: data, encoding: .utf8) ?? ""
-                NSLog("Sayline: YouTube search failed -> \(body.prefix(220))")
+                SaylineLog.log("YouTube search failed -> \(body.prefix(220))")
                 return nil
             }
             struct SearchResponse: Decodable {
@@ -60,13 +60,13 @@ enum YouTubeSearch {
             }
             let decoded = try JSONDecoder().decode(SearchResponse.self, from: data)
             guard let first = decoded.items.first, let videoID = first.id.videoId else {
-                NSLog("Sayline: YouTube search returned no video for \"\(query)\"")
+                SaylineLog.log("YouTube search returned no video for \"\(query)\"")
                 return nil
             }
-            NSLog("%@", "Sayline: YouTube top result for \"\(query)\" -> \(first.snippet.title) [\(videoID)]")
+            SaylineLog.log("YouTube top result for \"\(query)\" -> \(first.snippet.title) [\(videoID)]")
             return URL(string: "https://www.youtube.com/watch?v=\(videoID)")
         } catch {
-            NSLog("Sayline: YouTube search error -> \(error.localizedDescription)")
+            SaylineLog.log("YouTube search error -> \(error.localizedDescription)")
             return nil
         }
     }
