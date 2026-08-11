@@ -35,11 +35,7 @@ final class MeetingCoordinator {
                     duration: 4.0
                 )
             } else {
-                indicator.showNotice(
-                    "Nothing to join",
-                    detail: "No meetings in the next 30 minutes",
-                    pill: "Join my next meeting"
-                )
+                reportEmpty(now: now, pill: "Join my next meeting")
             }
             return
         }
@@ -113,11 +109,7 @@ final class MeetingCoordinator {
         let meetings = await store.meetings(around: now)
 
         guard let meeting = MeetingSelection.next(from: meetings, now: now) else {
-            indicator.showNotice(
-                "Nothing coming up",
-                detail: "No meetings in the next 30 minutes",
-                pill: "What's my next meeting"
-            )
+            reportEmpty(now: now, pill: "What's my next meeting")
             return
         }
 
@@ -130,6 +122,49 @@ final class MeetingCoordinator {
         let detail = meeting.joinURL == nil ? "\(when) — no join link" : when
         indicator.showNotice(meeting.spokenName, detail: detail,
                              pill: "What's my next meeting", duration: 4.5)
+    }
+
+    /// Says why nothing was found, which is not always "nothing is on".
+    ///
+    /// A Google Calendar that was never added to macOS produces exactly the
+    /// same empty result as a genuinely free afternoon, and telling someone
+    /// "no meetings" while their meeting is open in another tab is the kind
+    /// of wrong that reads as a broken app rather than a setup step.
+    private func reportEmpty(now: Date, pill: String) {
+        switch store.diagnoseEmptiness(around: now) {
+        case .noCalendarsConfigured:
+            NSLog("Sayline: no event calendars are configured on this Mac")
+            indicator.askFollowUp(
+                FollowUpRequest(
+                    question: "No calendars are set up on this Mac",
+                    detail: "Google and Outlook calendars have to be added in System Settings before Sayline can see them. Open it?",
+                    kind: .confirm(primary: "Open Settings", secondary: "Not now")
+                )
+            ) { answer in
+                guard answer == .confirmed else { return }
+                guard let url = URL(string:
+                    "x-apple.systempreferences:com.apple.preferences.internetaccounts") else { return }
+                NSWorkspace.shared.open(url)
+            }
+
+        case .suspiciouslyEmpty:
+            // Calendars exist and hold nothing for a whole day either side.
+            // Possible, and also what an unsynced account looks like — so
+            // say both rather than pick one.
+            NSLog("Sayline: calendars exist but hold no events for 24h either side — possible sync gap")
+            indicator.showNotice(
+                "No meetings found",
+                detail: "Your calendars look empty. If a meeting is missing, it may not have synced yet.",
+                pill: pill, duration: 4.6
+            )
+
+        case .nothingScheduled:
+            indicator.showNotice(
+                "Nothing coming up",
+                detail: "No meetings in the next 30 minutes",
+                pill: pill
+            )
+        }
     }
 
     // MARK: - Access

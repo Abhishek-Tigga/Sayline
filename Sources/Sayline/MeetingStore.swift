@@ -52,6 +52,36 @@ final class MeetingStore {
         }
     }
 
+    /// Why an empty result was empty.
+    ///
+    /// "No meetings" and "your calendar was never connected" look identical
+    /// from the outside and need completely different sentences. Found live
+    /// 2026-08-11: a user's Google Calendar was not in macOS at all, so
+    /// every query returned nothing while the meeting sat plainly visible
+    /// in their browser. That reads as a broken app, not a setup gap.
+    enum Emptiness: Equatable {
+        /// No calendar accounts at all, or none with event calendars.
+        case noCalendarsConfigured
+        /// Calendars exist and nothing is scheduled in the window. Ordinary.
+        case nothingScheduled
+        /// Calendars exist and hold no events for a whole day either side.
+        /// Not proof of a sync problem, but the shape of one.
+        case suspiciouslyEmpty
+    }
+
+    /// Whether any account is actually supplying event calendars.
+    func diagnoseEmptiness(around now: Date) -> Emptiness {
+        let calendars = store.calendars(for: .event)
+        guard !calendars.isEmpty else { return .noCalendarsConfigured }
+
+        let dayPredicate = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-24 * 3600),
+            end: now.addingTimeInterval(24 * 3600),
+            calendars: nil
+        )
+        return store.events(matching: dayPredicate).isEmpty ? .suspiciouslyEmpty : .nothingScheduled
+    }
+
     /// Events overlapping the window, as `Meeting` values.
     ///
     /// Every calendar, no picker — the design's filter is "has a join
@@ -64,6 +94,18 @@ final class MeetingStore {
     /// leaving the next investigation to guess.
     func meetings(around now: Date,
                   window: TimeInterval = MeetingSelection.defaultWindow) async -> [Meeting] {
+        // Ask macOS to pull from CalDAV before reading.
+        //
+        // Google calendars reach EventKit through CalDAV, which Calendar.app
+        // refreshes every 15 minutes by default. A meeting created or moved
+        // in the last few minutes is therefore simply not here yet — the
+        // user changed something, looked at Sayline, and saw stale truth.
+        // This is best-effort and asynchronous: it does not block, and the
+        // very next query may still miss. It costs nothing and shortens the
+        // window over repeated use, which is the honest description of what
+        // it buys.
+        store.refreshSourcesIfNecessary()
+
         let started = Date()
         // Reaches back far enough to catch a long meeting already running,
         // which is the case someone running late actually needs.
@@ -74,7 +116,11 @@ final class MeetingStore {
         )
         let events = store.events(matching: predicate)
         let elapsed = Int(Date().timeIntervalSince(started) * 1000)
-        NSLog("Sayline: calendar query returned \(events.count) event(s) in \(elapsed)ms")
+        let sources = store.calendars(for: .event)
+            .map { $0.source?.title ?? "?" }
+        let accounts = Set(sources).sorted().joined(separator: ", ")
+        NSLog("%@", "Sayline: calendar query returned \(events.count) event(s) in \(elapsed)ms "
+              + "from \(sources.count) calendar(s) [\(accounts.isEmpty ? "none" : accounts)]")
 
         return events.compactMap { event in
             guard let start = event.startDate, let end = event.endDate else { return nil }
