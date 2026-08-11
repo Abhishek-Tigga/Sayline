@@ -73,7 +73,11 @@ depends on. The harness compiles a hand-maintained list, and splitting
 noticing — the eval only runs when a human runs it.
 
 **Deterministic logic** — the half the router eval structurally cannot see,
-because it scores what the model emits, not what we do afterwards:
+because it scores what the model emits, not what we do afterwards.
+
+Keep the `&&`. Running the binary as a separate command after a failed
+`swiftc` executes a stale one from a previous build, which reports a
+confident pass — that happened on 2026-08-11 and nearly shipped.
 
 ```bash
 swiftc -o /tmp/chk Sources/Sayline/WebsiteCatalog.swift eval/catalog-checks/main.swift && /tmp/chk
@@ -81,7 +85,7 @@ swiftc -o /tmp/chk Sources/Sayline/FollowUp.swift eval/consent-checks/main.swift
 swiftc -o /tmp/chk Sources/Sayline/LocalTimestamp.swift eval/timestamp-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCatalog.swift \
   Sources/Sayline/InstalledAppCatalog.swift Sources/Sayline/FastRoute.swift \
-  eval/fastroute-checks/main.swift && /tmp/chk
+  Sources/Sayline/SaylineLog.swift eval/fastroute-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
 ```
