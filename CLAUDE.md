@@ -77,6 +77,8 @@ swiftc -o /tmp/chk Sources/Sayline/LocalTimestamp.swift eval/timestamp-checks/ma
 swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCatalog.swift \
   Sources/Sayline/InstalledAppCatalog.swift Sources/Sayline/FastRoute.swift \
   eval/fastroute-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
+  eval/meeting-checks/main.swift && /tmp/chk
 ```
 
 The fast path answers some commands without calling the model at all, so
