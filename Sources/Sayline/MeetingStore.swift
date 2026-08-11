@@ -104,16 +104,26 @@ final class MeetingStore {
     /// leaving the next investigation to guess.
     func meetings(around now: Date,
                   window: TimeInterval = MeetingSelection.defaultWindow) async -> [Meeting] {
-        // Ask macOS to pull from CalDAV before reading.
+        // Kept, but MEASURED NOT TO WORK — do not rely on it.
         //
-        // Google calendars reach EventKit through CalDAV, which Calendar.app
-        // refreshes every 15 minutes by default. A meeting created or moved
-        // in the last few minutes is therefore simply not here yet — the
-        // user changed something, looked at Sayline, and saw stale truth.
-        // This is best-effort and asynchronous: it does not block, and the
-        // very next query may still miss. It costs nothing and shortens the
-        // window over repeated use, which is the honest description of what
-        // it buys.
+        // Shipped on the reading that Apple's docs describe this as pulling
+        // from remote sources when needed. Tested live on 2026-08-11 with
+        // the account's refresh interval set back to 15 minutes so macOS's
+        // own timer could not be mistaken for this call: an event was
+        // renamed and another added in Google's web UI, and four queries
+        // over 83 seconds returned byte-identical results, with every
+        // `lastModifiedDate` frozen more than twelve minutes in the past.
+        // Nothing propagated.
+        //
+        // So "if necessary" is exactly what it says, and the system decides
+        // — not us. The call stays because it is one line, costs nothing,
+        // and Apple's behaviour may change; the comment is the part that
+        // matters, so nobody reads this as a working freshness mechanism
+        // and builds on it.
+        //
+        // What actually mitigates staleness today is the user setting
+        // Calendar → Settings → Accounts → Refresh Calendars to "Every
+        // minute". That sentence is in the empty-calendar notice.
         store.refreshSourcesIfNecessary()
 
         let started = Date()

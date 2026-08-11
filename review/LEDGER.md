@@ -1190,3 +1190,48 @@ hide a stale title.
 Re-run needed before route C is decided. Same shape: 15-minute interval,
 create an event, ask; then rename it, wait a minute, ask again and read
 the modified timestamps.
+
+### MEASUREMENT · refreshSourcesIfNecessary — conclusive, and it is a no
+2026-08-11 · user-run, Opus reading · established
+
+Re-run with the fixed instrumentation. Refresh interval at 15 minutes so
+macOS's own timer could not be mistaken for our call.
+
+```
+15:32:48  "Marketing Meet "        modified 14:10:04  [Google]
+          "BillMe - Product Meet"  modified 15:20:47  [Google]
+15:33:24  identical
+15:33:52  identical
+15:34:11  identical
+```
+
+During those 83 seconds and four queries the user renamed an event and
+added a new one in Google's web UI. Neither appeared. Every
+`lastModifiedDate` stayed frozen, the newest at 15:20:47 — more than
+twelve minutes stale by the last query.
+
+**`refreshSourcesIfNecessary()` does not force a CalDAV pull.** "If
+necessary" is the system's judgement, not ours.
+
+This also retires the earlier reading: the eleven-second appearance in the
+first test was macOS's own sync, not our call. It was recorded as
+unproven at the time, which is the only reason it did not become a wrong
+conclusion built on.
+
+**Consequences for the sequence in BACKLOG:**
+- Gate (1a) is answered, negatively. The staleness problem is *not*
+  already fixed by shipped code.
+- The only working mitigation today remains the user setting Refresh
+  Calendars to "Every minute" — already in the empty-calendar copy, and
+  now the load-bearing answer rather than a hint.
+- Route C's other gate, the ICS secret-URL staleness test, is now the
+  live question rather than a hypothetical.
+
+The call is kept with the measurement written into the comment beside it.
+Removing it would gain nothing; leaving it uncommented would let the next
+reader take it for a working freshness mechanism.
+
+One gap this exposes, not yet addressed: the empty-calendar diagnosis only
+fires when the window is empty. Here the user had events — they were just
+wrong — so nothing surfaced. Stale-but-present is the commoner case and
+currently says nothing at all.
