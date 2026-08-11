@@ -714,3 +714,150 @@ then compare, then build the better one — the same shape that made today
 work. `DESIGN-meetings-reminders.md` already holds 21 settled decisions
 about meetings from a grilling session; a plan that re-litigates them is a
 plan that wasted its round.
+
+---
+
+## Re-verification pass (Fable, 2026-08-11, second)
+
+Ran at `8f0f60c`: all four check suites pass (catalog, consent, timestamp,
+fastroute), build succeeds, full eval **59/61 (97%), 0 syntax failures,
+2446 median prompt tokens, 1030 ms median latency**. The two failures are
+the documented ones: `settings-screen-time-implicit` (model flake) and
+`settings-unknown-pane` through the substitute door, which is open on
+purpose — see F9 below.
+
+Two environment notes. First: my verification build replaced the binary,
+so **the Accessibility grant is stale again** — the
+`tccutil reset Accessibility com.abhishektigga.sayline` + re-grant
+sequence applies before the next live session. This will keep happening
+to every verifier who runs the documented build command until Developer ID
+signing lands. Second: median prompt tokens moved 2345 → 2446 (+101) with
+the regional site additions — not a regression, but it spends against the
+same budget meetings must fit inside; recorded so the meetings baseline is
+honest.
+
+### F4 · Frozen countdown
+2026-08-11 · Fable · VERIFIED (structural; live exercise still owed)
+The defer is the right shape: `deliveredAnAnswer` starts false, is set
+only on the one path that hands the recording to
+`handleSpokenFollowUpAnswer`, and the defer resumes on every other exit —
+including the two guards my first pass flagged, and any return added
+later, which is the property the two-line patch I proposed would not have
+had. `resumeFollowUpTimeout` no-ops when nothing is paused, so the defer
+is safe on holds with no question up. Traced every exit; built; suites
+pass. Still the only closed item with zero live evidence — one deliberate
+brief hotkey tap while a question is on screen settles it, and it should
+stay first on the live checklist.
+Commit: `b57e1c9`
+
+### F9 · Invented pane — the revert and the trade
+2026-08-11 · Fable · VERIFIED (the revert was right; my watch item was the
+bug)
+Verdict on the question asked: **the trade is right, and my original
+framing understated the cost side.** `rejectInventedPane` refused nine
+real intents (volume, brightness, dark mode, screen saver, microphone,
+camera, time zone, firewall) to catch one nonsense phrase — and the nine
+are exactly the requests where the model's synonym knowledge is the whole
+value of having a model in the loop. Deterministic-beats-prompt applies
+when *we* know the answer; for "volume settings" → Sound, the model knows
+and the catalog doesn't, so the rule deleted the model's one legitimate
+job. Keeping the substitute door open costs: a nonsense pane phrase opens
+a plausible-but-wrong pane. Real nonsense is rare (ASR noise usually
+shares a root with a real pane, which is why "doc" worked), and the punt
+door — the one that opened Settings at whatever was last viewed — is now
+closed deterministically; verified in code at `correctedSettingsPane` and
+in my eval run, where the substitute door was the only remaining path.
+The two new guard cases (`settings-volume-synonym`,
+`settings-brightness-synonym`) pass and will catch the rule if it creeps
+back. One addition to the BACKLOG plan: the synonym layer is worth more
+than re-arming the comparison — those nine aliases in
+`SettingsPaneCatalog.aliases` would make the nine phrases deterministic,
+faster, and immune to model drift, at ~zero token cost. Build the aliases
+for their own sake; whether the comparison ever returns matters much less
+afterwards.
+Commit: `b57e1c9`
+
+### FREEZE · Secure Input theory and fix
+2026-08-11 · Fable · code-reviewed — fix is sound regardless of the
+diagnosis; the diagnosis is the best-supported of the three; one stranding
+risk confirmed real
+Answers to the three questions the entry asked:
+
+1. **Can the tap be stranded off? Yes, one way, and it is a real one.**
+   Not by the code's own logic — the callback runs on the tap thread, so
+   `tapNeedsReenable` has no cross-thread race; the run loop slices every
+   0.25s regardless of event flow; the rate limit returns early without
+   clearing the flag, so retry is guaranteed. The stranding vector is
+   macOS's known **stuck Secure Input** condition: another process
+   (historically loginwindow itself, some password managers) can leave
+   secure input asserted indefinitely, and then this code waits forever
+   with exactly one log line ever printed. Do NOT add the proposed
+   ceiling: while secure input is genuinely on, re-enabling restores
+   nothing (keystrokes are withheld at the source) and merely resurrects
+   the fight the fix exists to end. The right hedge is visibility, not
+   force: re-log the waiting state once a minute with the elapsed time,
+   and name the holding process — `IOHIDCheckAccess`-adjacent APIs can't
+   say, but `ioreg -l -w0 | grep SecureInput` reveals the PID and belongs
+   in the debugging notes. A menu-bar "hotkey paused" surface is the
+   durable answer and is already parked with O-E.
+2. **Is the diagnosis right?** It is the only one of the three theories
+   with a mechanism that explains the keyboard/mouse asymmetry, and the
+   evidence (keyboard-only tap, keyboard-only death, 20s disable cadence,
+   Keychain dialog on screen) is consistent. One link is weaker than the
+   entry admits: `kCGEventTapDisabledByTimeout` canonically means "your
+   callback ran too long", and this callback does almost nothing — so the
+   20s disables are better read as "the system disables keyboard taps
+   under secure input and reports it as a timeout" than as real
+   starvation. That reading changes nothing about the fix and slightly
+   strengthens it: if the system is going to disable the tap under secure
+   input no matter what, re-enabling during secure input was always pure
+   fighting. Flagging it because if a fourth incident arrives with the
+   tap *enabled* and no secure input, this theory does not cover it and
+   should not be stretched to.
+3. **Does anything else block main during a Keychain read? No — and the
+   entry's inference needs one correction.** The Keychain read happens
+   inside the router `Task` on a cooperative-pool thread, not on main;
+   main went quiet at `agentRouting` because it was idle awaiting the
+   continuation, not because it was blocked. The chain "router waiting on
+   Keychain waiting on the dialog" holds, but it stalls a background
+   thread. Worth a line in the file: `SecItemCopyMatching` blocking a
+   cooperative thread is tolerable at one call, and would starve the pool
+   if several Tasks ever did it at once.
+Could not reproduce the incident (triggering a real Keychain prompt needs
+a hand on the dialog); nothing here was exercised live.
+Commit: `9dc8ae1`
+
+### O-A · FastRoute
+2026-08-11 · Fable · VERIFIED (suite + code; not live)
+The negative guarantees hold by construction, which is the strong kind:
+fixed commands and queries match only when the *entire* normalized
+utterance is in the table, and app commands require the entire post-verb
+tail to equal an installed app's name — so "open Safari, check my battery"
+survives even though the comma erases the conjunction word ("safari check
+my battery" is not an installed app and falls through). The
+website-ambiguity gate sends "open Spotify"/"open YouTube"/"open Amazon"
+to the model, and — worth recording as intended, not a bug — "open Music"
+also goes to the router because "music" is a YouTube alias by the standing
+all-music-to-YouTube decision. All 21 fastroute-checks cases pass,
+including the eleven negatives. Integration confirmed: the fast action
+feeds the same `AgentTurnRunner`, so Empty Trash via fast path still hits
+the confirmation gate. The 18%-answered / 0-disagreement / ~5ms numbers
+are Opus's measurements; I did not re-measure, but the suite plus the
+eval's unchanged score are consistent with them. Live hold still owed, as
+recorded.
+Commit: `34d8a20`
+
+### NEW · Site catalog regionalization
+2026-08-11 · Fable · VERIFIED (suites + eval; browser checks were Opus's)
+catalog-checks pass in region IN; the eval's Flipkart/Meesho cases pass
+including the "Misho" mishearing; prompt vocabulary confirms regional
+filtering. Token cost noted at the top of this pass.
+Commit: `f7dd7e6`
+
+### Bare-day fix, third attempt
+2026-08-11 · Fable · concur with user-verified
+timestamp-checks (including the 24 bare-day/names-a-time cases and the
+911 trap) pass at HEAD; `droppingInventedDueDates` sits on the transcript
+side where the eval cannot see it, which is the correct layer per the
+relocation note. Nothing to add beyond the user's live confirmation.
+Commit: `c24e7ad` / `fdc3537`

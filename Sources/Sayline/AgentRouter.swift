@@ -233,7 +233,7 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "open_website",
-                "description": "Opens a website in the browser, optionally at its search results. Use for \"open youtube\", \"open toolfolio.com\", \"search kendrick lamar on youtube\", \"look up John Smith on LinkedIn\", \"google swift concurrency\". Put ONLY the site in `site` and ONLY the thing being searched for in `query` — for \"search lo-fi music on youtube\", site is \"YouTube\" and query is \"lo-fi music\". If the user names a site not in the list below, pass exactly what they said and it will be handled. Note \"play <song> on youtube\" is also this tool: it opens the search results, which is as far as a link can go.",
+                "description": "Opens a website, optionally at its search results. \"open youtube\", \"search kendrick lamar on youtube\", \"look up John Smith on LinkedIn\", \"google swift concurrency\", \"play a song on youtube\", and the user's own pages (\"my Amazon orders\", \"my LinkedIn messages\"). Put ONLY the site in `site` and ONLY what is being looked for in `query`. If they name a site not listed, pass exactly what they said.",
                 "parameters": [
                     "type": "object",
                     "properties": [
@@ -247,7 +247,7 @@ final class AgentRouter {
                         ],
                         "page_url": [
                             "type": "string",
-                            "description": "The complete real URL of a canonical page, when one exists for what the user wants. Judge this by whether the site HAS such a page — NOT by which verb the user used. \"Search for the iPhone page on Apple India\" wants https://www.apple.com/in/iphone/ even though they said search. Also use it for the user's own pages on a site: \"my Amazon orders\", \"my LinkedIn messages\", \"my YouTube subscriptions\". Leave it out when results are genuinely the answer — \"best headphones on Amazon\" and \"people from Razorpay on LinkedIn\" have no canonical page, so those want a search. Leave it out if unsure of the exact URL; a wrong guess is checked and discarded, but search is the better default.",
+                            "description": "The real URL of a canonical page, when the site HAS one for what was asked. Judge by that, NOT by the verb used: \"search for the iPhone page on Apple India\" wants https://www.apple.com/in/iphone/ despite saying search. Omit when results are the answer (\"best headphones on Amazon\"), and omit if unsure of the exact URL — search is the better default.",
                         ],
                         "vertical": [
                             "type": "string",
@@ -255,7 +255,7 @@ final class AgentRouter {
                         ],
                         "play": [
                             "type": "boolean",
-                            "description": "True only when the user said \"play\" rather than \"open\", \"search\" or \"find\" — e.g. \"play a Kendrick Lamar song on YouTube\". Currently honoured for YouTube only, where it opens the top result directly so it starts playing instead of showing a list.",
+                            "description": "True only when they said \"play\", not \"open\"/\"search\"/\"find\". YouTube only; opens the top result so it starts playing.",
                         ],
                     ],
                     "required": ["site"],
