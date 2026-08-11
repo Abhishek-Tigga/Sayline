@@ -35,6 +35,9 @@ final class IndicatorViewModel: ObservableObject {
     /// Called by the buttons. The window owns the single-fire guard and the
     /// timeout, so the view can stay a plain function of state.
     var onFollowUpAnswer: ((FollowUpAnswer) -> Void)?
+    /// The one-time calendar setup card, shown under the answer.
+    @Published var setupCard: CalendarSetupCard?
+    var onSetupAction: ((CalendarSetupAction) -> Void)?
     /// The configured hotkey, for the "hold ⌥ and say…" hint.
     @Published var hotkeySymbol: String = "⌥" 
 
@@ -158,13 +161,19 @@ private struct IndicatorStack: View {
             } else if let notice = viewModel.notice {
                 NoticeBox(text: notice.text, detail: notice.detail, surface: surface)
                 LinearProcessingDots()
-            } else if let transcript = viewModel.transcript, !transcript.isEmpty {
+            } else if viewModel.setupCard == nil, let transcript = viewModel.transcript, !transcript.isEmpty {
                 SpeechBackBox(
                     text: transcript,
                     setAt: viewModel.transcriptSetAt,
                     surface: surface
                 )
                 LinearProcessingDots()
+            }
+            // Below the answer and above the pill, so the answer stays the
+            // thing being read and this is the footnote to it.
+            if let card = viewModel.setupCard {
+                SetupBox(card: card, surface: surface,
+                         onAction: { viewModel.onSetupAction?($0) })
             }
             PillView(viewModel: viewModel, surface: surface)
             if let label {
@@ -382,6 +391,69 @@ private struct SaylineMarker: View {
         }
         .opacity(0.5)
         .padding(.bottom, 6)
+    }
+}
+
+// MARK: - Calendar setup
+
+/// The one-time card that teaches the two manual steps.
+///
+/// Deliberately not a question: it sits under whatever answer was given
+/// rather than replacing it. Refusing to say what the next meeting is,
+/// when we probably have it right, would be a worse trade than answering
+/// with a caveat attached.
+private struct SetupBox: View {
+    let card: CalendarSetupCard
+    let surface: SurfaceStyle
+    let onAction: (CalendarSetupAction) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SaylineMarker()
+            Text(card.title)
+                .font(.system(size: SpeechBackBox.fontSize, weight: .semibold))
+                .foregroundStyle(PillStyle.foreground)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(card.detail)
+                .font(.system(size: SpeechBackBox.fontSize))
+                .foregroundStyle(PillStyle.foreground)
+                .opacity(0.75)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
+
+            if card.step == .connect {
+                accountList
+            }
+
+            HStack(spacing: 6) {
+                Button(card.primaryLabel) { onAction(.primary) }
+                    .buttonStyle(FollowUpButtonStyle(role: .primary))
+                Button(card.secondaryLabel) { onAction(.dismiss) }
+                    .buttonStyle(FollowUpButtonStyle(role: .secondary))
+            }
+            .padding(.top, 11)
+        }
+        .frame(maxWidth: 324 - 32, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .surfaceBackground(surface, cornerRadius: 14)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Names what is already connected. "iCloud" on its own tells someone
+    /// whose work calendar is Google exactly what is missing.
+    private var accountList: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text(card.accounts.isEmpty ? "Connected:" : "Connected:")
+                .font(.system(size: 11))
+                .opacity(0.5)
+            Text(card.accounts.isEmpty ? "nothing yet" : card.accounts.joined(separator: ", "))
+                .font(.system(size: 11, weight: .medium))
+                .opacity(0.9)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(PillStyle.foreground)
+        .padding(.top, 8)
     }
 }
 

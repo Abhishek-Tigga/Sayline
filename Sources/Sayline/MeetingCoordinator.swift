@@ -37,6 +37,7 @@ final class MeetingCoordinator {
             } else {
                 reportEmpty(now: now, pill: "Join my next meeting")
             }
+            offerSetupIfFirstTime()
             return
         }
 
@@ -110,6 +111,7 @@ final class MeetingCoordinator {
 
         guard let meeting = MeetingSelection.next(from: meetings, now: now) else {
             reportEmpty(now: now, pill: "What's my next meeting")
+            offerSetupIfFirstTime()
             return
         }
 
@@ -122,6 +124,7 @@ final class MeetingCoordinator {
         let detail = meeting.joinURL == nil ? "\(when) — no join link" : when
         indicator.showNotice(meeting.spokenName, detail: detail,
                              pill: "What's my next meeting", duration: 4.5)
+        offerSetupIfFirstTime()
     }
 
     /// Says why nothing was found, which is not always "nothing is on".
@@ -165,6 +168,58 @@ final class MeetingCoordinator {
                 pill: pill
             )
         }
+    }
+
+    // MARK: - One-time setup card
+
+    /// Offers the two manual setup steps once, under the answer.
+    ///
+    /// Shown alongside rather than instead: the answer we just gave is
+    /// probably right, and refusing to say what the next meeting is would
+    /// be a worse trade than saying it with a caveat attached.
+    ///
+    /// Once, then never again. A card that reappears every time someone
+    /// checks their calendar is a card people learn to dismiss without
+    /// reading — and this one is asking for two minutes in two other apps,
+    /// which is only worth asking for while it is still novel.
+    private func offerSetupIfFirstTime() {
+        guard !CalendarSetupState.hasBeenDismissed else { return }
+        present(.init(step: .connect, accounts: store.connectedAccounts()))
+    }
+
+    private func present(_ card: CalendarSetupCard) {
+        indicator.showSetupCard(card) { [weak self] action in
+            guard let self else { return }
+            switch (card.step, action) {
+            case (.connect, .primary):
+                // Internet Accounts is where Google and Outlook are added,
+                // and it is the one step with a working deep link.
+                if let url = URL(string:
+                    "x-apple.systempreferences:com.apple.preferences.internetaccounts") {
+                    NSWorkspace.shared.open(url)
+                }
+                // Straight to step two rather than ending here — the
+                // refresh interval is the half that actually causes wrong
+                // answers, and nobody would come back for it on their own.
+                self.present(.init(step: .refreshRate, accounts: card.accounts))
+
+            case (.refreshRate, .primary):
+                // Calendar's own settings cannot be deep-linked; opening
+                // the app is as close as we get, and the card says which
+                // two keystrokes follow.
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+                self.finishSetup()
+
+            case (_, .dismiss):
+                self.finishSetup()
+            }
+        }
+    }
+
+    private func finishSetup() {
+        CalendarSetupState.markDismissed()
+        indicator.dismissSetupCard()
+        NSLog("Sayline: calendar setup card dismissed — it will not be offered again")
     }
 
     // MARK: - Access

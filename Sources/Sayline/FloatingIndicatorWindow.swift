@@ -137,6 +137,37 @@ final class FloatingIndicatorWindow {
         }
     }
 
+    /// Shows the one-time calendar setup card under whatever is on screen.
+    ///
+    /// Persistent by design: no timeout, and `hide()` will not take it
+    /// away. Every other surface here is transient because every other
+    /// surface is telling you something; this one is asking you to go and
+    /// do two things in another app, and a card that vanishes mid-task is
+    /// worse than no card.
+    ///
+    /// It therefore needs mouse events, which the panel refuses in every
+    /// other state so it can never intercept a click meant for the app
+    /// underneath.
+    func showSetupCard(_ card: CalendarSetupCard,
+                       onAction: @escaping (CalendarSetupAction) -> Void) {
+        viewModel.setupCard = card
+        viewModel.onSetupAction = onAction
+        let panel = self.panel ?? makePanel()
+        self.panel = panel
+        reposition(panel)
+        panel.ignoresMouseEvents = false
+        panel.orderFrontRegardless()
+        NSLog("%@", "Sayline: showing calendar setup card (\(card.step))")
+    }
+
+    func dismissSetupCard() {
+        guard viewModel.setupCard != nil else { return }
+        viewModel.setupCard = nil
+        viewModel.onSetupAction = nil
+        if followUpCompletion == nil { panel?.ignoresMouseEvents = true }
+        hide()
+    }
+
     /// Shows a result in the same box a question uses, with the command
     /// itself in the pill below — the same two-part shape as the question
     /// that produced it, so an answer does not arrive somewhere new.
@@ -153,6 +184,10 @@ final class FloatingIndicatorWindow {
         }
         viewModel.setNotice(text, detail: detail)
         show(state: .message(pill))
+        // A notice above a live setup card must not drag it away when it
+        // expires; hide() already refuses, and this keeps the panel
+        // clickable so the card's buttons still work.
+        if viewModel.setupCard != nil { panel?.ignoresMouseEvents = false }
         let shown = Date()
         noticeShownAt = shown
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
@@ -179,6 +214,16 @@ final class FloatingIndicatorWindow {
         // at each of the six call sites.
         if followUpCompletion != nil {
             NSLog("Sayline: hide() ignored — a question is still waiting for an answer")
+            return
+        }
+        // The setup card asks the user to go and do something in another
+        // app. Taking it away while they are doing that is the one thing it
+        // must not do, so it outlives every transient surface and leaves
+        // only when dismissed.
+        if viewModel.setupCard != nil {
+            viewModel.setNotice(nil)
+            noticeShownAt = nil
+            NSLog("Sayline: hide() kept the setup card — it leaves on dismissal only")
             return
         }
         panel?.orderOut(nil)

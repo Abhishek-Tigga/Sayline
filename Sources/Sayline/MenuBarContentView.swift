@@ -80,6 +80,7 @@ struct MenuBarContentView: View {
                 Button("Ask for a value") { appDelegate.debugAskForValue() }
                 Button("Ask yes / no") { appDelegate.debugAskYesNo() }
                 Button("Confirm a delete") { appDelegate.debugAskDestructive() }
+                Button("Show calendar setup again") { CalendarSetupState.reset() }
             }
             Divider()
             #endif

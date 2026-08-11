@@ -52,6 +52,18 @@ final class MeetingStore {
         }
     }
 
+    /// The accounts actually supplying event calendars, by name.
+    ///
+    /// Shown in the setup card so the decision is informed: "iCloud" alone
+    /// tells someone whose work calendar is Google exactly what is wrong,
+    /// where "no meetings found" tells them nothing.
+    func connectedAccounts() -> [String] {
+        let names = store.calendars(for: .event)
+            .filter { $0.type != .birthday && $0.type != .subscription }
+            .compactMap { $0.source?.title }
+        return Array(Set(names)).sorted()
+    }
+
     /// Why an empty result was empty.
     ///
     /// "No meetings" and "your calendar was never connected" look identical
