@@ -9,6 +9,70 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **Google Calendar users see an empty calendar** (found live 2026-08-11,
+  half-fixed, strategy not yet chosen).
+
+  **The problem, in three parts.** Sayline reads through EventKit, which
+  reads whatever Calendar.app holds. A user whose calendar lives in Google
+  gets nothing unless they have added that account in System Settings →
+  Internet Accounts. Even once added, CalDAV refreshes every 15 minutes by
+  default, so a meeting created or moved minutes ago is not there yet. And
+  all of it fails as "no meetings" — the same words as a genuinely free
+  afternoon — which reads as a broken app rather than a setup step, while
+  the meeting sits visible in a browser tab.
+
+  This matters more than it sounds: most people's work calendar is Google,
+  so the default experience for the feature's main audience is that it
+  silently does not work.
+
+  **Already shipped** (commit on 2026-08-11): an empty result is diagnosed
+  before it is reported — no calendars offers to open Internet Accounts,
+  a 24-hour-empty calendar names sync as a possible cause, genuinely
+  nothing keeps the plain answer. Queries call `refreshSourcesIfNecessary()`
+  first, which is best-effort and does not fix the 15-minute default. The
+  query log names the accounts supplying calendars.
+
+  That makes the gap visible and recoverable. It does not close it.
+
+  **Two candidate paths, not yet decided.**
+
+  *A — onboarding check.* Notice at first run that no calendars are
+  configured and say so before the user tries a command and forms a first
+  impression. Cheap, folds into the permission-status view already parked
+  as O-E. Does not help the 15-minute staleness at all, and still depends
+  on the user doing the setup.
+
+  *B — read Google Calendar directly.* Removes the CalDAV dependency
+  entirely for the users who need it most, and makes freshness ours rather
+  than Calendar.app's.
+
+  **An unverified claim, flagged rather than relied on.** The suggestion
+  as first made was that OAuth PKCE lets a desktop app do this with no
+  client secret and no backend, token in Keychain. The auth flow part is
+  broadly right. What was not checked, and could change the answer:
+
+  - `calendar.readonly` is a **sensitive scope**. Google requires app
+    verification before users outside a test list can grant it — a review
+    process with a privacy policy and possibly a security assessment,
+    measured in weeks, not an afternoon.
+  - Unverified apps are capped at a small number of test users, which is
+    fine for development and not for shipping.
+  - The loopback redirect flow for installed apps has changed over time;
+    the currently supported shape needs confirming rather than assuming.
+  - A refresh token in the Keychain is a long-lived credential for
+    someone's calendar. That raises the stakes of the storage decision
+    well above an API key.
+
+  If verification is required, path B stops being "no backend needed" and
+  starts being a compliance project — which changes the sequencing
+  argument entirely, because the commercial backend is a plan rather than
+  a thing.
+
+  **What is worth deciding.** Whether B is achievable on the timeline the
+  product needs, or whether A plus honest copy is the right answer until
+  the backend exists. Building OAuth before the backend exists risks
+  building it twice.
+
 - **Country-scoped site catalogs, served rather than compiled in**
   (raised 2026-08-11, parked until after meetings ships).
 
