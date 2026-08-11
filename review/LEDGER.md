@@ -1235,3 +1235,55 @@ One gap this exposes, not yet addressed: the empty-calendar diagnosis only
 fires when the window is empty. Here the user had events — they were just
 wrong — so nothing surfaced. Stale-but-present is the commoner case and
 currently says nothing at all.
+
+---
+
+## FREEZE · Fourth incident. The Secure Input theory does not cover it.
+2026-08-11 · user-reported, Opus reading · theory retired
+
+The user's keyboard stopped working. Sayline had to be killed to recover
+it. From the log:
+
+```
+15:42:07  last normal activity — a too-short recording, indicator hidden
+15:42:11  event tap was disabled by the system (4294967294)
+          ... 7 disables in 96 seconds ...
+15:43:47  last line; the app stops logging entirely
+```
+
+**Zero `secure input` lines in the entire session.** So
+`IsSecureEventInputEnabled()` was false throughout and the fix shipped in
+`9dc8ae1` was never engaged. Fable's caveat was exact: *"if a fourth
+incident arrives with the tap enabled and no secure input, this theory
+does not cover it and should not be stretched to."* This is that incident.
+
+Three theories now, all disproven: event-tap starvation, an NSPanel leak,
+and Secure Input contention.
+
+**On whether my change caused it — I cannot clear myself.** The
+disable-by-timeout pattern predates the change, and moving the re-enable
+from the callback to the thread loop should not matter, since a disabled
+tap is out of the input path entirely. But it plainly did not prevent
+this, and "I see no mechanism" is not the same as "there is none".
+
+**What shipped in response is not a fix, and is not claimed as one.** A
+circuit breaker: four disables inside two minutes and the tap is switched
+off deliberately, with a notice telling the user their hotkey is gone and
+that relaunching restores it.
+
+The reasoning is a trade rather than a diagnosis. A dead hotkey is bad. A
+dead keyboard is much worse, and the person cannot even quit the app to
+escape it — this user had to kill it from outside. Facing an unexplained
+failure that harms the machine, giving up loudly beats persisting quietly.
+
+Note the tension with Fable's earlier guidance, which argued against a
+ceiling on re-enabling because during genuine secure input re-enabling
+restores nothing. That argument holds and is untouched: the breaker counts
+*disables*, not waiting time, and does not fire while secure input is on
+because no disable/re-enable cycle happens there.
+
+**What this makes overdue: F8, the persistent log and stall watchdog.**
+Three investigations have now died for the same reason — no evidence at
+the moment of failure, and a log that only exists because a developer
+launched the app through a redirect. The user cannot produce that. Until
+F8 exists, a fourth theory would be guessing with better vocabulary.

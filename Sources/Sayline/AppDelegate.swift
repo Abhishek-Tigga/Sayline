@@ -132,6 +132,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 self.indicatorWindow.dismissFollowUp()
             }
         }
+        // The tap gave up because macOS kept rejecting it. Say so — a
+        // hotkey that silently stops working is the failure people cannot
+        // report, and this one has a known remedy: relaunch.
+        hotkeyManager.onTapGaveUp = { [weak self] in
+            DispatchQueue.main.async {
+                self?.indicatorWindow.showNotice(
+                    "Hotkey turned off",
+                    detail: "macOS kept rejecting Sayline's keyboard listener. Quit and reopen Sayline to restore it.",
+                    pill: "Sayline", duration: 8.0
+                )
+            }
+        }
         hotkeyManager.onAgentModeRequested = { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }

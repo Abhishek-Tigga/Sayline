@@ -33,6 +33,13 @@ final class HotkeyManager {
     private var tapNeedsReenable = false
     private var lastTapReenable = Date.distantPast
     private var loggedSecureInputWait = false
+    /// When the tap was disabled, most recent last. Backs the circuit
+    /// breaker below.
+    private var recentDisables: [Date] = []
+    private var tappedOut = false
+    /// Fired when the breaker trips, so the app can tell the user their
+    /// hotkey is gone and why.
+    var onTapGaveUp: (() -> Void)?
     private var isHotkeyActive = false
     /// Guards against keyboard auto-repeat: holding Space sends many
     /// rapid keyDown events, not just one, so without this we'd fire
@@ -137,6 +144,39 @@ final class HotkeyManager {
         tapDidInstall = false
     }
 
+    /// Stops fighting when the system keeps rejecting us.
+    ///
+    /// Written after the freeze recurred on 2026-08-11 with the tap
+    /// enabled and secure input off — the case the previous theory
+    /// explicitly did not cover. Seven disables in 96 seconds, and a user
+    /// whose keyboard stopped working until the app was killed.
+    ///
+    /// The cause is still unknown after three disproven theories. What is
+    /// known is the shape: when macOS starts repeatedly timing this tap
+    /// out, re-enabling it is how the app stays in the input path while
+    /// the system is trying to remove it. So it stops.
+    ///
+    /// A dead hotkey is a bad outcome. A dead keyboard is a much worse
+    /// one, and the person cannot even quit the app to fix it. Given an
+    /// unexplained failure that harms the machine, giving up loudly beats
+    /// persisting quietly.
+    private func noteDisable() {
+        let now = Date()
+        recentDisables.append(now)
+        recentDisables.removeAll { now.timeIntervalSince($0) > 120 }
+
+        guard recentDisables.count < 4 else {
+            tappedOut = true
+            tapNeedsReenable = false
+            if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: false) }
+            NSLog("Sayline: the system disabled the event tap \(recentDisables.count) times in two minutes — "
+                  + "giving up rather than fighting for the keyboard. Hotkey is off until relaunch.")
+            onTapGaveUp?()
+            return
+        }
+        tapNeedsReenable = true
+    }
+
     /// Restores the tap once it is safe to do so. Runs on the tap thread
     /// between run-loop slices, never from inside the callback.
     ///
@@ -146,6 +186,7 @@ final class HotkeyManager {
     /// are spaced so a persistent failure cannot become a tight loop
     /// against the window server.
     private func reenableTapIfSafe() {
+        guard !tappedOut else { return }
         guard tapNeedsReenable, let eventTap else { return }
 
         if IsSecureEventInputEnabled() {
@@ -210,7 +251,7 @@ final class HotkeyManager {
             // So: mark it and let the thread loop decide, rather than
             // fighting the window server from inside the callback.
             NSLog("Sayline: event tap was disabled by the system (\(type.rawValue))")
-            tapNeedsReenable = true
+            noteDisable()
             return Unmanaged.passUnretained(event)
         default:
             return Unmanaged.passUnretained(event)
