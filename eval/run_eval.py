@@ -59,6 +59,8 @@ TOOL_TO_ACTION = {
                                      "page_url": "page_url", "vertical": "vertical"}),
     "create_reminder": ("createReminder", {"title": "title", "due": "due"}),
     "cancel_reminder": ("cancelReminder", {"name": "name"}),
+    "join_meeting": ("joinMeeting", {}),
+    "next_meeting": ("whatsNextMeeting", {}),
     "lock_screen": ("lockScreen", {}),
     "set_volume": ("setVolume", {"change": "change"}),
     "set_wifi": ("setWiFi", {"enabled": "enabled"}),

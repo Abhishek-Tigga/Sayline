@@ -303,6 +303,22 @@ final class AgentRouter {
         [
             "type": "function",
             "function": [
+                "name": "join_meeting",
+                "description": "Opens the join link of the meeting happening now or starting soon. \"join my next meeting\", \"hop on my call\".",
+                "parameters": ["type": "object", "properties": [:] as [String: Any]],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
+                "name": "next_meeting",
+                "description": "Says what the SINGLE next meeting is, without joining it. \"what's my next meeting\", \"when is my next call\". Not for a list — \"what meetings do I have today\" is out of scope, call nothing.",
+                "parameters": ["type": "object", "properties": [:] as [String: Any]],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
                 "name": "lock_screen",
                 "description": "Locks the Mac's screen immediately.",
                 "parameters": ["type": "object", "properties": [:] as [String: Any]],
@@ -809,6 +825,10 @@ final class AgentRouter {
         case "cancel_reminder":
             return .cancelReminder(name: (arguments["name"] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
+        case "join_meeting":
+            return .joinMeeting
+        case "next_meeting":
+            return .whatsNextMeeting
         case "lock_screen":
             return .lockScreen
         case "set_volume":

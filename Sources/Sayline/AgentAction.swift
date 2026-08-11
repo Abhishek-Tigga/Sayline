@@ -23,6 +23,10 @@ enum AgentAction {
     case createReminder(title: String, due: Date?)
     /// `name` is nil for "cancel that", meaning the one just created.
     case cancelReminder(name: String?)
+    /// No payload by design. Named-meeting join is out of the first build,
+    /// so there is nothing for a malformed argument to carry.
+    case joinMeeting
+    case whatsNextMeeting
     case lockScreen
     case setVolume(VolumeChange)
     case setWiFi(enabled: Bool)

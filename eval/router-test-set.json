@@ -839,6 +839,77 @@
         }
       ],
       "guards": "'Misho' is what the transcriber produces for Meesho, and it is the verbatim live transcript. The model maps it back to Meesho by itself once the site is in the vocabulary; the alias covers the case where it passes the misheard spelling straight through instead. First written with a site__contains matcher of 'isho', which 'Misho' satisfies and 'Meesho' does not — the expectation was wrong, not the routing."
+    },
+    {
+      "id": "meeting-join",
+      "transcript": "Join my next meeting",
+      "expect": [
+        {
+          "action": "joinMeeting"
+        }
+      ],
+      "guards": "The headline command. Zero-parameter tool, so there is nothing to malform."
+    },
+    {
+      "id": "meeting-join-casual",
+      "transcript": "Hop on my call",
+      "expect": [
+        {
+          "action": "joinMeeting"
+        }
+      ],
+      "guards": "Phrasing variety. FastRoute covers the common wordings locally; this proves the model still handles the ones it does not."
+    },
+    {
+      "id": "meeting-next",
+      "transcript": "What's my next meeting",
+      "expect": [
+        {
+          "action": "whatsNextMeeting"
+        }
+      ],
+      "guards": "Reads the meeting back without joining it."
+    },
+    {
+      "id": "meeting-next-when",
+      "transcript": "When is my next call",
+      "expect": [
+        {
+          "action": "whatsNextMeeting"
+        }
+      ],
+      "guards": "Asks the same question about time rather than identity; same tool."
+    },
+    {
+      "id": "meeting-no-create",
+      "transcript": "Create a meeting tomorrow at 3",
+      "expect": [],
+      "guards": "MUST match nothing. Calendar writes are out of scope by an explicit design decision — a misheard word becomes a real event other people see. The danger is not a wrong meeting tool but an improvised create_reminder, which would silently turn a calendar request into a reminder."
+    },
+    {
+      "id": "meeting-no-cancel",
+      "transcript": "Cancel my next meeting",
+      "expect": [],
+      "guards": "MUST NOT route to cancel_reminder. Cancelling a meeting and cancelling a reminder are different destructive acts, and the reminder tool would happily search for a reminder named 'next meeting'."
+    },
+    {
+      "id": "meeting-no-list",
+      "transcript": "What meetings do I have today",
+      "expect": [],
+      "guards": "List-shaped, and the list surface is parked. Declining beats half-answering through next_meeting, which would report one meeting as though it were the answer to 'all of them'."
+    },
+    {
+      "id": "meeting-not-a-meeting",
+      "transcript": "Remind me about the standup at 9am",
+      "expect": [
+        {
+          "action": "createReminder",
+          "args": {
+            "due__present": true
+          }
+        }
+      ],
+      "guards": "Contains meeting words but is a reminder. Guards the boundary from the other side — the meeting tools must not attract everything that mentions a standup."
     }
   ]
 }

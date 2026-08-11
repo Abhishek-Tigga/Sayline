@@ -71,8 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @MainActor
     private lazy var turnRunner = AgentTurnRunner(
         indicator: indicatorWindow,
-        reminders: reminders
+        reminders: reminders,
+        meetings: meetings
     )
+    @MainActor
+    private lazy var meetings = MeetingCoordinator(indicator: indicatorWindow)
     @MainActor
     private lazy var reminders = ReminderCoordinator(
         indicator: indicatorWindow,

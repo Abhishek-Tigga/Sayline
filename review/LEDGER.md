@@ -861,3 +861,75 @@ timestamp-checks (including the 24 bare-day/names-a-time cases and the
 side where the eval cannot see it, which is the correct layer per the
 relocation note. Nothing to add beyond the user's live confirmation.
 Commit: `c24e7ad` / `fdc3537`
+
+---
+
+## MEETINGS · Built to Fable's architecture
+2026-08-11 · Opus · claimed-fixed
+
+Steps 1–3 of `MEETINGS-ARCHITECTURE.md` §10. Step 4, the live pass, is
+owed and blocked on a fresh Accessibility grant.
+
+**Step 1 — the trim, and a correction to its premise.** The architecture
+names close_app/find_file/open_folder at 372/352/306 tokens as meetings'
+funding source. Those were my numbers from the morning and they were
+wrong: a chars/4 proxy over Swift *source*, counting comments that never
+reach the API. Measured against the real serialized payload they are 75,
+172 and 141, and already trimmed. The actual fat was `open_website` at 718
+— a third of the whole tool payload. Trimming it also caught prompt text
+that had gone stale: it told the model that "play a song on YouTube"
+"opens the search results, which is as far as a link can go", untrue since
+YouTube API playback shipped.
+
+One thing that trim got wrong and had to be put back, worth recording: I
+removed the sentence about the user's own pages, reasoning that
+`personalPage` overrides the model's URL anyway. Accuracy fell 59/61 to
+57/61 and the model returned *no action at all* for "show my Amazon
+orders". The sentence was never about which URL — it was about scope, and
+a deterministic override cannot correct a tool call that never happens.
+
+**Step 2 — the pure half.** `Meeting.swift` and `MeetingLink.swift`
+compile without frameworks and ship with `eval/meeting-checks`, 25 cases.
+Four of them are hostile input: a survey link ahead of the Meet link,
+notes holding only a non-provider URL, a provider name embedded in an
+attacker's URL, a lookalike domain. Those four are the trust boundary as
+tests — if one goes green-to-red, a voice command can be made to open a
+stranger's link.
+
+**Step 3 — the EventKit half and the wiring.** `MeetingStore` is the only
+file importing EventKit and logs every query's elapsed ms, since EventKit
+is blocking IPC in a pipeline with an unexplained freeze in its history.
+`MeetingCoordinator` mirrors `ReminderCoordinator` including
+offerSettings. Two zero-parameter tools, two runner cases, two
+`TOOL_TO_ACTION` lines, FastRoute phrases, and the harness file list did
+not grow — the F2 failure class stays closed.
+
+**Both §9 flags answered by the user:**
+1. The next-meeting answer uses `showNotice`, not the pill flash. The
+   design's own "if the flash proves too small" clause, arriving.
+2. Full access asked when needed, with the Info.plist string saying
+   plainly that Sayline reads events to find a join link and never writes.
+   That string is what the system dialog shows, so it is the only place
+   the explanation reaches the person deciding.
+
+**Budget, three attributable runs plus two for variance:**
+
+```
+baseline      2446 tokens   59/61
+after trim    2293 tokens   59/61   (-153, accuracy held)
+with meetings 2361 tokens   67/69
++ scope fix   2383 tokens   68/69   (99%, best recorded)
+```
+
+Ends **63 tokens under** the 2,446 baseline with two new tools shipped.
+
+`meeting-no-list` needed one description tightening — "the SINGLE next
+meeting… not for a list" — after failing twice. Two web cases moved around
+it across runs and settled; the fourth run shows the only failure is the
+documented banana coin-flip.
+
+**Not checked: any of it live.** No calendar has been read, no link
+opened, no permission prompt seen. The Accessibility grant is stale from
+these rebuilds, and the calendar grant has never been asked for at all.
+Step 4 is the whole live pass, and the F4 frozen-countdown tap is first on
+that list.

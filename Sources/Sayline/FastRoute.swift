@@ -68,6 +68,16 @@ enum FastRoute {
         (["turn off dark mode", "disable dark mode", "dark mode off", "switch to light mode"], .setDarkMode(enabled: false)),
         (["turn on wifi", "turn wifi on", "enable wifi", "turn on wi fi", "turn wi fi on"], .setWiFi(enabled: true)),
         (["turn off wifi", "turn wifi off", "disable wifi", "turn off wi fi", "turn wi fi off"], .setWiFi(enabled: false)),
+        // The commonest thing this feature is for, answered with no round
+        // trip: a calendar query is tens of milliseconds, so join becomes
+        // the fastest command in the app.
+        (["join my meeting", "join my next meeting", "join the meeting",
+          "join the next meeting", "join my call", "join my next call",
+          "hop on my meeting", "hop on my call"], .joinMeeting),
+        (["what is my next meeting", "whats my next meeting", "next meeting",
+          "when is my next meeting", "whens my next meeting",
+          "what is my next call", "whats my next call",
+          "when is my next call", "whens my next call"], .whatsNextMeeting),
     ]
 
     private static func fixedCommand(_ text: String) -> AgentAction? {

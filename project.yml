@@ -25,6 +25,12 @@ targets:
         # has to read the list to find a match.
         NSRemindersFullAccessUsageDescription: "Sayline needs access to Reminders so you can create and cancel them by voice."
         NSRemindersUsageDescription: "Sayline needs access to Reminders so you can create and cancel them by voice."
+        # macOS 14 has no read-only grant for events, so a read-only feature
+        # must ask for full access. This string is what the system dialog
+        # shows, and it is the only place that explanation reaches the person
+        # deciding — so it says plainly what Sayline does and does not do.
+        NSCalendarsFullAccessUsageDescription: "Sayline reads your calendar to find the next meeting and its join link. It never creates, edits or deletes events."
+        NSCalendarsUsageDescription: "Sayline reads your calendar to find the next meeting and its join link. It never creates, edits or deletes events."
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
     settings:

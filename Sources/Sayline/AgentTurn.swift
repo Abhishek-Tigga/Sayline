@@ -34,10 +34,14 @@ enum ActionOutcome {
 final class AgentTurnRunner {
     private let indicator: FloatingIndicatorWindow
     private let reminders: ReminderCoordinator
+    private let meetings: MeetingCoordinator
 
-    init(indicator: FloatingIndicatorWindow, reminders: ReminderCoordinator) {
+    init(indicator: FloatingIndicatorWindow,
+         reminders: ReminderCoordinator,
+         meetings: MeetingCoordinator) {
         self.indicator = indicator
         self.reminders = reminders
+        self.meetings = meetings
     }
 
     func run(_ actions: [AgentAction]) {
@@ -77,6 +81,14 @@ final class AgentTurnRunner {
 
         case .cancelReminder(let name):
             Task { await reminders.cancel(name: name) }
+            return .asking
+
+        case .joinMeeting:
+            Task { await meetings.join() }
+            return .asking
+
+        case .whatsNextMeeting:
+            Task { await meetings.whatsNext() }
             return .asking
 
         case .emptyTrash:

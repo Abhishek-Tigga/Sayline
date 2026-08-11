@@ -25,6 +25,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Sayline reads your calendar to find the next meeting and its join link. It never creates, edits or deletes events.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Sayline reads your calendar to find the next meeting and its join link. It never creates, edits or deletes events.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sayline needs microphone access to transcribe your speech into text.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
