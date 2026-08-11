@@ -132,6 +132,20 @@ final class MeetingStore {
         NSLog("%@", "Sayline: calendar query returned \(events.count) event(s) in \(elapsed)ms "
               + "from \(sources.count) calendar(s) [\(accounts.isEmpty ? "none" : accounts)]")
 
+        // Titles and last-modified, because a count cannot show staleness.
+        // The 2026-08-11 refresh test was inconclusive for exactly this
+        // reason: a rename does not change how many events there are, so
+        // four queries logged an identical line while the user watched a
+        // stale title on screen. `lastModifiedDate` is what settles it —
+        // if an edit made minutes ago is not reflected there, the local
+        // store has not pulled, whatever else is true.
+        for event in events {
+            let modified = event.lastModifiedDate.map { Self.stamp.string(from: $0) } ?? "?"
+            NSLog("%@", "Sayline:   · \"\(event.title ?? "")\" "
+                  + "starts \(Self.stamp.string(from: event.startDate)) "
+                  + "modified \(modified) [\(event.calendar.source?.title ?? "?")]")
+        }
+
         return events.compactMap { event in
             guard let start = event.startDate, let end = event.endDate else { return nil }
             return Meeting(
@@ -147,6 +161,12 @@ final class MeetingStore {
             )
         }
     }
+
+    private static let stamp: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
 
     /// Whether the user said yes. Only used to break a tie between two
     /// meetings starting in the same minute, so "unknown" counts as no.

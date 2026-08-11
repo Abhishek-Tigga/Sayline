@@ -1147,3 +1147,46 @@ has now been owed across three passes alongside four live checks. If it
 keeps slipping, the decision is being made by default rather than by
 evidence — and "we never measured" is a worse reason to skip route C than
 "we measured and it was fine".
+
+### MEASUREMENT · refreshSourcesIfNecessary, first live result
+2026-08-11 · user-run, Opus reading · inconclusive-leaning-no
+
+The test Fable ranked first, finally run. Refresh interval set back to 15
+minutes so macOS's own timer could not do the work and be mistaken for
+ours.
+
+```
+15:19:38   1 event
+15:19:49   2 events     <- "Design Meet", created ~11s earlier, appeared
+15:20:13   2 events
+15:20:27   2 events
+15:20:52   2 events
+15:22:40   2 events
+```
+
+A **creation** propagated in about eleven seconds. Then the event was
+renamed, and later moved and renamed again, and across four further
+queries over three minutes the user kept seeing the original title.
+
+**What this does not establish.** The count is the same whether a rename
+synced or not, so the log cannot distinguish "we pulled and nothing
+changed" from "we never pulled". The 15:19:49 appearance is also not
+proof that our call caused it — a background sync landing in that window
+would look identical. My instrumentation was too weak for the test I asked
+for, which is my error, not the test's.
+
+**What it leans toward.** If the call forced a pull on every query, three
+minutes and four queries would have shown a rename. They did not. So
+`refreshSourcesIfNecessary()` does not look like a reliable freshness
+mechanism — plausibly because "if necessary" is exactly what it says and
+the system throttles it after a recent sync.
+
+**Fixed for the re-run:** the query log now prints each event's title,
+start, `lastModifiedDate` and source. `lastModifiedDate` is the decisive
+signal — an edit made minutes ago that is not reflected there means the
+local store has not pulled, whatever else is true. Counts can no longer
+hide a stale title.
+
+Re-run needed before route C is decided. Same shape: 15-minute interval,
+create an event, ask; then rename it, wait a minute, ask again and read
+the modified timestamps.
