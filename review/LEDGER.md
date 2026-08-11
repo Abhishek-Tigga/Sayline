@@ -980,3 +980,92 @@ automatically — hold ⌥ and say no to stop".
 
 Ran: all five suites; build; relaunched; fresh test events created.
 Not checked: the confirmation itself, and the 10-second grace expiring.
+
+---
+
+## Verification pass (Fable, 2026-08-11, third)
+
+Ran at `82310a3`: **all five suites pass** (catalog, consent, timestamp,
+fastroute, meeting-checks), build succeeds, eval run twice — **66/69 and
+67/69, both at 2,383 median prompt tokens, 0 syntax failures**. My rebuild
+reset the Accessibility grant again; the tccutil dance applies before the
+next live session.
+
+### MEETINGS · Build to the architecture
+2026-08-11 · Fable · VERIFIED (suites, build, eval; live items listed
+below remain owed)
+The build matches the architecture, the correction to my trim numbers is
+accepted — my 372/352/306 figures were Opus's chars/4-over-source proxy
+counting comments the API never sees, and the ledger's real-payload
+numbers (75/172/141, with `open_website` at 718 as the true fat) are the
+kind of correction that should have been caught when I wrote §3; the
+budget méthode (three attributable runs) held regardless. **2,383 ≤ 2,446
+confirmed twice.**
+Two honest notes on the numbers:
+- "68/69 (99%), best recorded" is the top of a distribution. My two runs
+  scored 66 and 67, and the wobble is not the banana case: **since the
+  trim, the model sometimes fills `page_url` with a search-results URL**
+  instead of using `query` (`web-search-amazon`, `web-search-not-play` —
+  each failed once across my two runs). User-visible impact is ~zero:
+  the same results page opens, and `regionalized` still fixes the
+  domain. But the eval now scores a coin flip on two web cases that were
+  stable pre-trim. Either widen those expectations to accept the
+  equivalent `page_url` form, or normalize deterministically in
+  `parseAction` (a `page_url` matching a known site's own search
+  template collapses to site+query). Small, worth doing before the next
+  eval-gated change.
+- `MeetingLink.isProvider` never checks the URL scheme. An invite whose
+  `url` field is `file://zoom.us/j/x` passes the host test and gets
+  handed to `NSWorkspace.open` as a file URL. One-line hardening
+  (require http/https), one fixture case. Same for the notes path,
+  though NSDataDetector rarely emits non-http links.
+Also verified: harness file list unchanged (F2 class still closed), the
+`meeting-checks` hostile-input cases pass, selection's tie-break and
+window edges pass, `min(by:)` comparator is sound for its use.
+Commit: `662ba47` / `6feea28` / `b2b113b`
+
+### MEETINGS · The join confirmation and the silence inversion
+2026-08-11 · Fable · VERIFIED in code (both halves); never exercised live
+**Containment: yes, properly.** `timeoutFired` is the only path a timeout
+takes and it reads the declared field; Escape and a spoken "no" still
+decline regardless of `timeoutMeans`; an unclear answer still takes the
+declined path — right even here, because someone mumbling into the grace
+period is objecting, not absent. The queue keeps per-request semantics,
+so an inverted question queued behind a normal one cannot leak its
+inversion. The two consent-checks cases pin the default and the
+carriage. One guard worth adding while it is one line:
+`precondition(!(isDestructive && timeoutMeans == .confirmed))` in the
+initializer — the combination "auto-confirms destruction" should be
+unrepresentable, not merely absent.
+**Is joining the right exception: yes**, and the argument is stronger
+than the ledger states. Browser join links land on the provider's own
+pre-join lobby — camera/mic preview, a "Join now" button — so the
+auto-proceed does not put anyone in a call; it puts the lobby on screen.
+The true cost of a wrong auto-join is a browser tab, not an entrance.
+Record the boundary that protects this: if a native-app deep link path
+ever ships (Zoom app can enter with mic hot), the inversion's safety
+argument does not transfer and must be re-made.
+Not checked: the confirmation on screen, the 10-second expiry, the
+spoken "no" — nothing live. Owed alongside the F4 tap.
+Commit: `aaafb17`
+
+### MEETINGS · Empty result diagnosed
+2026-08-11 · Fable · VERIFIED in code, one heuristic gap noted
+The three-way split and its copy are right, and `refreshSourcesIfNecessary`
+is framed honestly. The gap: the ±24h probe queries **all** calendars,
+and Birthdays/Holidays/subscribed calendars almost always hold something
+— so the exact live case that motivated this (Google absent, meeting in a
+browser tab) can classify as `nothingScheduled` whenever a birthday sits
+within a day, skipping the sync-gap hint. Filter subscription/birthday
+calendar types out of the day probe, or scope it to CalDAV/Exchange
+sources. Small, and it is the difference between the diagnosis firing on
+its motivating case or not.
+Commit: `cdb53fc`
+
+### Still owed a live exercise — third time of asking
+2026-08-11 · Fable · unverified, unchanged
+1. **The F4 frozen-countdown tap**: one deliberate brief hotkey tap while
+   a question is on screen. Open since the fix landed.
+2. **The join confirmation**: on screen, the grace expiring into a join,
+   and a spoken "no" stopping it.
+Both need the Accessibility re-grant first (stale again as of this pass).

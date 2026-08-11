@@ -95,6 +95,121 @@ and [CHANGELOG.md](CHANGELOG.md).
   - No public API was found for adding a CalDAV account programmatically.
     Not an exhaustive search.
 
+  **Findings on both routes (Fable, 2026-08-11 — the probe taken past its
+  limits; each item says established or not).**
+
+  *The Apple Calendar route, answering the four open questions:*
+
+  1. **Adding or configuring a calendar account from an app: no supported
+     way exists.** Established as firmly as a negative can be: the
+     Accounts framework's add-account surface was never public API on
+     macOS for this, `~/Library/Accounts` is TCC-protected, and a
+     `.mobileconfig` CalDAV payload — the one real mechanism for
+     provisioning CalDAV — is a dead end *for Google specifically*,
+     because Google's CalDAV endpoint requires OAuth and macOS's Google
+     account flow lives inside System Settings itself. The Internet
+     Accounts deep link already shipped is the ceiling of what an app can
+     do: put the user one click from the right pane.
+  2. **The CalDAV refresh interval is not writable by code.** No key in
+     `com.apple.iCal` (confirmed again), and the real setting is stored
+     per-account in the TCC-protected Accounts store. BUT it is
+     user-settable to **"Every minute"** in Calendar → Settings →
+     Accounts → Refresh Calendars — which collapses the 15-minute
+     staleness to ~1 minute with zero code. That sentence belongs in the
+     `suspiciouslyEmpty` copy and in onboarding copy. This is the
+     cheapest real mitigation found on either route.
+  3. **`reload calendars` is weaker than the probe hoped — recommend
+     dropping it.** The sdef's own description reads "reload all calendar
+     *files* contents", i.e. re-read local data, which is exactly the
+     thing that does NOT help; nothing suggests it pulls from the server,
+     and it needs a per-app Automation grant plus a visible Calendar.app
+     launch. The offer-only-when-stale shape was sound *if* the command
+     pulled; since that is unestablished-leaning-no, this is the
+     workaround that would embarrass us. Park it permanently unless
+     someone demonstrates a server pull in a packet trace.
+  4. **The approach nobody had ranked: measure `refreshSourcesIfNecessary`
+     first.** Apple's docs describe it as pulling new data from remote
+     sources when needed — if it genuinely triggers a CalDAV pull, the
+     staleness problem is already fixed by the call shipped on
+     2026-08-11, and every workaround above is moot. This is a
+     ten-minute live test (edit an event in Google's web UI, ask Sayline
+     within a minute, read the log) and it is the FIRST thing to do —
+     before building anything. Also available and cheap:
+     `EKEventStoreChanged` notifications to know when data moved
+     (reactive hygiene, does not force sync), and the per-calendar
+     secret ICS URL — see route C below.
+
+  *The Google route, answering the four questions:*
+
+  5. **Verification: established, and lighter than feared.**
+     `calendar.readonly` is a **sensitive** scope (Google's own doc uses
+     "reading events stored in Google Calendar" as its example).
+     Sensitive-scope verification means brand/domain verification, scope
+     justification, and a demo video — Google states **up to ~10 days**.
+     The CASA security assessment Opus worried about applies to
+     *restricted* scopes (Gmail, Drive); the sensitive-verification page
+     requires no assessment. So path B is a ~10-day review, not a
+     compliance project — but it is still a review, with a privacy
+     policy and a homepage as prerequisites. (Scope classifications are
+     documentation and move; re-check at build time. The definitive
+     check remains creating the Cloud project and reading the real
+     consent screen.)
+  6. **Redirect flow: established.** Loopback (`http://127.0.0.1:port`)
+     remains the supported flow for the Desktop client type — it was
+     deprecated for iOS/Android/Chrome clients, *kept* for desktop.
+     Custom URI schemes are deprecated. One correction to the original
+     claim: Google issues Desktop clients a `client_secret`, it is just
+     explicitly non-confidential — embeddable, not absent. No backend
+     needed stands.
+  7. **Test-user cap: established — 100 test users, and the part that
+     actually bites: refresh tokens from an app in Testing status expire
+     every 7 days.** A beta on Testing status means every user
+     re-authorizes weekly. Workable for a handful of dev machines,
+     wrong for a real beta; the fix is completing the (10-day)
+     verification, after which both limits lift.
+  8. **Keychain custody: acceptable, and arguably better than the
+     backend.** A refresh token in the login Keychain is the standard
+     custody model for native apps (every desktop Google client does
+     this); it is device-bound, encrypted at rest, and revocable from
+     the user's Google account page. A backend holding thousands of
+     users' calendar tokens is a honeypot and an availability
+     dependency. Scope it read-only, name the revocation path in the
+     privacy copy, and Keychain is the right answer even after the
+     backend exists.
+
+  *Route C, proposed by neither: the per-calendar secret ICS URL.*
+  Google Calendar exposes a "secret address in iCal format" per calendar
+  — a capability URL, plain HTTPS GET, no OAuth, no verification, no
+  test-user cap. The user pastes one URL into Sayline settings; it lives
+  in the Keychain like a key. This solves the *absence* problem (no
+  macOS account needed at all) with BYOK-grade friction the beta already
+  tolerates. **Unestablished and decisive:** how stale Google serves
+  that feed — third-party ICS subscribers have historically seen lag
+  from minutes to hours. If the feed is fresh, C beats both A and B for
+  the beta; if it lags hours, it is worse than a 1-minute CalDAV
+  refresh. Ten-minute human test: create an event, curl the feed, time
+  it.
+
+  **Recommendation.** Neither A-then-wait nor B-now. Sequence:
+  1. *Measure first*: the `refreshSourcesIfNecessary` live test (§4) and
+     the ICS staleness test (route C) — twenty minutes total, and each
+     result can delete a workaround from this list.
+  2. *Ship A's remaining halves now*: the "Every minute" refresh-interval
+     sentence in the stale-calendar copy, and the Internet Accounts
+     nudge folded into onboarding when O-E unparks. Zero risk, helps
+     every user including the ones B would never cover (Exchange,
+     iCloud).
+  3. *Hold B until commercialization*, then do it properly: the ~10-day
+     sensitive verification is real but affordable exactly once there is
+     a privacy policy, a homepage, and a shipping product to demo —
+     all of which the backend/monetization milestone produces anyway.
+     Building B during beta buys weekly re-auth pain and a review
+     process ahead of the assets it needs.
+  4. *Route C is the bridge if, and only if,* the measurements in step 1
+     show CalDAV-at-1-minute still failing real beta users AND the ICS
+     feed proves fresh. Otherwise skip it — two calendar pipelines is a
+     real cost for a maybe.
+
 - **Country-scoped site catalogs, served rather than compiled in**
   (raised 2026-08-11, parked until after meetings ships).
 
