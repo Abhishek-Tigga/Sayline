@@ -58,5 +58,32 @@ check("already regional",    fixed("https://www.apple.com/in/iphone/", "Apple In
 check("no variant, untouched", fixed("https://www.youtube.com/feed/history", "YouTube"),
                              "https://www.youtube.com/feed/history")
 
+// ---- a page URL that is really a search ----------------------------
+// Since the tool trim, the model sometimes answers a search by putting a
+// results URL in page_url. Same page for the user, but it skips the code
+// that applies the region and the vertical — so amazon.com survives where
+// amazon.in should win. Collapsing it back is the fix; these pin it.
+print("\na search URL in page_url collapses back to site and query")
+
+func decompose(_ raw: String) -> String {
+    guard let url = URL(string: raw),
+          let d = WebsiteCatalog.searchDecomposition(of: url) else { return "nil" }
+    return "\(d.site)/\(d.query)"
+}
+check("amazon.com search URL",     decompose("https://www.amazon.com/s?k=top+rated+iphone+15+covers"),
+                                   "Amazon/top rated iphone 15 covers")
+check("amazon.in regional variant", decompose("https://www.amazon.in/s?k=headphones"), "Amazon/headphones")
+check("youtube search URL",         decompose("https://www.youtube.com/results?search_query=lo-fi+music"),
+                                   "YouTube/lo-fi music")
+check("flipkart search URL",        decompose("https://www.flipkart.com/search?q=headphones"),
+                                   "Flipkart/headphones")
+
+print("\n  a real page must NOT be collapsed")
+check("apple product page",   decompose("https://www.apple.com/in/iphone/"), "nil")
+check("amazon orders page",   decompose("https://www.amazon.in/gp/css/order-history"), "nil")
+check("youtube watch page",   decompose("https://www.youtube.com/watch?v=abc123"), "nil")
+check("linkedin messaging",   decompose("https://www.linkedin.com/messaging/"), "nil")
+check("empty query",          decompose("https://www.amazon.in/s?k="), "nil")
+
 print("\n\(failures == 0 ? "all checks passed" : "\(failures) FAILED")")
 exit(failures == 0 ? 0 : 1)

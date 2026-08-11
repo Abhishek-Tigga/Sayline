@@ -82,6 +82,12 @@ struct FollowUpRequest: Equatable {
         self.isDestructive = isDestructive
         self.timeoutMeans = timeoutMeans
         self.timeout = timeout
+        // A question that destroys something and proceeds on silence is
+        // never what anyone meant. Absent by convention until now; this
+        // makes it unrepresentable, which is the difference between a rule
+        // and a habit.
+        precondition(!(isDestructive && timeoutMeans == .confirmed),
+                     "a destructive question must never confirm on timeout")
     }
 }
 

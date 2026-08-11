@@ -762,6 +762,7 @@ final class AgentRouter {
             let site = (arguments["site"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
                 .nilIfEmpty ?? "Google"
             let query = (arguments["query"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let vertical = (arguments["vertical"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             // Our own table beats the model's URL for the user's own pages.
             // The model cannot know the region, so it always writes .com, and
             // it guesses paths that shift between runs. This is the same
@@ -787,6 +788,18 @@ final class AgentRouter {
                 // way to know where this Mac is. Correcting it here keeps that
                 // knowledge in one place instead of asking the prompt to carry
                 // a region it cannot see.
+                // A "page" that is exactly a site's own search URL is a
+                // search. Rebuilding it from site+query puts it back through
+                // the region and vertical handling it had skipped.
+                if let decomposed = WebsiteCatalog.searchDecomposition(of: url) {
+                    NSLog("%@", "Sayline: page_url was \(decomposed.site)'s own search URL — treating as a search for \"\(decomposed.query)\"")
+                    switch WebsiteCatalog.resolve(decomposed.site, query: decomposed.query, vertical: vertical) {
+                    case .site(let label, let rebuilt):
+                        return .openWebsite(label: "\(label) — \(decomposed.query)", url: rebuilt)
+                    default:
+                        break
+                    }
+                }
                 let regional = WebsiteCatalog.regionalized(url, siteHint: site)
                 if regional != url {
                     NSLog("%@", "Sayline: region-corrected \(url.absoluteString) -> \(regional.absoluteString)")
@@ -798,7 +811,6 @@ final class AgentRouter {
                WebsiteCatalog.isYouTube(site) {
                 return .playOnYouTube(query: query)
             }
-            let vertical = (arguments["vertical"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
             switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query, vertical: vertical) {
             case .site(let label, let url):
                 return .openWebsite(label: query.map { "\(label) — \($0)" } ?? label, url: url)

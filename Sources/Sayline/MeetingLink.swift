@@ -54,6 +54,12 @@ enum MeetingLink {
     }
 
     static func isProvider(_ url: URL) -> Bool {
+        // Scheme first. The host check alone let `file://zoom.us/j/x` pass,
+        // and an invite's url field is attacker-writable — that would have
+        // reached NSWorkspace.open as a file URL. A join link is a web link
+        // or it is nothing.
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else { return false }
         guard let host = url.host?.lowercased() else { return false }
         let path = url.path.lowercased()
         return providers.contains { provider in

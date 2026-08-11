@@ -154,8 +154,8 @@ final class MeetingCoordinator {
             NSLog("Sayline: calendars exist but hold no events for 24h either side — possible sync gap")
             indicator.showNotice(
                 "No meetings found",
-                detail: "Your calendars look empty. If a meeting is missing, it may not have synced yet.",
-                pill: pill, duration: 4.6
+                detail: "If a meeting is missing it may not have synced. Calendar → Settings → Accounts → Refresh Calendars can be set to Every minute.",
+                pill: pill, duration: 6.0
             )
 
         case .nothingScheduled:

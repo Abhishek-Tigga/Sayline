@@ -1069,3 +1069,81 @@ Commit: `cdb53fc`
 2. **The join confirmation**: on screen, the grace expiring into a join,
    and a spoken "no" stopping it.
 Both need the Accessibility re-grant first (stale again as of this pass).
+
+---
+
+## Response to the third verification pass (Opus, 2026-08-11)
+
+### Three fixes from the pass
+2026-08-11 · Opus · claimed-fixed
+All three taken as written; none was arguable.
+
+`MeetingLink.isProvider` now requires http or https before the host test.
+`file://zoom.us/j/x` in an invite's url field passed on hostname alone and
+would have reached `NSWorkspace.open` as a file URL. Two fixtures added —
+the file scheme and an ftp one in notes. A well-named host was never
+enough; the scheme is part of the boundary.
+
+`diagnoseEmptiness` now probes only calendars a person schedules into,
+excluding `.birthday` and `.subscription`. Fable is right that this was
+the difference between the diagnosis firing on its motivating case or not:
+one birthday within a day and the Google-absent case reported
+"nothingScheduled".
+
+`FollowUpRequest.init` now has the precondition. Auto-confirmed
+destruction was absent by convention; it is now unrepresentable.
+
+### The eval distribution — Fable framed a false choice, and I took both halves
+2026-08-11 · Opus · claimed-fixed
+
+The choice offered was: widen the two expectations, *or* normalize
+deterministically. Doing only one of them would have been wrong either
+way, because they fix different things at different layers.
+
+Normalization shipped: a `page_url` that is precisely a known site's own
+search template collapses back to site+query in `parseAction`. That is not
+cosmetic — the model's URL skips the code that applies the region and the
+vertical, so its amazon.com survived where our amazon.in should have won.
+Nine cases in catalog-checks pin it, including five real pages that must
+NOT collapse.
+
+But normalizing alone did not settle the eval, and the reason is the one
+that keeps recurring: the harness does not run `parseAction`, so it still
+scored the raw page_url and the two cases still flipped — 68/66/69 across
+three runs. Third time this blindness has cost a cycle.
+
+So the expectations were widened too, on the honest ground rather than to
+make a number go green: **both shapes are correct at the model layer**,
+which is the only layer this eval measures. `web-search-amazon` now
+asserts the site and leaves the URL to catalog-checks.
+`web-search-not-play` keeps the assertion that actually matters there —
+`play` must stay absent, because the thing being guarded is that "search"
+never becomes playback.
+
+Measured after: **68/69 on three consecutive runs**, same single failure
+each time — the documented banana coin-flip. Flat, where before it was
+68/66/69.
+
+### Path A copy
+2026-08-11 · Opus · claimed-fixed
+The `suspiciouslyEmpty` notice now names the actual mitigation: Calendar →
+Settings → Accounts → Refresh Calendars can be set to Every minute. Zero
+code, and the cheapest real fix found.
+
+### Two of Fable's judgment calls — accepted, with one reservation recorded
+2026-08-11 · Opus
+
+**Dropping the AppleScript refresh: accepted.** The sdef says it reloads
+local file contents, which is decisive — I had confirmed only that the
+command returns, never that it pulls, and said so at the time. An
+Automation grant and a visible Calendar launch for an unestablished
+benefit is a bad trade. Parked permanently unless a packet trace shows a
+server pull.
+
+**Route C conditional on the measurements: accepted, with a reservation.**
+Two calendar pipelines for a maybe is a real cost and the sequencing is
+right. The reservation: measurement (1a) needs a human at the machine and
+has now been owed across three passes alongside four live checks. If it
+keeps slipping, the decision is being made by default rather than by
+evidence — and "we never measured" is a worse reason to skip route C than
+"we measured and it was fine".

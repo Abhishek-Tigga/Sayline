@@ -116,6 +116,13 @@ check("a lookalike domain does not pass — the boundary must be a dot",
       extract(notes: "https://notzoom.us/j/123") == nil)
 check("zoom.us without a meeting path is not a join link",
       extract(notes: "Read more at https://zoom.us/pricing") == nil)
+// A well-named host is not enough. The url field is attacker-writable and
+// goes straight to NSWorkspace.open, so a file:// URL wearing a provider
+// hostname would have been opened as a file.
+check("a file:// URL with a provider host is refused",
+      extract(url: "file://zoom.us/j/9876543210") == nil)
+check("a non-web scheme in notes is refused",
+      extract(notes: "Join: ftp://meet.google.com/abc-defg-hij") == nil)
 
 print("\n  nothing to find")
 check("plain-text notes", extract(notes: "Bring the deck. Room 4.") == nil)

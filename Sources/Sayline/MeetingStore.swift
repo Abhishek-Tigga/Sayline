@@ -74,10 +74,20 @@ final class MeetingStore {
         let calendars = store.calendars(for: .event)
         guard !calendars.isEmpty else { return .noCalendarsConfigured }
 
+        // Only calendars a person actually schedules into. Birthdays and
+        // subscribed holiday feeds almost always hold something within a
+        // day, so probing everything answered "nothingScheduled" for the
+        // exact case this diagnosis exists for — a Google account absent
+        // from macOS, with the meeting sitting visible in a browser tab.
+        let scheduled = calendars.filter {
+            $0.type != .birthday && $0.type != .subscription
+        }
+        guard !scheduled.isEmpty else { return .noCalendarsConfigured }
+
         let dayPredicate = store.predicateForEvents(
             withStart: now.addingTimeInterval(-24 * 3600),
             end: now.addingTimeInterval(24 * 3600),
-            calendars: nil
+            calendars: scheduled
         )
         return store.events(matching: dayPredicate).isEmpty ? .suspiciouslyEmpty : .nothingScheduled
     }

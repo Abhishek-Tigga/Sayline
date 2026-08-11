@@ -386,6 +386,43 @@ enum WebsiteCatalog {
         return url
     }
 
+    /// Reads a URL back into the site and query that would have produced it.
+    ///
+    /// Since the tool descriptions were trimmed, the model sometimes answers
+    /// "search for headphones on Amazon" by putting a *search results* URL
+    /// in `page_url` rather than filling `site` and `query`. The user sees
+    /// the same page either way, so it looked harmless — but it routes
+    /// around the code that applies the region and the vertical, so the
+    /// model's amazon.com survives where our amazon.in should have won, and
+    /// it made two eval cases flip run to run.
+    ///
+    /// Collapsing it here is the house rule rather than another prompt
+    /// attempt: a page URL that is precisely a known site's own search
+    /// template is not a page, it is a search, and we already know how to
+    /// build those properly.
+    static func searchDecomposition(of url: URL) -> (site: String, query: String)? {
+        let absolute = url.absoluteString
+        for site in sites {
+            let templates = [site.searchTemplate] + site.regional.values.map { $0.search }
+            for template in templates.compactMap({ $0 }) {
+                guard let range = template.range(of: "%@") else { continue }
+                let prefix = String(template[template.startIndex..<range.lowerBound])
+                let suffix = String(template[range.upperBound...])
+                guard absolute.hasPrefix(prefix), absolute.hasSuffix(suffix),
+                      absolute.count > prefix.count + suffix.count else { continue }
+                let encoded = String(absolute.dropFirst(prefix.count).dropLast(suffix.count))
+                // A slash in the captured part means we matched a shorter
+                // template than the URL really is — a page, not a search.
+                guard !encoded.contains("/") else { continue }
+                let decoded = encoded.replacingOccurrences(of: "+", with: " ")
+                    .removingPercentEncoding ?? encoded
+                guard !decoded.isEmpty else { continue }
+                return (site.label, decoded)
+            }
+        }
+        return nil
+    }
+
     static func resolve(_ requested: String, query: String?, vertical: String? = nil) -> Resolution {
         let trimmed = requested.trimmingCharacters(in: .whitespacesAndNewlines)
         let (baseName, explicitRegion) = splitCountry(trimmed)
