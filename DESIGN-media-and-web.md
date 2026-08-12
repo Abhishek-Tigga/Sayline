@@ -172,9 +172,15 @@ Three distinct answers, never one:
 - **Access, accounts, no events in window** → "Nothing in the next N hours",
   which is now trustworthy because the other two cases cannot reach here.
 
-Also: account counting currently runs at launch, before Calendar permission
-exists, so a first run always computes zero. It must run after the grant,
-not before.
+Also: account counting appeared to run at launch, before Calendar
+permission exists, always computing zero.
+
+**Corrected while building.** Every product caller already runs after the
+grant — the setup card builds its list at answer time, and Settings builds
+it on appear. Only a `#if DEBUG` diagnostic counted at launch, which is why
+the log read `0 provider(s)` on every cold start. That log was the thing
+that misled, not the card. The diagnostic now says access is not granted
+yet instead of implying the user has no calendars.
 
 The setup card should stop being gated on *dismissal* and start being gated
 on *connection*. Someone who dismisses it while still having nothing

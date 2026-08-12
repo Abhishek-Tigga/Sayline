@@ -74,14 +74,14 @@ matches("unpause", "controlMedia")
 matches("close this tab", "closeCurrentTab")
 matches("close the tab", "closeCurrentTab")
 
-print("\nmedia — must reach the router, or the ask-flow never happens")
-// These name no track, so they belong to the "what would you like to
-// hear?" flow. If the fast path claimed them as a resume, someone with
-// nothing playing would get "Nothing is playing" instead of being asked.
-falls("play music", "no track named — this is the ask-flow")
-falls("play some music", "no track named")
-falls("play a song", "no track named")
-falls("put on some music", "no track named")
+print("\nmedia — wants music, named none: ask rather than guess")
+// These name no track, so they are the ask-flow — now fast-routed, since
+// the answer is a question we already know to ask.
+matches("play music", "askWhatToPlay")
+matches("Play some music.", "askWhatToPlay")
+matches("play a song", "askWhatToPlay")
+matches("put on some music", "askWhatToPlay")
+matches("play something", "askWhatToPlay")
 // Named music is a search, not a transport command.
 falls("play lo-fi on YouTube", "names what to play")
 falls("play Bohemian Rhapsody", "names a track")

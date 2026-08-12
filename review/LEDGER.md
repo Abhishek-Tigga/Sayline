@@ -1623,3 +1623,71 @@ the transport table so the ask-flow can own them.
 then `MediaTarget` missing from the source-concatenation list. The dry run
 passed throughout, because it reads the binary. Only the two pane modes
 still need that list, and the `--parse-actions` migration deletes it.
+
+---
+
+## 2026-08-12 — media stages 3–5 + calendar (Opus)
+
+**A4b · the ask-flow.** `claimed-fixed`. "Play music" and its kin now
+fast-route to `askWhatToPlay`, which asks *"What would you like to hear?"*
+with the shape of an answer named — an artist, a song, a genre. The reply
+resolves through `YouTubeSearch.topVideoURL`, the same top-video path
+"play lo-fi on YouTube" already uses, so it lands on a playing video and
+not a results page — which is what A4b asked for, and what stops "play the
+first one" from being needed.
+
+The reply does not return to the router: intent is already known, a second
+round trip would cost ~2s to re-derive it, and a bare "Bollywood" could
+come back as a web search for the word. Degrades to the YouTube search
+page when there is no key, quota or network.
+
+Also tightened `control_media`'s description, which had been capturing
+"play music" as a resume in tracing.
+
+**A5 · prefer the installed app, else the website.** `claimed-fixed`.
+Built as A5 recommends rather than literally, and the user's build order
+authorised exactly this. One `InstalledAppCatalog` lookup in `parseAction`.
+
+Proven both directions on this machine: Gmail (no app, in catalog) →
+`openWebsite(mail.google.com)`; Figma (installed *and* in catalog) →
+`openApp`. Figma is the only app here that is both, which is what makes it
+the case that proves the gate is live rather than always-true.
+
+Worth recording: Spotify, Slack, WhatsApp and Notion — the four regressions
+A5 warned about — are **not installed on this Mac**, so the literal rule
+would have cost nothing here. The distinction still matters for users who
+have them.
+
+**A9 · calendar.** `claimed-fixed`, and one part of the design note
+**withdrawn as wrong**:
+
+- The setup card is now gated on *connection*, not dismissal. Connected
+  and dismissed stays quiet; nothing connected keeps offering, because
+  dismissing it is dismissing the only route to fixing it.
+- The three-way split and the denied-access fourth state were **already
+  correct** — `reportEmpty` distinguishes `noCalendarsConfigured`,
+  `suspiciouslyEmpty` and `nothingScheduled`, and `ensureAccess` routes
+  denial to `offerSettings`. A9's tightening was already satisfied.
+- **The design note's claim that account counting runs before the grant
+  was wrong.** Every product caller runs after it — the card builds its
+  list at answer time, Settings on appear. Only a `#if DEBUG` diagnostic
+  counted at launch, which is why the log read `0 provider(s)` on cold
+  start and cost a round of misdiagnosis. The log was the thing that
+  misled. Fixed there; no product code restructured. Note corrected.
+
+**Numbers, three runs post-change:** 71/72, 71/72, **72/72**. Pre-change
+was 72/72 three times. Different case failed each time
+(`settings-unknown-pane`, then `settings-screen-time-implicit`), **neither
+involving the new tools**, and neither reproduced in isolation —
+screen-time was 5/5 correct when traced alone, banana settings is a
+measured ~50/50. Historical variance on identical commits in `results.md`
+runs 93%–100%, so this sits inside the noise; the earlier perfect streak
+was itself lucky. Prompt 2412 → **2609** median tokens (+8%) for four new
+tools. Media commands are fast-routed and pay none of it.
+
+All seven check suites green, including `media-checks` (24) and the 24 new
+`fastroute-checks` media cases.
+
+**Not verified by its author, as ever.** Nothing here has been run by a
+human against a real playing track, a real browser tab, or a real empty
+calendar. Every claim above is checks-and-tracing only.

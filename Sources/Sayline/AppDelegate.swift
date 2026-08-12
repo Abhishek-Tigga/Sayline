@@ -135,7 +135,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // card saying "Google" and nothing else.
         Task { @MainActor in
             let store = MeetingStore()
-            SaylineLog.log("[accounts] calendar access granted: \(store.hasAccess)")
+            // Only meaningful once access exists. At launch it usually does
+            // not, and the old unconditional version logged "0 provider(s)"
+            // every cold start — which reads as "this user has no calendars"
+            // and cost a round of misdiagnosis on 2026-08-12. Nothing in the
+            // product computes accounts this early; the setup card builds
+            // its list at answer time, after the grant.
+            guard store.hasAccess else {
+                SaylineLog.log("[accounts] calendar access not granted yet — not counting accounts")
+                return
+            }
             let accounts = store.connectedAccounts()
             SaylineLog.log("[accounts] \(accounts.count) provider(s): "
                 + accounts.map { "\($0.provider)=\($0.addresses.joined(separator: "|"))" }

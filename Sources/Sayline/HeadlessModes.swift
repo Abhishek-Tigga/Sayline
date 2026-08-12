@@ -131,6 +131,7 @@ enum HeadlessModes {
         case .controlMedia(let command):
             return ["action": "controlMedia", "command": command.rawValue]
         case .closeCurrentTab: return ["action": "closeCurrentTab"]
+        case .askWhatToPlay: return ["action": "askWhatToPlay"]
         case .setVolume(let change): return ["action": "setVolume", "change": change.rawValue]
         case .setWiFi(let on): return ["action": "setWiFi", "enabled": on]
         case .setDarkMode(let on): return ["action": "setDarkMode", "enabled": on]

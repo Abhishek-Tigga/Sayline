@@ -192,6 +192,7 @@ def swift_helper(mode, stdin_text=""):
         # migration in BACKLOG.md deletes. Until that lands, this comment is
         # the warning.
         (SRC / "NowPlaying.swift").read_text(),   # MediaTarget
+        (SRC / "InstalledAppCatalog.swift").read_text(),  # open_app fallback
         (SRC / "MediaControl.swift").read_text(),
         (SRC / "AgentRouter.swift").read_text(),
         SWIFT_STUBS,

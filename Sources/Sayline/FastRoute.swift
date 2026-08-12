@@ -95,6 +95,14 @@ enum FastRoute {
          .controlMedia(.previous)),
         (["close this tab", "close the tab", "close tab", "close this",
           "close the current tab"], .closeCurrentTab),
+        // Wants music, named none. Fast-routed because the answer is a
+        // question we already know to ask — sending it to the model costs
+        // two seconds to be told what the phrase itself says, and the model
+        // has been observed routing these three different ways run to run.
+        (["play music", "play some music", "play a song", "play something",
+          "put on some music", "put some music on", "play me some music",
+          "play me a song", "i want to listen to music", "play some songs"],
+         .askWhatToPlay),
         // The commonest thing this feature is for, answered with no round
         // trip: a calendar query is tens of milliseconds, so join becomes
         // the fastest command in the app.

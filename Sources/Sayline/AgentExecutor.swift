@@ -28,6 +28,11 @@ enum AgentExecutor {
             return openSystemSettingsFallback(requestedPaneName: requestedPaneName)
         case .lockScreen:
             return lockScreen()
+        case .askWhatToPlay:
+            // AgentTurnRunner owns this — it asks the question and plays
+            // the answer. Nothing to do without a conversation.
+            SaylineLog.log("askWhatToPlay reached the executor — the runner should have handled it")
+            return false
         case .controlMedia:
             // AgentTurnRunner owns this: it has to find the target, may
             // have to ask which of two, and always has a sentence to show.

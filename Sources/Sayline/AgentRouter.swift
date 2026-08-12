@@ -330,7 +330,7 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "control_media",
-                "description": "Controls whatever is already playing — music, a video, a podcast — wherever it is playing. Use for \"stop the music\", \"pause\", \"skip this song\", \"go back a track\", \"resume\". This never opens or searches for anything: if the user names something to play that is not already playing, use open_website instead. For volume use set_volume, not this.",
+                "description": "Controls audio that is ALREADY playing — pause it, resume it, skip a track. Use for \"stop the music\", \"pause\", \"skip this song\", \"go back a track\", \"resume\". Never use this to start something that is not already playing: \"play music\", \"play a song\", \"play some jazz\" and \"play X on YouTube\" are all open_website with play=true, even the ones that name nothing. For volume use set_volume, not this.",
                 "parameters": [
                     "type": "object",
                     "properties": [
@@ -770,6 +770,25 @@ final class AgentRouter {
             return .closeCurrentTab
         case "open_app":
             guard let appName = arguments["app_name"] as? String else { return nil }
+            // Prefer the installed app; fall back to the website when no
+            // such app exists.
+            //
+            // Traced 2026-08-12: "Open Gmail" routes to open_website and
+            // works, "open gmail" routes to open_app and does nothing at
+            // all — the same request, decided by one capital letter, and
+            // there is no Gmail app on macOS for that branch to launch.
+            // Rather than try to make the model consistent, make either
+            // answer land somewhere real.
+            //
+            // Deliberately not "always the website": that would fix Gmail
+            // and break Spotify, Slack, WhatsApp and Notion, all of which
+            // are installed apps people mean when they name them. One
+            // catalog lookup keeps both.
+            if InstalledAppCatalog.realName(for: appName) == nil,
+               case .site(let label, let url) = WebsiteCatalog.resolve(appName, query: nil) {
+                SaylineLog.log("no \"\(appName)\" app installed — opening \(label) instead")
+                return .openWebsite(label: label, url: url)
+            }
             return .openApp(name: appName)
         case "find_file":
             guard let query = arguments["query"] as? String else { return nil }
@@ -857,6 +876,15 @@ final class AgentRouter {
             if wantsPlayback, let query, !query.isEmpty,
                WebsiteCatalog.isYouTube(site) {
                 return .playOnYouTube(query: query)
+            }
+            // "Play music" — playback wanted, nothing named. Opening
+            // youtube.com and playing nothing is what this used to do, and
+            // it is a worse answer than a question. Caught here as a
+            // deterministic rule rather than by asking the prompt to
+            // behave: the model has been observed routing this three
+            // different ways across runs.
+            if wantsPlayback, query?.isEmpty != false, WebsiteCatalog.isYouTube(site) {
+                return .askWhatToPlay
             }
             switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query, vertical: vertical) {
             case .site(let label, let url):

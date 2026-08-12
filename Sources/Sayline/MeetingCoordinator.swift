@@ -204,11 +204,23 @@ final class MeetingCoordinator {
     }
 
     private func offerSetupIfFirstTime() {
-        guard !CalendarSetupState.hasBeenDismissed else {
+        let accounts = store.connectedAccounts()
+        // Gated on connection, not on dismissal.
+        //
+        // Dismissal is the right silence for someone who is already set
+        // up — they have seen it, they are fine, stop asking. It is the
+        // wrong silence for someone with nothing connected: they have
+        // dismissed the only route to fixing it, and tomorrow they get the
+        // same empty answer with no way back. Nothing else in the app
+        // teaches you that Google calendars must be added to macOS first.
+        //
+        // So: connected and dismissed means quiet. Not connected means
+        // keep offering, however many times it takes.
+        guard accounts.isEmpty || !CalendarSetupState.hasBeenDismissed else {
             announceNewAccounts()
             return
         }
-        present(.init(step: .review, accounts: store.connectedAccounts()))
+        present(.init(step: .review, accounts: accounts))
     }
 
     private func present(_ card: CalendarSetupCard) {

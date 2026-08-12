@@ -100,6 +100,9 @@ final class AgentTurnRunner {
             Task { await self.controlMedia(command) }
             return .asking
 
+        case .askWhatToPlay:
+            return askWhatToPlay()
+
         case .closeCurrentTab:
             return closeCurrentTab()
 
@@ -181,6 +184,60 @@ final class AgentTurnRunner {
         let sentence = await Task.detached { MediaControl.perform(command, on: target) }.value
         SaylineLog.log("media \(command.rawValue) on \(target) -> \(sentence)")
         indicator.flashMessage(sentence, duration: 3.0)
+    }
+
+    /// Asks what to play, then plays it — without going back to the model.
+    ///
+    /// The question offers the shape of an answer rather than leaving it
+    /// open. "What would you like to hear?" invites silence; naming the
+    /// three kinds of answer that work — an artist, a song, a genre — tells
+    /// someone that "Bollywood" is a complete reply.
+    ///
+    /// The reply bypasses the router deliberately. Intent is already known,
+    /// so a second round trip would spend two seconds re-deriving it, and
+    /// re-routing a bare "Bollywood" risks it coming back as a web search
+    /// for the word.
+    private func askWhatToPlay() -> ActionOutcome {
+        indicator.askFollowUp(
+            FollowUpRequest(
+                question: "What would you like to hear?",
+                detail: "An artist, a song, or a genre — Bollywood, lo-fi, Afrobeat",
+                kind: .value(hint: "Hold the hotkey and say it")
+            )
+        ) { [weak self] answer in
+            guard let self else { return }
+            guard case .spoken(let request) = answer,
+                  !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                // Declined or timed out. Nothing was playing before and
+                // nothing is playing now, so there is nothing to undo —
+                // just say the question closed.
+                self.indicator.flashMessage("Nothing playing", duration: 2.0)
+                return
+            }
+            Task { await self.play(request) }
+        }
+        return .asking
+    }
+
+    private func play(_ request: String) async {
+        indicator.show(state: .agentRouting)
+        // The same top-video path "play lo-fi on YouTube" already uses, so
+        // a reply lands on a playing video rather than a results page.
+        guard let url = await YouTubeSearch.topVideoURL(for: request) else {
+            // No key, no quota, or no network. The search page is what the
+            // rest of the app degrades to, so degrade the same way instead
+            // of failing — they can press play themselves.
+            guard case .site(let label, let searchURL) = WebsiteCatalog.resolve("YouTube", query: request) else {
+                indicator.flashMessage("Couldn't find anything for \"\(request)\"", duration: 3.0)
+                return
+            }
+            SaylineLog.log("no video for \"\(request)\" — opening YouTube search instead")
+            AgentExecutor.execute(.openWebsite(label: label, url: searchURL))
+            indicator.flashMessage("Opened YouTube results for \"\(request)\"", duration: 3.0)
+            return
+        }
+        AgentExecutor.execute(.openWebsite(label: "YouTube — \(request)", url: url))
+        indicator.flashMessage("Playing \(request)", duration: 2.4)
     }
 
     /// Closes a browser tab, and refuses to send the keystroke anywhere

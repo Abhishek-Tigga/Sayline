@@ -36,6 +36,15 @@ enum AgentAction {
     /// already covered by checks.
     case controlMedia(MediaCommand)
 
+    /// They want music but named none — so ask, rather than guess.
+    ///
+    /// "Play music" used to open youtube.com and play nothing, which is a
+    /// worse answer than a question. The reply resolves straight to a video
+    /// through the existing top-video path and never returns to the router:
+    /// a second round trip would cost two seconds to re-derive an intent
+    /// already known, and could re-route "Bollywood" as a web search.
+    case askWhatToPlay
+
     /// Closes the frontmost browser tab, and only a browser's.
     ///
     /// Sent as a keystroke to whatever holds focus, so it is gated on the
