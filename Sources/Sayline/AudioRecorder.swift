@@ -12,6 +12,10 @@ final class AudioRecorder {
     /// Frames the tap actually wrote. Zero means the device accepted the
     /// engine but never delivered audio — see `capturedNoAudio`.
     private var framesWritten: AVAudioFramePosition = 0
+    /// Diagnostics for the 2026-08-12 zero-frame bug. Remove with the
+    /// [mic] log lines once the cause is known.
+    private var tapCallbacks = 0
+    private var firstBufferLogged = false
     /// Name of the device the engine really used, read after `start()`.
     private(set) var lastInputDeviceName = "unknown"
 
@@ -118,8 +122,30 @@ final class AudioRecorder {
         }
 
         framesWritten = 0
+        // Temporary diagnostics for the zero-frame bug of 2026-08-12, where
+        // every recording produced frames: 0 while an independent
+        // AVAudioEngine in another process captured 48000 in three seconds
+        // on the same device. The question these answer is the one the log
+        // could not: does the tap fire at all, and if so with what?
+        tapCallbacks = 0
+        firstBufferLogged = false
+        SaylineLog.log("[mic] engine.isRunning before start: \(engine.isRunning), "
+            + "format \(format.sampleRate)Hz \(format.channelCount)ch, "
+            + "inputNode format \(input.inputFormat(forBus: 0).sampleRate)Hz")
+
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            guard let self, let file = self.audioFile else { return }
+            guard let self else { return }
+            self.tapCallbacks += 1
+            if !self.firstBufferLogged {
+                self.firstBufferLogged = true
+                var peak: Float = 0
+                if let data = buffer.floatChannelData?[0] {
+                    for i in 0..<Int(buffer.frameLength) { peak = max(peak, abs(data[i])) }
+                }
+                SaylineLog.log("[mic] first tap buffer: \(buffer.frameLength) frames, peak \(peak), "
+                    + "file \(self.audioFile == nil ? "MISSING" : "ready")")
+            }
+            guard let file = self.audioFile else { return }
             do {
                 try file.write(from: buffer)
                 self.framesWritten += AVAudioFramePosition(buffer.frameLength)
@@ -155,6 +181,7 @@ final class AudioRecorder {
         isRecording = false
         lastRecordingDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
         SaylineLog.log("recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s frames: \(framesWritten)")
+        SaylineLog.log("[mic] tap fired \(tapCallbacks) time(s) during that recording")
     }
 
     /// True only if the just-finished recording is an accidental hotkey tap
