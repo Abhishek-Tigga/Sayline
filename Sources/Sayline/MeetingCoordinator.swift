@@ -184,34 +184,65 @@ final class MeetingCoordinator {
     /// which is only worth asking for while it is still novel.
     private func offerSetupIfFirstTime() {
         guard !CalendarSetupState.hasBeenDismissed else { return }
-        present(.init(step: .connect, accounts: store.connectedAccounts()))
+        present(.init(step: .review, accounts: store.connectedAccounts()))
     }
 
     private func present(_ card: CalendarSetupCard) {
         indicator.showSetupCard(card) { [weak self] action in
             guard let self else { return }
             switch (card.step, action) {
-            case (.connect, .primary):
-                // Internet Accounts is where Google and Outlook are added,
-                // and it is the one step with a working deep link.
-                if let url = URL(string:
-                    "x-apple.systempreferences:com.apple.preferences.internetaccounts") {
-                    NSWorkspace.shared.open(url)
-                }
-                // Straight to step two rather than ending here — the
-                // refresh interval is the half that actually causes wrong
-                // answers, and nobody would come back for it on their own.
-                self.present(.init(step: .refreshRate, accounts: card.accounts))
+
+            case (.review, .primary):
+                // Internet Accounts is where Google is added, and it has a
+                // working deep link. Then wait: adding an account happens
+                // over there and takes as long as it takes, so racing ahead
+                // to the next instruction would be talking to nobody.
+                self.open("x-apple.systempreferences:com.apple.preferences.internetaccounts")
+                self.present(.init(step: .adding, accounts: card.accounts))
+
+            case (.adding, .primary):
+                // They say it is added, so read the accounts again — the
+                // card that follows should reflect what is actually there
+                // rather than the picture from before they left.
+                self.present(.init(step: .refreshRate,
+                                   accounts: self.store.connectedAccounts()))
 
             case (.refreshRate, .primary):
-                // Calendar's own settings cannot be deep-linked; opening
-                // the app is as close as we get, and the card says which
-                // two keystrokes follow.
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+                self.openCalendarSettings()
                 self.finishSetup()
 
             case (_, .dismiss):
                 self.finishSetup()
+            }
+        }
+    }
+
+    private func open(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Opens Calendar's own Accounts settings, rather than describing where
+    /// they live.
+    ///
+    /// The refresh interval is inside Calendar.app and has no deep link, so
+    /// this activates the app and sends ⌘, — which lands directly on the
+    /// Accounts tab, confirmed live. It needs Automation permission for
+    /// System Events the first time, and that is the right trade: one
+    /// prompt against telling somebody to go and find a preference two
+    /// menus deep, which is the instruction people abandon.
+    private func openCalendarSettings() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+        let script = """
+        tell application "Calendar" to activate
+        delay 0.6
+        tell application "System Events" to keystroke "," using command down
+        """
+        DispatchQueue.global(qos: .userInitiated).async {
+            var error: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&error)
+            if let error {
+                SaylineLog.log("couldn't open Calendar settings automatically -> \(error)")
             }
         }
     }

@@ -13,6 +13,12 @@ import Foundation
 /// and reminders are separate TCC grants with separate request calls, the
 /// two share no state worth sharing, and two small stores that each mirror
 /// a proven shape beat one store carrying two permission lifecycles.
+/// One calendar provider, and which of its accounts are on this Mac.
+struct ConnectedAccount: Equatable {
+    let provider: String
+    let addresses: [String]
+}
+
 enum CalendarAccess: Equatable {
     case granted
     /// Refused or restricted. Both are dead ends from code — macOS will not
@@ -52,16 +58,37 @@ final class MeetingStore {
         }
     }
 
-    /// The accounts actually supplying event calendars, by name.
+    /// The accounts supplying event calendars, with their addresses.
     ///
-    /// Shown in the setup card so the decision is informed: "iCloud" alone
-    /// tells someone whose work calendar is Google exactly what is wrong,
-    /// where "no meetings found" tells them nothing.
-    func connectedAccounts() -> [String] {
-        let names = store.calendars(for: .event)
+    /// `EKSource.title` is only ever the provider — "Google", "iCloud" —
+    /// which is not enough to answer the question someone actually has:
+    /// *which* of my accounts is connected. With two Gmail addresses,
+    /// "Google" tells you nothing about whether the right one is here.
+    ///
+    /// The addresses come from calendar titles. Google names a person's
+    /// primary calendar after their email, so an "@" in a calendar title
+    /// inside a Google source is the account. Heuristic rather than an API,
+    /// because EventKit exposes no account address — so an empty address
+    /// list degrades to just the provider name rather than to nothing.
+    func connectedAccounts() -> [ConnectedAccount] {
+        let calendars = store.calendars(for: .event)
             .filter { $0.type != .birthday && $0.type != .subscription }
-            .compactMap { $0.source?.title }
-        return Array(Set(names)).sorted()
+
+        #if DEBUG
+        SaylineLog.log("[accounts] raw calendars: "
+            + calendars.map { "\($0.source?.title ?? "?")/\($0.title)" }.joined(separator: ", "))
+        #endif
+
+        var byProvider: [String: Set<String>] = [:]
+        for calendar in calendars {
+            guard let provider = calendar.source?.title else { continue }
+            byProvider[provider, default: []].formUnion(
+                calendar.title.contains("@") ? [calendar.title] : []
+            )
+        }
+        return byProvider
+            .map { ConnectedAccount(provider: $0.key, addresses: $0.value.sorted()) }
+            .sorted { $0.provider < $1.provider }
     }
 
     /// Why an empty result was empty.

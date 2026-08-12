@@ -12,53 +12,80 @@ import Foundation
 /// Neither half can be automated. There is no public API to add a CalDAV
 /// account, the refresh interval lives in a protected store, and
 /// `refreshSourcesIfNecessary()` was measured not to force a pull. So the
-/// honest remaining move is to teach the two steps once, name the accounts
-/// already connected so the decision is informed, and get out of the way.
+/// honest remaining move is to walk the two steps once and open every door
+/// we can open on the way.
 ///
-/// Shown once and then never again unless asked for. A card that reappears
-/// every time someone checks their calendar is a card people learn to
-/// dismiss without reading.
+/// Three steps rather than two, because the middle one is a wait. Adding an
+/// account happens in another app and takes as long as it takes; a card
+/// that raced ahead to "now set the refresh rate" while someone was still
+/// signing in would be talking to nobody.
 struct CalendarSetupCard: Equatable {
     enum Step: Equatable {
-        /// What Sayline can see, and the offer to change it.
-        case connect
-        /// Said after Internet Accounts opens — the part that lives inside
-        /// Calendar.app and cannot be deep-linked to.
+        /// What Sayline can see right now, and the offer to change it.
+        case review
+        /// Waiting while they add an account in System Settings.
+        case adding
+        /// The refresh interval — the half that causes wrong answers.
         case refreshRate
     }
 
     let step: Step
-    /// Accounts currently supplying event calendars, by name. Empty is the
-    /// loudest possible version of this card.
-    let accounts: [String]
+    let accounts: [ConnectedAccount]
+
+    /// "2 Google accounts", "Google and iCloud", "Nothing connected".
+    var summary: String {
+        guard !accounts.isEmpty else { return "No calendar accounts connected" }
+        let parts = accounts.map { account -> String in
+            let count = account.addresses.count
+            return count > 1 ? "\(count) \(account.provider) accounts" : account.provider
+        }
+        if parts.count == 1 { return "\(parts[0]) connected" }
+        return "\(parts.dropLast().joined(separator: ", ")) and \(parts.last!) connected"
+    }
+
+    /// The addresses themselves, which is the part that answers "is it the
+    /// right account". Empty when EventKit exposed none.
+    var addressLines: [String] {
+        accounts.flatMap { account in
+            account.addresses.isEmpty ? [] : account.addresses.map { "\(account.provider) · \($0)" }
+        }
+    }
 
     var title: String {
         switch step {
-        case .connect:
-            return accounts.isEmpty ? "No calendars connected" : "Calendar setup"
-        case .refreshRate:
-            return "One more step"
+        case .review: return accounts.isEmpty ? "No calendars connected" : "Calendar accounts"
+        case .adding: return "Add your account"
+        case .refreshRate: return "One last step"
         }
     }
 
     var detail: String {
         switch step {
-        case .connect:
-            if accounts.isEmpty {
-                return "Sayline reads your Mac's calendar. Google and Outlook have to be added in System Settings first."
-            }
-            return "Sayline reads your Mac's calendar, so it only sees accounts added here."
+        case .review:
+            return accounts.isEmpty
+                ? "Sayline reads your Mac's calendar. Google and Outlook have to be added in System Settings first."
+                : "Sayline only sees accounts added to this Mac. Missing one?"
+        case .adding:
+            return "In System Settings, click Add Account and choose Google. Come back and press Done when it is added."
         case .refreshRate:
-            return "In Calendar, press ⌘, then Accounts, and set Refresh Calendars to Every minute. Otherwise changes take up to 15 minutes to reach Sayline."
+            return "Set Refresh Calendars to Every minute. Without it, changes take up to 15 minutes to reach Sayline."
         }
     }
 
     var primaryLabel: String {
-        step == .connect ? "Open Accounts" : "Open Calendar"
+        switch step {
+        case .review: return "Add an account"
+        case .adding: return "Done"
+        case .refreshRate: return "Open Calendar settings"
+        }
     }
 
     var secondaryLabel: String {
-        step == .connect ? "Not now" : "Done"
+        switch step {
+        case .review: return "Looks right"
+        case .adding: return "Cancel"
+        case .refreshRate: return "Skip"
+        }
     }
 }
 

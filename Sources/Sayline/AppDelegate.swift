@@ -128,6 +128,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         #endif
         AudioRecorder.sweepOrphanedRecordings()
         InstalledAppCatalog.load()
+        #if DEBUG
+        // Proves the address heuristic finds something on a real machine.
+        // EventKit exposes no account address, so this reads calendar
+        // titles, and a heuristic that quietly finds nothing would ship a
+        // card saying "Google" and nothing else.
+        Task { @MainActor in
+            let store = MeetingStore()
+            SaylineLog.log("[accounts] calendar access granted: \(store.hasAccess)")
+            let accounts = store.connectedAccounts()
+            SaylineLog.log("[accounts] \(accounts.count) provider(s): "
+                + accounts.map { "\($0.provider)=\($0.addresses.joined(separator: "|"))" }
+                    .joined(separator: "  "))
+        }
+        #endif
         hotkeyManager.hotkeyOption = hotkeyOption
         hotkeyManager.onHotkeyDown = { [weak self] in
             DispatchQueue.main.async { self?.beginRecording() }

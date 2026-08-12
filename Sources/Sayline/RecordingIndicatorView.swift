@@ -421,7 +421,7 @@ private struct SetupBox: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 3)
 
-            if card.step == .connect {
+            if card.step == .review {
                 accountList
             }
 
@@ -440,17 +440,24 @@ private struct SetupBox: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// Names what is already connected. "iCloud" on its own tells someone
-    /// whose work calendar is Google exactly what is missing.
+    /// Names the accounts, and the addresses under them.
+    ///
+    /// "Google" alone does not answer the question someone actually has —
+    /// with two Gmail addresses, which one is connected? So the summary
+    /// counts them and the lines below name them.
     private var accountList: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Text(card.accounts.isEmpty ? "Connected:" : "Connected:")
-                .font(.system(size: 11))
-                .opacity(0.5)
-            Text(card.accounts.isEmpty ? "nothing yet" : card.accounts.joined(separator: ", "))
+        VStack(alignment: .leading, spacing: 3) {
+            Text(card.summary)
                 .font(.system(size: 11, weight: .medium))
                 .opacity(0.9)
                 .fixedSize(horizontal: false, vertical: true)
+            ForEach(card.addressLines, id: \.self) { line in
+                Text(line)
+                    .font(.system(size: 11))
+                    .opacity(0.55)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
         .foregroundStyle(PillStyle.foreground)
         .padding(.top, 8)
