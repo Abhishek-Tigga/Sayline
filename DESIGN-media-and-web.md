@@ -148,6 +148,92 @@ The setup card should stop being gated on *dismissal* and start being gated
 on *connection*. Someone who dismisses it while still having nothing
 connected will hit the same wall tomorrow with no way back.
 
+## Playing music without interrupting the person
+
+The request: someone working says "play some lo-fi". They should not be
+thrown into a full-screen YouTube window and have to claw their way back.
+The proposed shape was Picture-in-Picture — Safari supports it for YouTube,
+Chrome is less certain.
+
+### Measured: our own floating player is not possible
+
+The most seamless design would be Sayline's own small always-on-top panel
+playing the video — no browser, no tab, no focus change, and we control the
+window. It was worth testing before proposing, and it fails.
+
+YouTube refuses to play inside a `WKWebView`. Five probes:
+
+| Attempt | Result |
+|---|---|
+| Plain `/embed/ID?autoplay=1` | player loads, `paused:true`, `duration:0` |
+| Same with a Safari user agent | identical |
+| Official IFrame Player API + `playVideo()` | **error 152**, no video element |
+| Same, muted first (the usual autoplay dodge) | **error 152** |
+| All of the above re-run with a freshly fetched, live video ID | unchanged |
+
+Error 152 is an embedding refusal, not a bug in our code and not a dead
+video. YouTube gates playback to real browsers. No user agent, origin, or
+autoplay flag gets around it, and anything that did would be circumventing
+a deliberate restriction — not something to build a commercial product on.
+
+**So Picture-in-Picture in a window we own is out.** Not hard: unavailable.
+
+### Measured: the browser routes, and the tension between them
+
+| Route | Focus | Plays? |
+|---|---|---|
+| `open -g` (documented as background) | **stolen** — Chrome activates anyway | — |
+| AppleScript `make new tab` | **kept**, verified | **no** — background tabs do not autoplay |
+| AppleScript tab + `activate` | stolen for ~6s | **yes**, audible after 6s |
+
+That is the whole problem in three rows. Browsers only autoplay sound in a
+foreground tab that the person has engaged with. Keeping their focus means
+no music; getting music means taking their focus.
+
+**But playback survives losing focus.** Once Safari was audible, moving to
+another app left it playing. Verified.
+
+### What this makes possible
+
+Open in the foreground, wait until sound actually starts, then hand focus
+straight back to the app they were in. The per-process audio detector
+already built is what makes this honest — we return focus the moment
+playback is *observed*, not after a guessed delay.
+
+Cost, measured: about six seconds of YouTube on screen before focus
+returns. That is a real interruption, smaller than today's but not zero.
+
+Triggering PiP itself is still not automatable. Safari's PiP needs either a
+user gesture or `webkitSetPresentationMode`, which requires "Allow
+JavaScript from Apple Events" — a hidden Develop-menu setting no consumer
+will have on. If PiP is wanted, someone presses the button.
+
+### The reframe worth arguing about
+
+For **music**, the video is not the point. PiP was a means; the end was
+"don't break my flow." Once a background tab is playing and the user can
+say "next", "louder", "stop" without touching it, an invisible tab may beat
+a small visible window. PiP matters for a lecture or a match. For lo-fi it
+may be solving the wrong half.
+
+Also relevant, and specific to this machine: no Spotify installed, and
+Apple Music needs a subscription to play arbitrary tracks. The clean answer
+for other users — hand music to a real music app, which has no window and
+no focus problem at all — is not available here. Worth designing for when
+it is present, but it cannot be the primary path.
+
+### Open questions on this, for Fable
+
+6. **Is six seconds of stolen focus acceptable**, or is a silent background
+   tab that needs one click better? Note the first is automatic and
+   interrupting; the second is unintrusive and incomplete.
+7. **Is there a route none of the five probes covered?** A helper the
+   browser trusts, a different embeddable source, an audio-only path that
+   is legitimate rather than a scrape. Say so if the conclusion that
+   `WKWebView` is a dead end is wrong — it is load-bearing for this design.
+8. **Should music prefer a real music app when one exists**, falling back
+   to the browser only when it does not?
+
 ## Open questions for review
 
 1. **Why did play work and pause not?** This is the load-bearing unknown.

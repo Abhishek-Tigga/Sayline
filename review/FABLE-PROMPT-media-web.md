@@ -49,6 +49,25 @@ this mechanism, and the design needs rewriting rather than patching. The
 probes are in the scratchpad and the results are quoted in the note. Say
 plainly if you think the conclusion drawn from them is wrong.
 
+## The second load-bearing unknown: playing music without interrupting
+
+The user's goal is that "play some lo-fi" should not throw them out of what
+they are doing. Picture-in-Picture was the proposed shape.
+
+Five probes establish that YouTube will not play inside a `WKWebView` at
+all — error 152, an embedding refusal, reproduced with the official IFrame
+API and a freshly fetched live video ID. A player window we own is out.
+
+The browser routes trade off against each other: a background tab keeps
+focus but does not autoplay; a foreground tab plays but costs about six
+seconds of the user's screen. Playback does survive losing focus, which is
+what makes "open, wait for real audio, hand focus back" viable.
+
+Read that section of the design note carefully and challenge it. If
+`WKWebView` is not actually a dead end, or there is a legitimate route none
+of the five probes covered, that finding is worth more than everything else
+in this review.
+
 ## Standards
 
 Judge against the pillars in `CLAUDE.md`, not against taste:
