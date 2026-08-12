@@ -1571,3 +1571,55 @@ B1 assumes A9 landed. B4 waits for the media tools from A2/A3.
 
 Per the ledger rule: everything above is analysis, marked claimed;
 nothing is VERIFIED, including by me.
+
+---
+
+## 2026-08-12 — media control, stages 1–2 (Opus)
+
+**A2/A3 · per-target control routing.** `claimed-fixed`.
+
+`MediaTarget` finds what is audible via the public per-process audio API
+(macOS 14.2+), excluding our own PID — we always hold an output stream, so
+without that exclusion "nothing is playing" is unsayable. `MediaControl`
+then routes by target: AppleScript for Music/Spotify, where player state is
+queryable and the sentence can describe an outcome; a media key for
+browsers and unknowns, where it cannot, and the sentence names only what
+was sent. Two audible targets ask via the follow-up primitive; silence
+picks neither.
+
+Adopted per-target routing on the evidence rather than despite it: the
+media key could not be made to behave reproducibly across repeated probes
+(see the design note), so it is the fallback and never load-bearing.
+
+Media phrases are in FastRoute's fixed table — whole-utterance, ~5ms, no
+round trip, per A3. No `mediaMute`; `setVolume(.mute)` already exists, per
+A7. AppleScript and process inspection both run off the main thread.
+
+**A4c/A7 · the frontmost gate.** `claimed-fixed`. `closeCurrentTab` sends
+Cmd+W only when the frontmost app classifies as a browser, and says which
+it did either way. No confirmation, per A7.
+
+Checks: `eval/media-checks` (24, new) covers classification and the
+phrase-per-mechanism rule, including that a browser never claims an
+outcome even when handed a state. `eval/fastroute-checks` gained 24 media
+cases, including negatives that keep "play music" and "play a song" out of
+the transport table so the ask-flow can own them.
+
+**Two things a reviewer should not take on trust:**
+
+1. Router eval is **71/72**, down from 72/72, on `settings-unknown-pane`.
+   Traced separately: "Open banana settings" is a ~50/50 coin flip at
+   temperature 0 — four runs, two correct punts, two confident "About".
+   So the previous 72/72 contained a flip that landed right. Whether the
+   two new tools shifted those odds is not established either way. The
+   deterministic correction only fires when the model punts, by design, so
+   a confident wrong pane is passed through. Not fixed here; flagged.
+2. Prompt cost rose with two new tools: median 2412 → **2587 tokens**
+   (+175, +7%). Median latency 1122 → 1145 ms. The fast path answers the
+   media phrases at ~5ms, so the commands this was built for do not pay it;
+   everything else does.
+
+**The eval file list broke for the fourth time**, identically — `MediaCommand`
+then `MediaTarget` missing from the source-concatenation list. The dry run
+passed throughout, because it reads the binary. Only the two pane modes
+still need that list, and the `--parse-actions` migration deletes it.

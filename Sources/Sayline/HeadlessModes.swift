@@ -128,6 +128,9 @@ enum HeadlessModes {
         case .openSystemSettingsFallback(let requested):
             return ["action": "openSystemSettingsFallback", "requested": requested]
         case .lockScreen: return ["action": "lockScreen"]
+        case .controlMedia(let command):
+            return ["action": "controlMedia", "command": command.rawValue]
+        case .closeCurrentTab: return ["action": "closeCurrentTab"]
         case .setVolume(let change): return ["action": "setVolume", "change": change.rawValue]
         case .setWiFi(let on): return ["action": "setWiFi", "enabled": on]
         case .setDarkMode(let on): return ["action": "setDarkMode", "enabled": on]

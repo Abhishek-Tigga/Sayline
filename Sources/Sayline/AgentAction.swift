@@ -28,6 +28,23 @@ enum AgentAction {
     case joinMeeting
     case whatsNextMeeting
     case lockScreen
+
+    /// Acts on whatever is already playing. Carries no destination, which
+    /// is what distinguishes this family from every case above it — see
+    /// `MediaControl`. There is deliberately no mute case here:
+    /// `setVolume(.mute)` already exists, is already fast-routed, and is
+    /// already covered by checks.
+    case controlMedia(MediaCommand)
+
+    /// Closes the frontmost browser tab, and only a browser's.
+    ///
+    /// Sent as a keystroke to whatever holds focus, so it is gated on the
+    /// frontmost app actually being a browser. Without that gate, Cmd+W
+    /// into Pages closes someone's document — the command would appear to
+    /// work while doing something entirely different, which is the failure
+    /// mode this project treats as the worst kind.
+    case closeCurrentTab
+
     case setVolume(VolumeChange)
     case setWiFi(enabled: Bool)
     case setDarkMode(enabled: Bool)

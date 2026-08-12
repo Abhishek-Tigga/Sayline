@@ -60,6 +60,38 @@ falls("what's my next reminder", "a reminder, not a meeting")
 falls("cancel my next meeting", "calendar writes are out of scope")
 falls("what meetings do I have today", "list-shaped, parked")
 
+print("\nmedia control — fixed vocabulary, so it must never pay the round trip")
+matches("stop the music", "controlMedia")
+matches("Stop the music.", "controlMedia")
+matches("pause", "controlMedia")
+matches("pause it", "controlMedia")
+matches("stop", "controlMedia")
+matches("next song", "controlMedia")
+matches("skip this song", "controlMedia")
+matches("previous track", "controlMedia")
+matches("resume", "controlMedia")
+matches("unpause", "controlMedia")
+matches("close this tab", "closeCurrentTab")
+matches("close the tab", "closeCurrentTab")
+
+print("\nmedia — must reach the router, or the ask-flow never happens")
+// These name no track, so they belong to the "what would you like to
+// hear?" flow. If the fast path claimed them as a resume, someone with
+// nothing playing would get "Nothing is playing" instead of being asked.
+falls("play music", "no track named — this is the ask-flow")
+falls("play some music", "no track named")
+falls("play a song", "no track named")
+falls("put on some music", "no track named")
+// Named music is a search, not a transport command.
+falls("play lo-fi on YouTube", "names what to play")
+falls("play Bohemian Rhapsody", "names a track")
+// Volume already has its own routed, tested action; there is no media
+// mute case and this must not start matching one.
+matches("mute", "setVolume")
+matches("louder", "setVolume")
+falls("stop the video in Chrome", "names an app — not whole-utterance")
+falls("pause my meeting", "not a media command")
+
 print("\nMUST reach the router — a wrong answer here eats the sentence")
 falls("open Safari and check my battery", "two commands in one utterance")
 falls("lock the screen then open Safari", "two commands")

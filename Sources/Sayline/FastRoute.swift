@@ -68,6 +68,33 @@ enum FastRoute {
         (["turn off dark mode", "disable dark mode", "dark mode off", "switch to light mode"], .setDarkMode(enabled: false)),
         (["turn on wifi", "turn wifi on", "enable wifi", "turn on wi fi", "turn wi fi on"], .setWiFi(enabled: true)),
         (["turn off wifi", "turn wifi off", "disable wifi", "turn off wi fi", "turn wi fi off"], .setWiFi(enabled: false)),
+        // Media control belongs here by construction: fixed vocabulary, no
+        // arguments, and the standing rule that a design answering "stop"
+        // after a two-second round trip has failed however correct it is.
+        // The router keeps a tool as backstop for phrasings not listed.
+        //
+        // "stop"/"pause" both map to pause. On the browser path one key
+        // toggles either way, and on the scriptable path pausing is what
+        // people mean by stop — nobody asking Sayline to stop the music
+        // wants the playhead reset.
+        (["pause", "pause the music", "pause music", "pause the song",
+          "pause it", "stop", "stop the music", "stop music", "stop the song",
+          "stop playing", "stop it", "pause the video", "stop the video"],
+         .controlMedia(.pause)),
+        // Resume only. "play music" and "play a song" are deliberately
+        // absent: those name no track and belong to the ask-flow, and a
+        // phrase cannot be in both tables.
+        (["resume", "resume the music", "resume music", "resume playing",
+          "continue playing", "unpause", "keep playing", "carry on"],
+         .controlMedia(.play)),
+        (["next", "next song", "next track", "skip", "skip this",
+          "skip the song", "skip this song", "next one", "play the next song"],
+         .controlMedia(.next)),
+        (["previous", "previous song", "previous track", "go back a song",
+          "last song", "play the previous song", "back a track"],
+         .controlMedia(.previous)),
+        (["close this tab", "close the tab", "close tab", "close this",
+          "close the current tab"], .closeCurrentTab),
         // The commonest thing this feature is for, answered with no round
         // trip: a calendar query is tens of milliseconds, so join becomes
         // the fastest command in the app.

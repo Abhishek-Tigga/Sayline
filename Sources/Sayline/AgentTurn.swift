@@ -91,6 +91,18 @@ final class AgentTurnRunner {
             Task { await meetings.whatsNext() }
             return .asking
 
+        case .controlMedia(let command):
+            // Off the main thread, always. Finding the target inspects
+            // other processes and the AppleScript route waits on another
+            // app answering — including, the first time, on a permission
+            // dialog someone may leave sitting there. Blocking main on any
+            // of that is how this app's unexplained freezes look.
+            Task { await self.controlMedia(command) }
+            return .asking
+
+        case .closeCurrentTab:
+            return closeCurrentTab()
+
         case .emptyTrash:
             return confirmEmptyTrash()
 
@@ -114,6 +126,86 @@ final class AgentTurnRunner {
         default:
             return AgentExecutor.execute(action) ? .done : .failed("Agent: couldn't complete that")
         }
+    }
+
+    // MARK: - Media
+
+    /// Finds what is playing, then drives it by whatever route that app
+    /// supports.
+    ///
+    /// The empty case is the one worth caring about. "Nothing is playing"
+    /// used to be unsayable — the app had no way to know — so a misheard
+    /// "stop" opened YouTube. It is now a real answer, and a trustworthy
+    /// one: the detector over-reports rather than under-reports, so an
+    /// empty result genuinely means nothing holds the output.
+    private func controlMedia(_ command: MediaCommand) async {
+        let targets = await Task.detached { MediaTarget.audible() }.value
+
+        guard let first = targets.first else {
+            indicator.flashMessage("Nothing is playing", duration: 2.4)
+            return
+        }
+
+        guard targets.count > 1 else {
+            await apply(command, to: first)
+            return
+        }
+
+        // Two things audible at once — a tab and Spotify, say. Guessing
+        // here is a coin flip that pauses the wrong one, and the person
+        // asking is the only one who knows which they meant.
+        let second = targets[1]
+        indicator.askFollowUp(
+            FollowUpRequest(
+                question: "Which one?",
+                detail: "\(first.appName) and \(second.appName) are both playing",
+                kind: .confirm(primary: first.appName, secondary: second.appName)
+            )
+        ) { [weak self] answer in
+            guard let self else { return }
+            switch answer {
+            case .confirmed:
+                Task { await self.apply(command, to: first) }
+            case .declined:
+                Task { await self.apply(command, to: second) }
+            case .timedOut, .spoken:
+                // Silence picks nothing. Acting on a guess after a
+                // question about which of two to act on would make the
+                // question decorative.
+                self.indicator.flashMessage("Left both alone", duration: 2.4)
+            }
+        }
+    }
+
+    private func apply(_ command: MediaCommand, to target: MediaTarget) async {
+        let sentence = await Task.detached { MediaControl.perform(command, on: target) }.value
+        SaylineLog.log("media \(command.rawValue) on \(target) -> \(sentence)")
+        indicator.flashMessage(sentence, duration: 3.0)
+    }
+
+    /// Closes a browser tab, and refuses to send the keystroke anywhere
+    /// else.
+    ///
+    /// Cmd+W goes to whatever holds focus. Without this gate, "close this
+    /// tab" said while Pages is frontmost closes a document — the command
+    /// appears to work while doing something completely different, which is
+    /// worse than doing nothing. So it checks first and says either way.
+    ///
+    /// No confirmation: the request is explicit, and a browser tab comes
+    /// back with Cmd+Shift+T. Confirming every one would teach people to
+    /// stop using it.
+    private func closeCurrentTab() -> ActionOutcome {
+        let frontmost = NSWorkspace.shared.frontmostApplication?.localizedName
+        guard let frontmost,
+              case .browser = MediaTarget.classify(appName: frontmost) else {
+            indicator.flashMessage("The front window isn't a browser", duration: 3.0)
+            return .reported
+        }
+        guard AgentExecutor.execute(.closeCurrentTab) else {
+            return .failed("Couldn't close the tab")
+        }
+        indicator.flashMessage("Closed the \(frontmost) tab", duration: 2.4)
+        return .reported
     }
 
     /// Emptying the Trash is the only permanent, unrecoverable thing a

@@ -28,6 +28,14 @@ enum AgentExecutor {
             return openSystemSettingsFallback(requestedPaneName: requestedPaneName)
         case .lockScreen:
             return lockScreen()
+        case .controlMedia:
+            // AgentTurnRunner owns this: it has to find the target, may
+            // have to ask which of two, and always has a sentence to show.
+            // Reaching here means it was called directly.
+            SaylineLog.log("controlMedia reached the executor — the runner should have handled it")
+            return false
+        case .closeCurrentTab:
+            return closeFrontmostTab()
         case .setVolume(let change):
             return setVolume(change)
         case .setWiFi(let enabled):
@@ -187,6 +195,26 @@ enum AgentExecutor {
             return info
         }
         return "Nothing appears to be playing"
+    }
+
+    /// Sends Cmd+W to whatever holds focus.
+    ///
+    /// Deliberately unguarded here — `AgentTurnRunner` checks the frontmost
+    /// app is a browser before calling, because it is the layer that can
+    /// also tell the user why nothing happened. Anything calling this
+    /// directly is responsible for that check itself.
+    private static func closeFrontmostTab() -> Bool {
+        guard let source = CGEventSource(stateID: .combinedSessionState) else { return false }
+        let w: CGKeyCode = 13
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: w, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: w, keyDown: false) else {
+            return false
+        }
+        down.flags = .maskCommand
+        up.flags = .maskCommand
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+        return true
     }
 
     private static func isRunning(_ appName: String) -> Bool {

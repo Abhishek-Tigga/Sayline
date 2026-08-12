@@ -329,6 +329,32 @@ final class AgentRouter {
         [
             "type": "function",
             "function": [
+                "name": "control_media",
+                "description": "Controls whatever is already playing — music, a video, a podcast — wherever it is playing. Use for \"stop the music\", \"pause\", \"skip this song\", \"go back a track\", \"resume\". This never opens or searches for anything: if the user names something to play that is not already playing, use open_website instead. For volume use set_volume, not this.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "command": [
+                            "type": "string",
+                            "enum": MediaCommand.allCases.map(\.rawValue),
+                            "description": "Pause and Play act on what is already playing; Next and Previous move between tracks.",
+                        ]
+                    ],
+                    "required": ["command"],
+                ],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
+                "name": "close_current_tab",
+                "description": "Closes the frontmost tab of the browser the user is looking at. Only for \"close this tab\", \"close the tab\". Not for closing an app or a window — use close_app for those.",
+                "parameters": ["type": "object", "properties": [:] as [String: Any]],
+            ],
+        ],
+        [
+            "type": "function",
+            "function": [
                 "name": "set_volume",
                 "description": "Mutes, unmutes, or nudges the system output volume up or down by a fixed step.",
                 "parameters": [
@@ -736,6 +762,12 @@ final class AgentRouter {
         }
 
         switch name {
+        case "control_media":
+            guard let raw = arguments["command"] as? String,
+                  let command = MediaCommand(rawValue: raw) else { return nil }
+            return .controlMedia(command)
+        case "close_current_tab":
+            return .closeCurrentTab
         case "open_app":
             guard let appName = arguments["app_name"] as? String else { return nil }
             return .openApp(name: appName)

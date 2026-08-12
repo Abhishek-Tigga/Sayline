@@ -183,6 +183,16 @@ def swift_helper(mode, stdin_text=""):
         (SRC / "YouTubeSearch.swift").read_text(),
         (SRC / "LocalTimestamp.swift").read_text(),
         (SRC / "SaylineLog.swift").read_text(),
+        # MediaCommand lives here, and AgentAction + AgentRouter both use it.
+        # Added 2026-08-12 after this list broke for the FOURTH time, in the
+        # same way: a new router dependency, a list nobody updated, a helper
+        # that would not compile. The dry run passed throughout, because it
+        # asks the built binary — only the two source-compiled pane modes
+        # still need this list, and they are what the --parse-actions
+        # migration in BACKLOG.md deletes. Until that lands, this comment is
+        # the warning.
+        (SRC / "NowPlaying.swift").read_text(),   # MediaTarget
+        (SRC / "MediaControl.swift").read_text(),
         (SRC / "AgentRouter.swift").read_text(),
         SWIFT_STUBS,
         SWIFT_MAIN,
