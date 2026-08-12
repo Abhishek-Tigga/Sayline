@@ -310,7 +310,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let appInfo = FocusedAppReader.current()
         capturedFocusedAppInfo = appInfo
         SaylineLog.log("focused app -> \(appInfo.name) [\(appInfo.bundleID ?? "?")] window: \(appInfo.windowTitle ?? "?") -> context: \(appInfo.context.rawValue)")
-        audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID)
+        // Fire and forget: the engine now comes up on its own queue, so
+        // this returns immediately and the pill appears without waiting on
+        // CoreAudio. Failure is reported at hotkey-up, where the existing
+        // no-audio path already lives.
+        audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID) { started in
+            if !started { SaylineLog.log("audio engine did not start for this hold") }
+        }
         indicatorWindow.show(state: .recording)
         // Answering a question is still part of the agent exchange, so the
         // pill keeps its agent styling. Resetting it here made the pill
@@ -324,7 +330,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func handleHotkeyUp() {
         SoundEffectPlayer.shared.playHotkeyUp()
         isRecording = false
-        audioRecorder.stop()
+        // Everything below reads state the recorder settles as it shuts the
+        // engine down — lastRecordingURL, capturedNoAudio, the duration —
+        // so it has to run after that, not merely after asking for it.
+        audioRecorder.stop { [weak self] in
+            self?.finishRecording()
+        }
+    }
+
+    /// Runs once the engine is fully stopped and its results are readable.
+    private func finishRecording() {
         // The countdown stopped when the hold began, and every path out of
         // here except a delivered answer has to start it again.
         //

@@ -3,6 +3,25 @@ import CoreAudio
 
 /// Records microphone audio to a temp .wav file for the duration of a tap-hold.
 final class AudioRecorder {
+    /// Every call into `AVAudioEngine` happens here, never on main.
+    ///
+    /// `outputFormat(forBus:)` is a `dispatch_sync` onto AVFAudio's own
+    /// internal queue. On 2026-08-12 that queue was servicing a hardware
+    /// property listener stuck in a mach round trip to `coreaudiod`, and
+    /// the main thread waited on it permanently: menu bar dead, hotkey
+    /// dead, 33% CPU, captured in a `sample` stack.
+    ///
+    /// This is very likely the freeze recorded in CLAUDE.md as four
+    /// incidents with three disproven theories. A wedged main thread stops
+    /// the app servicing its event tap, macOS disables the tap with
+    /// `kCGEventTapDisabledByTimeout`, and the keyboard dies until Sayline
+    /// is killed — which is exactly what was reported each time.
+    ///
+    /// The machine that produced it had a duplicated Bluetooth device, a
+    /// Continuity microphone and a virtual driver installed. We cannot
+    /// stop macOS churning its device list; we can refuse to block the
+    /// main thread on it.
+    private let audioQueue = DispatchQueue(label: "com.abhishektigga.sayline.audio")
     private let engine = AVAudioEngine()
     private var audioFile: AVAudioFile?
     private(set) var isRecording = false
@@ -97,9 +116,26 @@ final class AudioRecorder {
     /// that it picks up newly connected AirPods with zero extra code). A
     /// non-nil UID pins recording to that specific device regardless of
     /// whatever macOS currently considers default.
-    func start(preferredDeviceUID: String? = nil) {
-        guard !isRecording else { return }
+    /// Starts recording. **Never touches the audio engine on the calling
+    /// thread** — see `audioQueue`.
+    ///
+    /// `completion` runs on the main thread once the engine is up, with
+    /// `true` when it actually started.
+    func start(preferredDeviceUID: String? = nil, completion: @escaping (Bool) -> Void) {
+        guard !isRecording else { completion(false); return }
+        // Claimed on the caller's thread (main) so a second hold cannot
+        // race in behind this one while the engine is still coming up.
+        isRecording = true
+        audioQueue.async { [weak self] in
+            let started = self?.startOnAudioQueue(preferredDeviceUID: preferredDeviceUID) ?? false
+            DispatchQueue.main.async {
+                if !started { self?.isRecording = false }
+                completion(started)
+            }
+        }
+    }
 
+    private func startOnAudioQueue(preferredDeviceUID: String?) -> Bool {
         // Safety net for the lifecycle above: even if a consumer forgot to
         // discard, the previous recording dies here.
         discardLastRecording()
@@ -118,7 +154,7 @@ final class AudioRecorder {
             audioFile = try AVAudioFile(forWriting: url, settings: format.settings)
         } catch {
             SaylineLog.log("failed to create audio file: \(error)")
-            return
+            return false
         }
 
         framesWritten = 0
@@ -156,7 +192,6 @@ final class AudioRecorder {
 
         do {
             try engine.start()
-            isRecording = true
             lastRecordingURL = url
             recordingStartTime = Date()
             // Read after start, not before. Before the engine runs, the audio
@@ -166,19 +201,31 @@ final class AudioRecorder {
             // 16 kHz on a device that should do 48 kHz is the tell.
             lastInputDeviceName = currentInputDeviceName()
             SaylineLog.log("recording started on \(lastInputDeviceName) at \(Int(format.sampleRate)) Hz -> \(url.path)")
+            return true
         } catch {
             SaylineLog.log("failed to start audio engine: \(error)")
             input.removeTap(onBus: 0)
             audioFile = nil
+            return false
         }
     }
 
-    func stop() {
-        guard isRecording else { return }
+    /// Stops recording. `completion` runs on main once the engine is down
+    /// and `lastRecordingURL`, `capturedNoAudio` and the rest are settled —
+    /// read them there, not immediately after calling this.
+    func stop(completion: @escaping () -> Void) {
+        guard isRecording else { completion(); return }
+        isRecording = false
+        audioQueue.async { [weak self] in
+            self?.stopOnAudioQueue()
+            DispatchQueue.main.async { completion() }
+        }
+    }
+
+    private func stopOnAudioQueue() {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         audioFile = nil
-        isRecording = false
         lastRecordingDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
         SaylineLog.log("recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s frames: \(framesWritten)")
         SaylineLog.log("[mic] tap fired \(tapCallbacks) time(s) during that recording")

@@ -1733,3 +1733,66 @@ heartbeat for 2.2s`, returning after **7.8s**, immediately before
 since it was built, and it points at an EventKit call on the main thread
 rather than at the event tap. Not investigated yet; recorded so it is not
 lost.
+
+---
+
+## 2026-08-12 — main-thread deadlock in CoreAudio (Opus)
+
+**Very likely *the* freeze.** `claimed-fixed`. Needs a human.
+
+Symptom escalated across three builds: `frames: 0`, then the whole app
+hung — menu bar dead, hotkey dead, 33% CPU, state `R`, main thread never
+recovering.
+
+`sample` of the hung process, main thread:
+
+```
+AppDelegate.beginRecording()               AppDelegate.swift:313
+  AudioRecorder.start(preferredDeviceUID:) AudioRecorder.swift:113
+    -[AVAudioNode outputFormatForBus:]
+      AVAudioIOUnit::GetClientFormat
+        _dispatch_sync_f_slow
+          __DISPATCH_WAIT_FOR_QUEUE__
+```
+
+The queue it waits on, `DispatchQueue_724: AVAudioIOUnit`, was itself
+inside `AVAudioIOUnit::IOUnitPropertyListener` → `_GetHWFormat` →
+`AudioObjectGetPropertyData` → `HALC_Object_GetPropertyData_DAI32`, a mach
+round trip to `coreaudiod` (543 of 2292 samples on that one frame).
+
+So `outputFormat(forBus:)` is a `dispatch_sync` onto AVFAudio's internal
+queue; that queue was servicing a hardware-property listener stuck in IPC;
+main waited forever.
+
+This machine's device list is unstable and is the likely trigger: a
+**duplicated** Bluetooth device (`Bass Baggie` listed twice), a Continuity
+`iphone Microphone`, a `Microsoft Teams Audio` virtual driver, and an
+earlier recording that ran on a macOS-created
+`CADefaultDeviceAggregate-*`.
+
+**Why this probably closes the four freeze incidents.** A wedged main
+thread stops the app servicing its event tap; macOS then disables the tap
+with `kCGEventTapDisabledByTimeout` and keystrokes stop until the process
+is killed — exactly what was reported, and exactly what the three
+disproven theories (tap starvation, panel leak, Secure Input) failed to
+explain. `StallWatchdog` was built to separate "our callback is blocked"
+from "the system refused us"; it fired, and the stack says the first.
+
+**Fix.** `AudioRecorder` gained a private serial `audioQueue`; all engine
+work moved onto it. `start` and `stop` take completions that fire on main.
+`AppDelegate.handleHotkeyUp` split — everything reading post-stop state
+moved into `finishRecording()`, called from `stop`'s completion, because
+those values only settle as the engine shuts down.
+
+**Two earlier theories of mine were wrong** and are recorded so nobody
+re-runs them: (1) the microphone grant was lost in the rebuild — disproved
+by `mic authorized: true` on the failing line; (2) the input device was at
+fault — disproved by a standalone `AVAudioEngine` in another process
+capturing 48000 frames on the same device at the same moment.
+
+**Unverified, and the open question.** Moving off main provably removes the
+*hang*. Whether it also fixes `frames: 0` is **not established**: if the IO
+unit is wedged, a tap may still never fire — it would just fail without
+freezing the app. The `[mic]` diagnostics (tap-fired count, first buffer
+frames and peak) are still in the build to answer exactly that on the next
+live hold. Do not treat zero-frames as fixed until those lines say so.
