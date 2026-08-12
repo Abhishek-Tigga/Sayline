@@ -35,6 +35,8 @@ final class AudioRecorder {
     /// [mic] log lines once the cause is known.
     private var tapCallbacks = 0
     private var firstBufferLogged = false
+    /// Set once — voice processing belongs to the node, not the recording.
+    private var voiceProcessingEnabled = false
     /// Name of the device the engine really used, read after `start()`.
     private(set) var lastInputDeviceName = "unknown"
 
@@ -135,6 +137,38 @@ final class AudioRecorder {
         }
     }
 
+    /// Turns on Apple's voice processing: echo cancellation plus noise
+    /// suppression, the same path FaceTime uses.
+    ///
+    /// This is what stops dictation transcribing whatever the speakers are
+    /// playing. Sound from the built-in speakers reaches the built-in
+    /// microphone, and Whisper cannot tell a lyric from a sentence — a
+    /// YouTube track was transcribed as if the user had said it.
+    ///
+    /// The first attempt at this paused the user's music for the length of
+    /// each hold. It worked and it was hated, correctly: silencing someone's
+    /// music every time they dictate is a worse experience than the problem
+    /// it solved. Cancelling the speaker out of the signal fixes the same
+    /// thing while the music keeps playing.
+    ///
+    /// Measured on this Mac before shipping it, speaker audio only: peak
+    /// **0.8085 without, 0.0230 with** — a 97% reduction.
+    ///
+    /// Set once per node, before the engine starts. Failure is not fatal:
+    /// a recording with echo in it beats no recording at all.
+    private func enableVoiceProcessing(on input: AVAudioInputNode) {
+        guard !voiceProcessingEnabled else { return }
+        do {
+            try input.setVoiceProcessingEnabled(true)
+            voiceProcessingEnabled = true
+            SaylineLog.log("voice processing enabled — speaker audio cancelled from the mic")
+        } catch {
+            // Some devices and aggregate configurations refuse it. Carry on
+            // unprocessed rather than losing the hold.
+            SaylineLog.log("voice processing unavailable (\(error.localizedDescription)) — recording raw")
+        }
+    }
+
     private func startOnAudioQueue(preferredDeviceUID: String?) -> Bool {
         // Safety net for the lifecycle above: even if a consumer forgot to
         // discard, the previous recording dies here.
@@ -146,6 +180,11 @@ final class AudioRecorder {
             setInputDevice(deviceID, on: input)
         }
 
+        enableVoiceProcessing(on: input)
+
+        // Read AFTER voice processing is enabled. Turning it on replaces the
+        // input format — 16 kHz became 48 kHz in testing — so a format read
+        // first would describe a graph that no longer exists.
         let format = input.outputFormat(forBus: 0)
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("sayline-\(UUID().uuidString).wav")

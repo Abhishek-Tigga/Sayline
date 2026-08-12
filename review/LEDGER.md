@@ -1857,3 +1857,45 @@ today is the setup card gated on *connection* rather than dismissal, so
 someone with nothing connected keeps being offered it. The stronger version
 — confirming which accounts are connected before answering a calendar
 question — is still open.
+
+---
+
+## 2026-08-12 — pause-during-dictation replaced by voice processing (Opus)
+
+**Reverted by user rejection, and replaced with the better mechanism.**
+`claimed-fixed`.
+
+Pausing audible media for the length of each hold solved the lyrics-in-
+dictation problem and was a bad experience: *"this experience is very bad,
+that music getting paused when I am enabling dictation."* The user proposed
+isolating their voice at the microphone instead.
+
+Measured before implementing, speaker audio only, no one speaking:
+
+```
+without voice processing : peak 0.8085   (48000 Hz, 139200 frames)
+with voice processing    : peak 0.0230   (48000 Hz, 139200 frames)
+==> speaker bleed cut to 3%
+```
+
+So `AVAudioInputNode.setVoiceProcessingEnabled(true)` — Apple's echo
+cancellation and noise suppression — removes 97% of the leak while the
+music keeps playing. The user's instinct was right and the pause was
+unnecessary.
+
+Ducking is fully removed: `duckQueue`, `duckedTarget`, both methods, both
+call sites, and `MediaTarget.outputCanReachTheMicrophone()`, which existed
+only to serve it. Nothing was left behind to rot.
+
+Two things worth knowing for whoever reviews:
+
+1. **Voice processing changes the input format** — 16 kHz became 48 kHz.
+   `outputFormat(forBus:)` is now read *after* enabling it; read before, it
+   describes a graph that no longer exists. Recordings are correspondingly
+   larger.
+2. **It fails open.** Some devices and aggregate configurations refuse it;
+   the log says so and the hold records unprocessed, because echo in a
+   recording beats no recording.
+
+Not verified by its author: needs a human dictating with music on the
+speakers.

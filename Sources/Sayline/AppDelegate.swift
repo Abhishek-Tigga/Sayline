@@ -81,12 +81,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicator: indicatorWindow,
         hotkeySymbol: { [weak self] in self?.hotkeyOption.shortSymbol ?? "⌥" }
     )
-    /// Serialises pause-for-dictation against resume-after, so a short
-    /// hold cannot resume before the pause it is undoing has landed.
-    private let duckQueue = DispatchQueue(label: "com.abhishektigga.sayline.duck")
-    /// What we paused for the current hold. Touched only on `duckQueue`.
-    private var duckedTarget: MediaTarget?
-
     private let audioRecorder = AudioRecorder()
     private let cloudTranscriber = GroqTranscriber()
     private let localTranscriber = WhisperKitTranscriber()
@@ -323,7 +317,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID) { started in
             if !started { SaylineLog.log("audio engine did not start for this hold") }
         }
-        pauseMediaWhileRecording()
         indicatorWindow.show(state: .recording)
         // Answering a question is still part of the agent exchange, so the
         // pill keeps its agent styling. Resetting it here made the pill
@@ -345,42 +338,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
-    /// Quietens music for the length of a hold, so dictation transcribes
-    /// the user rather than the song.
-    ///
-    /// Sound from the built-in speakers reaches the built-in microphone,
-    /// and Whisper cannot tell a lyric from a sentence — on 2026-08-12 a
-    /// YouTube track was transcribed as if the user had said it. Blocking
-    /// dictation in "music apps" would not help: the music plays in one app
-    /// while the dictation goes somewhere else entirely.
-    ///
-    /// Only when the sound can actually reach the microphone. On headphones
-    /// there is no leak and pausing would be a rude surprise.
-    private func pauseMediaWhileRecording() {
-        duckQueue.async { [weak self] in
-            guard let self, self.duckedTarget == nil else { return }
-            guard MediaTarget.outputCanReachTheMicrophone() else { return }
-            guard let target = MediaTarget.audible().first else { return }
-            _ = MediaControl.perform(.pause, on: target)
-            self.duckedTarget = target
-            SaylineLog.log("paused \(target.appName) for this hold — it was audible on the speakers")
-        }
-    }
-
-    /// Puts the music back. Same serial queue as the pause, so the order
-    /// holds even for a hold shorter than the pause took.
-    private func resumeMediaAfterRecording() {
-        duckQueue.async { [weak self] in
-            guard let self, let target = self.duckedTarget else { return }
-            self.duckedTarget = nil
-            _ = MediaControl.perform(.play, on: target)
-            SaylineLog.log("resumed \(target.appName) after the hold")
-        }
-    }
-
     /// Runs once the engine is fully stopped and its results are readable.
     private func finishRecording() {
-        resumeMediaAfterRecording()
         // The countdown stopped when the hold began, and every path out of
         // here except a delivered answer has to start it again.
         //

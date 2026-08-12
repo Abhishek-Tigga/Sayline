@@ -93,39 +93,6 @@ enum MediaTarget: Equatable {
         return names
     }
 
-    /// True when sound is coming out of speakers the microphone can hear.
-    ///
-    /// The reason dictation transcribes song lyrics: audio leaves the
-    /// built-in speakers and arrives back through the built-in microphone,
-    /// and Whisper cannot tell that apart from a person talking.
-    ///
-    /// On headphones there is no such path, and pausing someone's music
-    /// every time they dictate would be an unwelcome surprise. So the
-    /// question is not "is anything playing" but "can we hear it too".
-    /// Built-in output is the case that leaks; anything plugged in or
-    /// paired is left alone. A Bluetooth *speaker* leaks as well and is
-    /// treated as headphones here — being occasionally too polite is the
-    /// better failure.
-    static func outputCanReachTheMicrophone() -> Bool {
-        var deviceID = AudioDeviceID(0)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
-                                         &address, 0, nil, &size, &deviceID) == noErr,
-              deviceID != 0 else { return false }
-
-        var transport = UInt32(0)
-        size = UInt32(MemoryLayout<UInt32>.size)
-        address.mSelector = kAudioDevicePropertyTransportType
-        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transport) == noErr else {
-            return false
-        }
-        return transport == kAudioDeviceTransportTypeBuiltIn
-    }
-
     /// Reports *only* what we are sure about.
     ///
     /// This detector means "holds an output stream open", not "is audible".
