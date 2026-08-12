@@ -85,10 +85,24 @@ check("browser play and pause are worded identically",
       MediaControl.sentence(for: .play, target: chrome, observedState: nil)
         == MediaControl.sentence(for: .pause, target: chrome, observedState: nil))
 
+// MARK: - Tab situation decides whether closing is safe or needs asking
+
+// Cmd+W closes the front WINDOW. On a window down to one tab that closes
+// the lot — which is how "close this tab" shut a whole Chrome window full
+// of open links on 2026-08-12. These pin the distinction the fix rests on.
+check("many tabs closes one silently",
+      MediaControl.TabSituation.oneOfMany(remaining: 4) != .lastTab)
+check("last tab is its own case",
+      MediaControl.TabSituation.lastTab == .lastTab)
+check("unscriptable browser is not mistaken for a safe close",
+      MediaControl.TabSituation.unknown != .oneOfMany(remaining: 1))
+check("remaining count is carried, so the message can be specific",
+      MediaControl.TabSituation.oneOfMany(remaining: 4) == .oneOfMany(remaining: 4))
+
 // MARK: - Report
 
 if failures.isEmpty {
-    print("all passed (\(24) checks)")
+    print("all passed (\(28) checks)")
 } else {
     print("FAILED:")
     failures.forEach { print("  - \($0)") }

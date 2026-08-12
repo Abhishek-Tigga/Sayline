@@ -52,6 +52,76 @@ enum MediaControl {
         }
     }
 
+    /// Resumes whatever was paused, when nothing is currently audible.
+    ///
+    /// A paused Music or Spotify vanishes from the audio-process list — it
+    /// holds no output stream — so "resume" arrives with no target. Both
+    /// answer AppleScript while paused, though, so ask them directly and
+    /// only fall back to the broadcast key when neither is the answer.
+    static func resumeWhateverWasPaused() -> String {
+        for app in ["Spotify", "Music"] where isRunning(app) {
+            guard playerState(of: app) == .paused else { continue }
+            guard runScript(.play, app: app) else { continue }
+            return sentence(for: .play, target: .scriptable(app: app),
+                            observedState: playerState(of: app))
+        }
+        // Most likely a paused browser tab, which cannot be asked anything.
+        postMediaKey(.play)
+        return "Sent play to whatever was paused"
+    }
+
+    /// What closing the front tab of `app` would actually do.
+    ///
+    /// Cmd+W does not mean "close a tab". It means "close the front
+    /// window", and a window showing one tab is closed entirely — which is
+    /// how "close this tab" shut a whole Chrome window on 2026-08-12. Ask
+    /// the browser how many tabs it has before deciding whether that is
+    /// what the user meant.
+    enum TabSituation: Equatable {
+        /// Several tabs — closing one is unambiguous and reversible.
+        case oneOfMany(remaining: Int)
+        /// The last tab, so closing it closes the window.
+        case lastTab
+        /// Not scriptable, or the question could not be answered.
+        case unknown
+    }
+
+    static func tabSituation(in app: String) -> TabSituation {
+        guard let raw = execute(tabCountScript(for: app)),
+              let count = Int(raw.trimmingCharacters(in: .whitespaces)) else {
+            return .unknown
+        }
+        return count > 1 ? .oneOfMany(remaining: count - 1) : .lastTab
+    }
+
+    /// Closes exactly the active tab, leaving the window and every other
+    /// tab alone. Returns false when the browser cannot be scripted.
+    static func closeActiveTab(in app: String) -> Bool {
+        execute(closeTabScript(for: app)) != nil
+    }
+
+    private static func tabCountScript(for app: String) -> String {
+        // Safari and the Chromium family disagree about the vocabulary, and
+        // everything else is unknown territory rather than a guess.
+        if app.localizedCaseInsensitiveContains("safari") {
+            return "tell application \"\(app)\" to return (count of tabs of front window) as string"
+        }
+        return "tell application \"\(app)\" to return (count of tabs of front window) as string"
+    }
+
+    private static func closeTabScript(for app: String) -> String {
+        if app.localizedCaseInsensitiveContains("safari") {
+            return "tell application \"\(app)\" to close current tab of front window"
+        }
+        return "tell application \"\(app)\" to close active tab of front window"
+    }
+
+    private static func isRunning(_ appName: String) -> Bool {
+        NSWorkspace.shared.runningApplications.contains {
+            $0.localizedName?.caseInsensitiveCompare(appName) == .orderedSame
+        }
+    }
+
     // MARK: - Wording
 
     /// Pure, and the whole point of A6: phrase per mechanism, never per

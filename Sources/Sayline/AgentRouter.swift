@@ -752,6 +752,31 @@ final class AgentRouter {
         return words[start..<settingsIndex].joined(separator: " ")
     }
 
+
+    /// The search terms inside a site's own results URL.
+    ///
+    /// The model frequently answers "play afrobeat" with
+    /// `page_url: ".../results?search_query=afrobeat"` instead of filling
+    /// in `query`. The words are right there; only the shape differs, so
+    /// read them rather than losing the request.
+    static func searchQuery(inURL raw: String) -> String? {
+        guard let components = URLComponents(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let items = components.queryItems else { return nil }
+        // Every common spelling of "the search box", not just YouTube's.
+        let keys: Set<String> = ["search_query", "q", "query", "k", "search", "text", "wd"]
+        for item in items where keys.contains(item.name.lowercased()) {
+            // `+` is a space in a query string, but URLComponents only
+            // decodes percent-escapes — leaving "Bollywood+music" to be
+            // searched literally, plus sign and all.
+            guard let value = item.value?
+                .replacingOccurrences(of: "+", with: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !value.isEmpty else { continue }
+            return value
+        }
+        return nil
+    }
+
     private func parseAction(from toolCall: [String: Any]) -> AgentAction? {
         guard let function = toolCall["function"] as? [String: Any],
               let name = function["name"] as? String,
@@ -848,6 +873,32 @@ final class AgentRouter {
                 // a login wall.
                 return .openWebsite(label: "\(site.label) — \(query)", url: page)
             }
+            // Playback is decided before any URL branch, because it is an
+            // intent and those branches only know about destinations.
+            //
+            // This was the bug behind "only lo-fi plays". The model emits
+            // three different shapes for the same request — sometimes
+            // `query: "afrobeat"`, sometimes `page_url:
+            // "youtube.com/results?search_query=afro+music"`, sometimes a
+            // bare `youtube.com` — and the `page_url` branch below returned
+            // first, so `play: true` was never read. Every genre that
+            // happened to arrive with a page_url landed on a results page
+            // and played nothing. Nothing about it was specific to a genre;
+            // it only looked that way because the shape varies run to run.
+            //
+            // Reading the intent first, and taking the query from wherever
+            // it actually is, makes every phrasing behave the same.
+            if (arguments["play"] as? Bool) == true, WebsiteCatalog.isYouTube(site) {
+                let spoken = query?.nilIfEmpty
+                    ?? (arguments["page_url"] as? String).flatMap(Self.searchQuery(inURL:))
+                if let spoken {
+                    return .playOnYouTube(query: spoken)
+                }
+                // Playback wanted, nothing named — the ask-flow, not a
+                // YouTube home page that plays nothing.
+                return .askWhatToPlay
+            }
+
             if let pageURL = (arguments["page_url"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
                !pageURL.isEmpty, let url = URL(string: pageURL), url.scheme?.hasPrefix("http") == true {
                 // The model writes amazon.com and apple.com because it has no
@@ -871,20 +922,6 @@ final class AgentRouter {
                     SaylineLog.log("region-corrected \(url.absoluteString) -> \(regional.absoluteString)")
                 }
                 return .openDirectPage(url: regional, fallbackSite: site, fallbackQuery: query)
-            }
-            let wantsPlayback = (arguments["play"] as? Bool) ?? false
-            if wantsPlayback, let query, !query.isEmpty,
-               WebsiteCatalog.isYouTube(site) {
-                return .playOnYouTube(query: query)
-            }
-            // "Play music" — playback wanted, nothing named. Opening
-            // youtube.com and playing nothing is what this used to do, and
-            // it is a worse answer than a question. Caught here as a
-            // deterministic rule rather than by asking the prompt to
-            // behave: the model has been observed routing this three
-            // different ways across runs.
-            if wantsPlayback, query?.isEmpty != false, WebsiteCatalog.isYouTube(site) {
-                return .askWhatToPlay
             }
             switch WebsiteCatalog.resolve(site, query: query?.isEmpty == true ? nil : query, vertical: vertical) {
             case .site(let label, let url):

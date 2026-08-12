@@ -144,10 +144,40 @@ final class AgentTurnRunner {
     private func controlMedia(_ command: MediaCommand) async {
         let targets = await Task.detached { MediaTarget.audible() }.value
 
-        guard let first = targets.first else {
+        // Direction matters, and the media key has none — it is a toggle.
+        //
+        // Sending it blindly is why "stop the music" *started* paused music
+        // and "resume" did nothing: both commands posted the same key, so
+        // the outcome depended entirely on what the player was already
+        // doing. The detector is what supplies the missing direction.
+        //
+        // Skip/previous are unaffected: they mean the same thing whatever
+        // the current state, so they always send.
+        switch (command, targets.isEmpty) {
+        case (.pause, true):
+            // Nothing audible and asked to stop. Toggling here would start
+            // something, which is the opposite of what was asked.
             indicator.flashMessage("Nothing is playing", duration: 2.4)
             return
+        case (.play, false):
+            // Already playing and asked to play. Toggling would pause it.
+            indicator.flashMessage("\(targets[0].appName) is already playing", duration: 2.4)
+            return
+        case (.play, true):
+            // Asked to resume with nothing audible. There is no target to
+            // aim at — a paused browser tab may still hold the audio
+            // device, but a paused Spotify does not — so send the key
+            // broadcast and claim only that.
+            await resumeWithNoKnownTarget()
+            return
+        case (.next, true), (.previous, true):
+            indicator.flashMessage("Nothing is playing", duration: 2.4)
+            return
+        default:
+            break
         }
+
+        guard let first = targets.first else { return }
 
         guard targets.count > 1 else {
             await apply(command, to: first)
@@ -178,6 +208,20 @@ final class AgentTurnRunner {
                 self.indicator.flashMessage("Left both alone", duration: 2.4)
             }
         }
+    }
+
+    /// "Resume" when nothing is making sound.
+    ///
+    /// A paused Spotify disappears from the audible list entirely, so there
+    /// is no target to route to — but the request is still perfectly
+    /// reasonable. Ask the scriptable players directly, since they answer
+    /// even while paused, and fall back to the broadcast key otherwise.
+    private func resumeWithNoKnownTarget() async {
+        let sentence = await Task.detached {
+            MediaControl.resumeWhateverWasPaused()
+        }.value
+        SaylineLog.log("media Play with nothing audible -> \(sentence)")
+        indicator.flashMessage(sentence, duration: 3.0)
     }
 
     private func apply(_ command: MediaCommand, to target: MediaTarget) async {
@@ -258,11 +302,61 @@ final class AgentTurnRunner {
             indicator.flashMessage("The front window isn't a browser", duration: 3.0)
             return .reported
         }
-        guard AgentExecutor.execute(.closeCurrentTab) else {
-            return .failed("Couldn't close the tab")
+
+        // Ask the browser, rather than firing Cmd+W and hoping.
+        //
+        // Cmd+W closes the front *window*, and a window down to its last
+        // tab closes completely — which is how "close this tab" took out a
+        // whole Chrome window full of open links. Closing the active tab by
+        // name leaves the window and its siblings untouched.
+        switch MediaControl.tabSituation(in: frontmost) {
+        case .oneOfMany(let remaining):
+            guard MediaControl.closeActiveTab(in: frontmost) else {
+                return .failed("Couldn't close the tab")
+            }
+            indicator.flashMessage("Closed the tab — \(remaining) left", duration: 2.4)
+            return .reported
+
+        case .lastTab:
+            // The only tab, so this closes the window however it is done.
+            // That is a bigger thing than was asked for, so ask first.
+            indicator.askFollowUp(
+                FollowUpRequest(
+                    question: "That's the last tab",
+                    detail: "Closing it closes the \(frontmost) window. Close it?",
+                    kind: .confirm(primary: "Close it", secondary: "Keep it")
+                )
+            ) { [weak self] answer in
+                guard let self else { return }
+                guard answer == .confirmed else {
+                    self.indicator.flashMessage("Left it open", duration: 2.0)
+                    return
+                }
+                _ = MediaControl.closeActiveTab(in: frontmost)
+                self.indicator.flashMessage("Closed the \(frontmost) window", duration: 2.4)
+            }
+            return .asking
+
+        case .unknown:
+            // Not scriptable — the keystroke is all we have, and we cannot
+            // tell what it will hit. Say so rather than guessing.
+            indicator.askFollowUp(
+                FollowUpRequest(
+                    question: "Close the front \(frontmost) tab?",
+                    detail: "Sayline can't check how many tabs are open, so this may close the window.",
+                    kind: .confirm(primary: "Close it", secondary: "Cancel")
+                )
+            ) { [weak self] answer in
+                guard let self else { return }
+                guard answer == .confirmed else {
+                    self.indicator.flashMessage("Left it open", duration: 2.0)
+                    return
+                }
+                _ = AgentExecutor.execute(.closeCurrentTab)
+                self.indicator.flashMessage("Sent close to \(frontmost)", duration: 2.4)
+            }
+            return .asking
         }
-        indicator.flashMessage("Closed the \(frontmost) tab", duration: 2.4)
-        return .reported
     }
 
     /// Emptying the Trash is the only permanent, unrecoverable thing a

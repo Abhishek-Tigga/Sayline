@@ -1796,3 +1796,64 @@ unit is wedged, a tap may still never fire — it would just fail without
 freezing the app. The `[mic]` diagnostics (tap-fired count, first buffer
 frames and peak) are still in the build to answer exactly that on the next
 live hold. Do not treat zero-frames as fixed until those lines say so.
+
+---
+
+## 2026-08-12 — four live-test findings (Opus)
+
+Media control works. Four defects found by using it, all `claimed-fixed`.
+
+**1 · "Only lo-fi plays" was not about genres at all.** Every other genre
+landed on a search page. Traced: the model emits three different shapes for
+the same request — `query: "afrobeat"`, or
+`page_url: "…/results?search_query=afro+music"`, or a bare `youtube.com` —
+and the `page_url` branch in `parseAction` returned **before** `play: true`
+was ever read. So any phrasing that arrived with a URL dropped the playback
+intent. Lo-fi only looked special because its shape varied run to run.
+
+Playback intent is now read before every URL branch, and the query is taken
+from `query` *or* from the search parameter inside the URL (`+` decoded as
+space, which `URLComponents` does not do). Traced 8/8 phrasings — lo-fi,
+afro, R&B, afrobeat, jazz, Bollywood, with and without "on YouTube" — all
+now reach `playOnYouTube`. Recorded in memory as a general lesson: fix the
+class, never the named example.
+
+**2 · Pause and resume were inverted on browsers.** "Stop the music" on
+paused music *started* it; "resume" did nothing. One media key toggles both
+directions, and it was being sent blind, so the result depended entirely on
+what the player was already doing — my own comment called that acceptable.
+Direction now comes from the detector: pause with nothing audible says so
+and sends nothing; play with something audible says it is already playing;
+play with nothing audible asks Music/Spotify directly, since a *paused*
+scriptable player answers AppleScript but holds no audio stream and so is
+invisible to the detector.
+
+**3 · "Close this tab" closed a whole Chrome window.** Cmd+W closes the
+front *window*; a window on its last tab closes entirely. Now the browser
+is asked how many tabs it has: several closes the active tab by name
+(window untouched, count reported), the last tab asks first, and an
+unscriptable browser asks with the uncertainty stated. Four cases added to
+`media-checks`.
+
+**4 · Dictation transcribed the YouTube track.** Built-in speakers reach
+the built-in microphone and Whisper cannot tell a lyric from a sentence.
+Blocking dictation "in music apps" would not help — the music plays in one
+app while the dictation goes somewhere else. Audible media is now paused
+for the length of the hold and resumed after, serialised on one queue so a
+short hold cannot resume before its pause lands. Gated on
+`outputCanReachTheMicrophone()` (built-in output only): on headphones there
+is no leak, and pausing would be an unwelcome surprise.
+
+**Numbers:** router eval 71/72 — the known ~50/50 `settings-unknown-pane`
+coin flip, not a new failure. Prompt 2609 median tokens, latency 1086 ms.
+All seven check suites green; `media-checks` now 28.
+
+**Not verified by its author.** Findings 2, 3 and 4 need a human with music
+playing, a multi-tab window, and speakers.
+
+**Not built, deliberately.** The user asked for a first-run calendar
+confirmation and explicitly said not to build it in this pass. What exists
+today is the setup card gated on *connection* rather than dismissal, so
+someone with nothing connected keeps being offered it. The stronger version
+— confirming which accounts are connected before answering a calendar
+question — is still open.
