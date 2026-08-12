@@ -38,6 +38,10 @@ final class IndicatorViewModel: ObservableObject {
     /// The one-time calendar setup card, shown under the answer.
     @Published var setupCard: CalendarSetupCard?
     var onSetupAction: ((CalendarSetupAction) -> Void)?
+    /// Returns false when the change was refused — deselecting the last
+    /// account, which is always a slip.
+    var onAccountToggle: ((String, Bool) -> Bool)?
+    @Published var accountRefusal: String?
     /// The configured hotkey, for the "hold ⌥ and say…" hint.
     @Published var hotkeySymbol: String = "⌥" 
 
@@ -172,8 +176,18 @@ private struct IndicatorStack: View {
             // Below the answer and above the pill, so the answer stays the
             // thing being read and this is the footnote to it.
             if let card = viewModel.setupCard {
-                SetupBox(card: card, surface: surface,
-                         onAction: { viewModel.onSetupAction?($0) })
+                SetupBox(
+                    card: card, surface: surface,
+                    onAction: { viewModel.onSetupAction?($0) },
+                    onToggle: { id, on in
+                        if viewModel.onAccountToggle?(id, on) == false {
+                            viewModel.accountRefusal = "Keep at least one account on"
+                        } else {
+                            viewModel.accountRefusal = nil
+                        }
+                    },
+                    refusal: viewModel.accountRefusal
+                )
             }
             PillView(viewModel: viewModel, surface: surface)
             if let label {
@@ -406,6 +420,10 @@ private struct SetupBox: View {
     let card: CalendarSetupCard
     let surface: SurfaceStyle
     let onAction: (CalendarSetupAction) -> Void
+    let onToggle: (String, Bool) -> Void
+    /// Shown when a toggle was refused, so the refusal is explained rather
+    /// than looking like the switch is broken.
+    let refusal: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -421,7 +439,7 @@ private struct SetupBox: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 3)
 
-            if card.step == .review {
+            if card.step == .review, !card.accounts.isEmpty {
                 accountList
             }
 
@@ -440,27 +458,67 @@ private struct SetupBox: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    /// Names the accounts, and the addresses under them.
+    /// Every account, with a switch, inside a fixed height.
     ///
-    /// "Google" alone does not answer the question someone actually has —
-    /// with two Gmail addresses, which one is connected? So the summary
-    /// counts them and the lines below name them.
+    /// Scrolls rather than grows: this panel floats over whatever someone
+    /// is working in, and a card that gets taller with each account added
+    /// would eventually cover it. Three rows are visible and the rest are
+    /// a scroll away, so four accounts and fourteen look the same from
+    /// outside.
     private var accountList: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(card.summary)
                 .font(.system(size: 11, weight: .medium))
                 .opacity(0.9)
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(card.addressLines, id: \.self) { line in
-                Text(line)
-                    .font(.system(size: 11))
-                    .opacity(0.55)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(card.accounts) { account in
+                        AccountRow(account: account, onToggle: onToggle)
+                    }
+                }
+                .padding(.trailing, 2)
+            }
+            .frame(maxHeight: 86)
+            .scrollIndicators(.visible)
+
+            if let refusal { 
+                Text(refusal)
+                    .font(.system(size: 10))
+                    .opacity(0.6)
             }
         }
         .foregroundStyle(PillStyle.foreground)
         .padding(.top, 8)
+    }
+}
+
+/// One account, with the switch that includes or excludes it.
+private struct AccountRow: View {
+    let account: ConnectedAccount
+    let onToggle: (String, Bool) -> Void
+    @State private var isOn: Bool
+
+    init(account: ConnectedAccount, onToggle: @escaping (String, Bool) -> Void) {
+        self.account = account
+        self.onToggle = onToggle
+        _isOn = State(initialValue: account.isSelected)
+    }
+
+    var body: some View {
+        Toggle(isOn: Binding(
+            get: { isOn },
+            set: { newValue in isOn = newValue; onToggle(account.id, newValue) }
+        )) {
+            Text(account.label)
+                .font(.system(size: 11))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .tint(PillStyle.foreground.opacity(0.85))
     }
 }
 

@@ -68,6 +68,10 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Calendars") {
+                CalendarAccountsSettings()
+            }
+
             Section("General") {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { appDelegate.launchAtLogin },
@@ -85,5 +89,50 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 380)
+    }
+}
+
+
+/// The account scope, editable after the one-time card is gone.
+///
+/// The card offers this during onboarding, but a choice made before anyone
+/// has used the feature needs a way back — so it lives here too, with room
+/// for the addresses the card has to truncate.
+private struct CalendarAccountsSettings: View {
+    @State private var accounts: [ConnectedAccount] = []
+    @State private var refusal: String?
+    private let store = MeetingStore()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if accounts.isEmpty {
+                Text("No calendar accounts are connected to this Mac.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Sayline reads meetings from these accounts.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                ForEach(accounts) { account in
+                    Toggle(account.label, isOn: binding(for: account))
+                }
+                if let refusal {
+                    Text(refusal).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .onAppear { accounts = store.connectedAccounts() }
+    }
+
+    private func binding(for account: ConnectedAccount) -> Binding<Bool> {
+        Binding(
+            get: { account.isSelected },
+            set: { enabled in
+                let accepted = CalendarScope.set(account.id, enabled: enabled,
+                                                 allKnown: accounts.map(\.id))
+                refusal = accepted ? nil : "Keep at least one account on."
+                accounts = store.connectedAccounts()
+            }
+        )
     }
 }

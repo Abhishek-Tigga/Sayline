@@ -14,9 +14,19 @@ import Foundation
 /// two share no state worth sharing, and two small stores that each mirror
 /// a proven shape beat one store carrying two permission lifecycles.
 /// One calendar provider, and which of its accounts are on this Mac.
-struct ConnectedAccount: Equatable {
+struct ConnectedAccount: Equatable, Identifiable {
+    /// `EKSource.sourceIdentifier` — stable across renames, unlike the
+    /// title, which is what a person edits in System Settings.
+    let id: String
     let provider: String
     let addresses: [String]
+    var isSelected: Bool
+
+    /// "Google · a@gmail.com", or just the provider when EventKit exposed
+    /// no address for it.
+    var label: String {
+        addresses.isEmpty ? provider : "\(provider) · \(addresses.joined(separator: ", "))"
+    }
 }
 
 enum CalendarAccess: Equatable {
@@ -79,16 +89,46 @@ final class MeetingStore {
             + calendars.map { "\($0.source?.title ?? "?")/\($0.title)" }.joined(separator: ", "))
         #endif
 
-        var byProvider: [String: Set<String>] = [:]
+        var addressesBySource: [String: (provider: String, addresses: Set<String>)] = [:]
         for calendar in calendars {
-            guard let provider = calendar.source?.title else { continue }
-            byProvider[provider, default: []].formUnion(
-                calendar.title.contains("@") ? [calendar.title] : []
-            )
+            guard let source = calendar.source else { continue }
+            var entry = addressesBySource[source.sourceIdentifier]
+                ?? (provider: source.title, addresses: [])
+            if calendar.title.contains("@") { entry.addresses.insert(calendar.title) }
+            addressesBySource[source.sourceIdentifier] = entry
         }
-        return byProvider
-            .map { ConnectedAccount(provider: $0.key, addresses: $0.value.sorted()) }
+        return addressesBySource
+            .map { id, entry in
+                ConnectedAccount(id: id, provider: entry.provider,
+                                 addresses: entry.addresses.sorted(),
+                                 isSelected: CalendarScope.isSelected(id))
+            }
             .sorted { $0.provider < $1.provider }
+    }
+
+    /// The calendars a query may read, honouring the account scope.
+    ///
+    /// Returns nil for "everything", which is what `predicateForEvents`
+    /// wants when nothing is narrowed — passing an explicit list of all of
+    /// them would behave the same but hide the distinction.
+    private func scopedCalendars() -> [EKCalendar]? {
+        guard CalendarScope.isNarrowed else { return nil }
+        let allowed = store.calendars(for: .event)
+            .filter { calendar in
+                guard let id = calendar.source?.sourceIdentifier else { return false }
+                return CalendarScope.isSelected(id)
+            }
+        // Never let a scope produce an empty query — that reads as "no
+        // meetings" and is indistinguishable from a broken setup.
+        return allowed.isEmpty ? nil : allowed
+    }
+
+    /// New accounts since the last look, having recorded what exists now.
+    @discardableResult
+    func noteNewAccounts() -> [ConnectedAccount] {
+        let accounts = connectedAccounts()
+        let freshIDs = Set(CalendarScope.noteSources(accounts.map(\.id)))
+        return accounts.filter { freshIDs.contains($0.id) }
     }
 
     /// Why an empty result was empty.
@@ -120,6 +160,7 @@ final class MeetingStore {
         // from macOS, with the meeting sitting visible in a browser tab.
         let scheduled = calendars.filter {
             $0.type != .birthday && $0.type != .subscription
+                && CalendarScope.isSelected($0.source?.sourceIdentifier ?? "")
         }
         guard !scheduled.isEmpty else { return .noCalendarsConfigured }
 
@@ -171,7 +212,7 @@ final class MeetingStore {
         let predicate = store.predicateForEvents(
             withStart: now.addingTimeInterval(-4 * 3600),
             end: now.addingTimeInterval(window),
-            calendars: nil
+            calendars: scopedCalendars()
         )
         let events = store.events(matching: predicate)
         let elapsed = Int(Date().timeIntervalSince(started) * 1000)

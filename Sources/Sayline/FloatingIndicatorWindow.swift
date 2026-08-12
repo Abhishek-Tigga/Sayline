@@ -149,9 +149,12 @@ final class FloatingIndicatorWindow {
     /// other state so it can never intercept a click meant for the app
     /// underneath.
     func showSetupCard(_ card: CalendarSetupCard,
-                       onAction: @escaping (CalendarSetupAction) -> Void) {
+                       onAction: @escaping (CalendarSetupAction) -> Void,
+                       onAccountToggle: @escaping (String, Bool) -> Bool) {
         viewModel.setupCard = card
         viewModel.onSetupAction = onAction
+        viewModel.onAccountToggle = onAccountToggle
+        viewModel.accountRefusal = nil
         let panel = self.panel ?? makePanel()
         self.panel = panel
         reposition(panel)
@@ -164,6 +167,8 @@ final class FloatingIndicatorWindow {
         guard viewModel.setupCard != nil else { return }
         viewModel.setupCard = nil
         viewModel.onSetupAction = nil
+        viewModel.onAccountToggle = nil
+        viewModel.accountRefusal = nil
         if followUpCompletion == nil { panel?.ignoresMouseEvents = true }
         hide()
     }

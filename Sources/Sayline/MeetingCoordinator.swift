@@ -162,8 +162,12 @@ final class MeetingCoordinator {
             )
 
         case .nothingScheduled:
+            // Name the scope when one is set. "Nothing coming up" while a
+            // personal meeting sits visible on screen reads as the app
+            // being broken again, when it is the app doing as it was told.
             indicator.showNotice(
-                "Nothing coming up",
+                CalendarScope.isNarrowed ? "Nothing coming up in your chosen accounts"
+                                         : "Nothing coming up",
                 detail: "No meetings in the next 30 minutes",
                 pill: pill
             )
@@ -182,13 +186,33 @@ final class MeetingCoordinator {
     /// checks their calendar is a card people learn to dismiss without
     /// reading — and this one is asking for two minutes in two other apps,
     /// which is only worth asking for while it is still novel.
+    /// Tells the user once when an account appears that they never chose.
+    ///
+    /// New accounts are included rather than excluded — excluding one
+    /// silently is the failure this whole area exists to remove — but
+    /// including it without saying so would surface meetings from nowhere.
+    private func announceNewAccounts() {
+        let fresh = store.noteNewAccounts()
+        guard !fresh.isEmpty else { return }
+        let names = fresh.map(\.label).joined(separator: ", ")
+        SaylineLog.log("new calendar account(s) included: \(names)")
+        indicator.showNotice(
+            fresh.count == 1 ? "New calendar account included" : "New calendar accounts included",
+            detail: "\(names) — turn it off in Settings if you would rather not.",
+            pill: "Calendar", duration: 5.0
+        )
+    }
+
     private func offerSetupIfFirstTime() {
-        guard !CalendarSetupState.hasBeenDismissed else { return }
+        guard !CalendarSetupState.hasBeenDismissed else {
+            announceNewAccounts()
+            return
+        }
         present(.init(step: .review, accounts: store.connectedAccounts()))
     }
 
     private func present(_ card: CalendarSetupCard) {
-        indicator.showSetupCard(card) { [weak self] action in
+        indicator.showSetupCard(card, onAction: { [weak self] action in
             guard let self else { return }
             switch (card.step, action) {
 
@@ -214,7 +238,15 @@ final class MeetingCoordinator {
             case (_, .dismiss):
                 self.finishSetup()
             }
-        }
+        }, onAccountToggle: { [weak self] id, enabled in
+            guard let self else { return false }
+            let all = self.store.connectedAccounts().map(\.id)
+            let accepted = CalendarScope.set(id, enabled: enabled, allKnown: all)
+            SaylineLog.log(accepted
+                ? "calendar scope: \(id) \(enabled ? "on" : "off")"
+                : "calendar scope: refused to turn off the last account")
+            return accepted
+        })
     }
 
     private func open(_ urlString: String) {
