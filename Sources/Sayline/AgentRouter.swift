@@ -87,8 +87,10 @@ final class AgentRouter {
     question (e.g. "open Safari, then what's my battery"), call each \
     tool needed, one per item, in the order they were said. If the \
     request doesn't clearly match any available tool (for example it's \
-    about email, calendar, or anything else not covered), do not call \
-    any tool for that part — just reply normally.
+    about email, or anything else not covered), do not call any tool for \
+    that part — just reply normally. Calendars ARE covered: "check my \
+    calendar", "what's on today", "when's my next call" all mean \
+    next_meeting.
 
     General rule for "<X> settings" phrasing: default to \
     open_system_setting (a real pane inside the System Settings app), \
@@ -312,7 +314,7 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "next_meeting",
-                "description": "Says what the SINGLE next meeting is, without joining it. \"what's my next meeting\", \"when is my next call\". Not for a list — \"what meetings do I have today\" is out of scope, call nothing.",
+                "description": "The next meeting, without joining it. \"what's my next meeting\", \"when is my next call\", \"check my calendar\", \"what's on today\". Answers with one meeting; if they explicitly want them all listed, call nothing.",
                 "parameters": ["type": "object", "properties": [:] as [String: Any]],
             ],
         ],

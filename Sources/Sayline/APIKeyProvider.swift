@@ -18,6 +18,13 @@ import Foundation
 /// retries from scratch and prompts again — a real retry-storm bug found
 /// via live testing, not hypothetical.
 enum APIKeyProvider {
+    /// Why a key could not be used, when one is plainly stored.
+    ///
+    /// Ad-hoc signing gives every rebuild a different code identity, so a
+    /// Keychain item saved by an earlier build is present but unreadable by
+    /// this one. The honest sentence is "re-enter it", not "you have none".
+    static var lastFailureWasUnreadable = false
+
     private static var hasResolved = false
     private static var cachedKey: String?
 
@@ -33,6 +40,12 @@ enum APIKeyProvider {
             resolved = envKey
         } else {
             resolved = nil
+        }
+        lastFailureWasUnreadable = resolved == nil && KeychainStore.itemExists()
+        if lastFailureWasUnreadable {
+            SaylineLog.log("a Groq key is stored but this build cannot read it — "
+                + "ad-hoc signing changes the app's identity on every rebuild, "
+                + "so the Keychain treats it as a different app. Re-save it in Settings.")
         }
 
         cachedKey = resolved

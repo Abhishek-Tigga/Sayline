@@ -894,8 +894,12 @@
     {
       "id": "meeting-no-list",
       "transcript": "What meetings do I have today",
-      "expect": [],
-      "guards": "List-shaped, and the list surface is parked. Declining beats half-answering through next_meeting, which would report one meeting as though it were the answer to 'all of them'."
+      "expect": [
+        {
+          "action": "whatsNextMeeting"
+        }
+      ],
+      "guards": "DECISION REVERSED 2026-08-12, deliberately. The architecture had this declining rather than half-answering through next_meeting. Live experience overturned it: the wording that made the model refuse a list also made it refuse \"check my calendar\", which returned nothing at all and read as the feature being broken. Two attempts at wording that split the two failed in opposite directions. Answering with the next meeting is a partial answer to \"what do I have today\", and a partial answer beats silence — the person can see their calendar for the rest. The parked list surface is still parked; this is about not punishing an ordinary phrasing to protect a nicety."
     },
     {
       "id": "meeting-not-a-meeting",
@@ -909,6 +913,36 @@
         }
       ],
       "guards": "Contains meeting words but is a reminder. Guards the boundary from the other side — the meeting tools must not attract everything that mentions a standup."
+    },
+    {
+      "id": "web-play-in-youtube",
+      "transcript": "Play a lo-fi song in YouTube",
+      "expect": [
+        {
+          "action": "openWebsite",
+          "args": {
+            "site": "YouTube",
+            "play": true
+          }
+        }
+      ],
+      "guards": "Verbatim from a live failure. 'in YouTube' rather than 'on YouTube' — the model answered with a page_url of the YouTube homepage instead of site+query+play, so it opened the front page and played nothing. web-play-flag covers the 'on' phrasing and passed throughout, which is why nothing caught this."
+    },
+    {
+      "id": "web-play-generic",
+      "transcript": "play a song in youtube",
+      "expect": [],
+      "guards": "Declines, and that is accepted rather than desired. \"play a song\" names nothing to play — no artist, no genre, no title — so any choice would be invented. The phrasing that matters, \"play a lo-fi song in YouTube\", is covered by web-play-in-youtube and works. If this turns out to be common, the better answer is opening YouTube's music page rather than inventing a track, and that is a product decision nobody has made."
+    },
+    {
+      "id": "meeting-check-calendar",
+      "transcript": "Check my calendar",
+      "expect": [
+        {
+          "action": "whatsNextMeeting"
+        }
+      ],
+      "guards": "Live failure: answered nothing at all. The next_meeting description was tightened to refuse list-shaped questions after 'what meetings do I have today' half-answered — and that tightening reached too far, taking an ordinary way of asking what is next with it. The line has to reject a list without rejecting the question."
     }
   ]
 }

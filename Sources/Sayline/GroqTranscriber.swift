@@ -8,7 +8,9 @@ enum TranscriptionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "No Groq API key set — add one in Settings"
+            return APIKeyProvider.lastFailureWasUnreadable
+                ? "Your Groq key can't be read after the last rebuild — re-enter it in Settings"
+                : "No Groq API key set — add one in Settings"
         case .invalidResponse:
             return "Unexpected response from Groq"
         case .apiError(let message):
