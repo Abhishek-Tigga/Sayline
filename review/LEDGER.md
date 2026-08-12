@@ -1287,3 +1287,33 @@ Three investigations have now died for the same reason — no evidence at
 the moment of failure, and a log that only exists because a developer
 launched the app through a redirect. The user cannot produce that. Until
 F8 exists, a fourth theory would be guessing with better vocabulary.
+
+---
+
+## 2026-08-12 — eval harness reads the binary (Opus)
+
+**F-shadow — the harness reconstructed the router instead of asking it.**
+`claimed-fixed`, half of it.
+
+The harness compiled a hand-maintained list of source files into a throwaway
+program to recover the prompt and tools. It broke three times when
+`AgentRouter` gained a dependency — `WebsiteCatalog`, `LocalTimestamp`,
+`SaylineLog` — and twice nobody noticed for a day. A harness that will not
+compile and a harness nobody ran produce the same silence.
+
+`Sayline --dump-config` now prints the prompt and tool schema from the
+built app. No list, no reconstruction, and the thing measured is the thing
+that ships. Verified: 3070 chars, 17 tools, 17 strict, and the full eval
+still scores 72/72 with median prompt 2412 tokens and median latency
+1122 ms — unchanged, which is the point.
+
+**Not fixed, and deliberately so.** Scoring still compares against the
+model's raw tool call, not the app's resulting action. `--parse-actions` is
+built and hand-verified, but 30 of 72 expectations are written in the tool
+schema's vocabulary and would need rewriting. Regenerating them from current
+behaviour would produce a test set that agrees with the code by construction
+— worse than none, because it would be trusted. Left in `BACKLOG.md` with
+the per-case method written down.
+
+Open for a reviewer: whether splitting it this way was right, or whether a
+half-migrated harness is its own trap.

@@ -40,7 +40,7 @@ code, the rejected alternatives are not.
 
 | File | What it holds |
 |---|---|
-| `DESIGN-meetings-reminders.md` | 21 decisions with their rejected alternatives. Meetings are designed but **not built** |
+| `DESIGN-meetings-reminders.md` | 21 decisions with their rejected alternatives. Meetings are **built** |
 | `BACKLOG.md` | Parked work, each with why it's parked and what unparks it |
 | `PRODUCT.md` | Direction and the "why" behind product calls |
 | `CHANGELOG.md` | One row per meaningful change |
@@ -57,20 +57,27 @@ Only a different reviewer promotes it, and only after running something.
 
 ## How to verify
 
-Four layers, all cheap, none of them optional when touching what they cover.
+Six layers, all cheap, none of them optional when touching what they cover.
 
-**Router accuracy** — 57 cases against the live model. Reads the real prompt
-and tools out of `AgentRouter.swift`, never its own copy:
+**Router accuracy** — 72 cases against the live model. Gets the real prompt
+and tool schema by asking the built binary, so there is no second copy to
+drift:
 
 ```bash
-python3 eval/run_eval.py --arm openai --dry-run          # compiles only, no API calls
+xcodebuild -project Sayline.xcodeproj -scheme Sayline -configuration Debug build
+python3 eval/run_eval.py --arm openai --dry-run          # no API calls
 python3 eval/run_eval.py --arm openai --model gpt-4o-mini
 ```
 
-Run the `--dry-run` line after **any** change to which files `AgentRouter`
-depends on. The harness compiles a hand-maintained list, and splitting
-`LocalTimestamp` out of `AgentRouter` broke it for a day without anyone
-noticing — the eval only runs when a human runs it.
+**Build first.** The harness reads the newest binary in DerivedData; a stale
+one measures the prompt you had yesterday.
+
+It used to compile a hand-maintained list of source files instead, which
+broke three times when `AgentRouter` gained a dependency nobody added —
+twice unnoticed for a day, because a harness that cannot compile and a
+harness nobody ran look identical. `Sayline --dump-config` ended that class.
+Two source-compiled modes remain for pane resolution; they go away with the
+`--parse-actions` migration in `BACKLOG.md`.
 
 **Deterministic logic** — the half the router eval structurally cannot see,
 because it scores what the model emits, not what we do afterwards.
@@ -95,6 +102,10 @@ The fast path answers some commands without calling the model at all, so
 the router eval cannot see it — `fastroute-checks` is the only thing that
 can. Its negative cases matter most: a false match there does not give a
 wrong answer, it silently drops the rest of the sentence.
+
+**Deterministic logic, cont.** `scope-checks` covers which calendar
+accounts are readable; `meeting-checks` covers meeting parsing and link
+detection. Both are pure and framework-free on purpose.
 
 **Live URLs** — the catalog is compiled in, so a moved URL needs a release.
 This detects, it cannot heal:
@@ -162,7 +173,11 @@ answered by talking — build the disposable version and look at it.
   the single fact that separates "our callback is blocked" from "the system
   refused us". Next incident, read `~/Library/Logs/Sayline/sayline.log` for
   `MAIN THREAD STALLED` next to the disable lines.
-- **Meetings are designed and unbuilt.** No EventKit calendar code exists.
+- **The eval still scores the model's raw output, not the app's.** Pane
+  correction, search-URL decomposition and due-date stripping all run after
+  the model and the harness cannot see them. `Sayline --parse-actions`
+  exists and works; wiring it in means rewriting 30 expectations one at a
+  time, which is in `BACKLOG.md` with the reason it must not be automated.
 - **~2s latency on every agent command** — the router round trip. Real, and
   currently unaddressed.
 - **Two API keys were pasted in chat** and should be rotated.

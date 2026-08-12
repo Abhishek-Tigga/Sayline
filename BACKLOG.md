@@ -9,6 +9,47 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **Score the eval against the app's own parser** (half built 2026-08-12,
+  the other half deliberately not rushed).
+
+  The eval scores what the model emits. Production then runs that through
+  pane correction, search-URL decomposition, invented-due-date stripping
+  and the personal-pages table — none of which the harness sees. It
+  reimplements a *part* of that in Python and misses the rest, so cases
+  have flipped run to run for reasons unrelated to the model, and fixes
+  have passed in production while failing here. Three times now a fix has
+  been invisible to the eval that was supposed to measure it.
+
+  **Built and proven already:** `Sayline --parse-actions` reads tool-call
+  JSON on stdin and prints what the app would really do, running the real
+  `actionsForEval`. Verified by hand — "Open banana settings" comes back as
+  the visible fallback, an Amazon search URL in `page_url` comes back
+  rebuilt as `amazon.in/s?k=…` with the region applied, a bare-day reminder
+  comes back with the due date stripped.
+
+  **Why it is not wired into scoring yet.** The expectations are written in
+  the tool schema's vocabulary — `site: "Amazon"`, `query: "headphones"` —
+  and the app's actions carry a resolved URL instead. Thirty of seventy-two
+  cases would need rewriting.
+
+  That is not a mechanical rename. Each expectation encodes an intent, and
+  the fast way to migrate thirty of them is to run the app, take whatever
+  it prints, and call that the expectation — which produces a test set that
+  agrees with the code by construction and can never fail. A test set that
+  cannot fail is worse than no test set, because it is trusted.
+
+  **What the migration should do instead:** take each case one at a time,
+  read what it was written to protect, and assert that in the new
+  vocabulary. `web-search-amazon` guards that a search reaches Amazon's
+  results with the query intact — so it becomes
+  `url__contains: "amazon.in/s?k="` plus the query, which is a *stronger*
+  assertion than `site: "Amazon"` ever was, because it also pins the
+  region. Several cases get better this way. None should get vaguer.
+
+  Once done, `--parse-actions` replaces the Python `normalize()` and the
+  `pane-phrases`/`resolve-panes` modes, and the source-concatenation file
+  list disappears entirely.
+
 - **Google Calendar users see an empty calendar** (found live 2026-08-11,
   half-fixed, strategy not yet chosen).
 

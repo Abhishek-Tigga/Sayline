@@ -139,11 +139,43 @@ if mode == "dump-config" {
 """
 
 
+def _binary():
+    """The built Sayline binary — the thing that actually ships."""
+    matches = sorted(
+        Path.home().glob(
+            "Library/Developer/Xcode/DerivedData/Sayline-*/Build/Products/Debug/"
+            "Sayline.app/Contents/MacOS/Sayline"
+        ),
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )
+    if not matches:
+        sys.exit("No built Sayline binary found. Build it first:\n"
+                 "  xcodegen generate && xcodebuild -project Sayline.xcodeproj "
+                 "-scheme Sayline -configuration Debug build")
+    return str(matches[0])
+
+
 def swift_helper(mode, stdin_text=""):
-    """Concatenate the real sources with stubs + a main, run under `swift`."""
-    # Every dependency of AgentRouter has to be here. Missing one fails
-    # loudly at compile time, which is the good outcome — but it is worth
-    # noting this list has to grow whenever the router gains a dependency.
+    """Ask the built app for the prompt and tools, or fall back to source.
+
+    `dump-config` goes to the binary, which has no file list to maintain and
+    cannot drift from production because it *is* production. That path broke
+    three separate times when AgentRouter gained a dependency nobody added
+    to the list below, and twice it went unnoticed for a day, because a
+    harness that cannot compile and a harness nobody ran look identical.
+
+    The other modes still compile from source. They exist to resolve pane
+    strings for the Python-side scoring mirror, and both go away with the
+    `--parse-actions` migration — see BACKLOG. Until then this list is only
+    load-bearing for those modes, not for the prompt.
+    """
+    if mode == "dump-config":
+        proc = subprocess.run([_binary(), "--dump-config"],
+                              capture_output=True, text=True, timeout=120)
+        if proc.returncode != 0:
+            sys.exit(f"sayline --dump-config failed:\n{proc.stderr[:2000]}")
+        return json.loads(proc.stdout)
+
     parts = [
         (SRC / "AgentAction.swift").read_text(),
         (SRC / "SettingsPaneCatalog.swift").read_text(),

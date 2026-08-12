@@ -622,6 +622,19 @@ final class AgentRouter {
             return []
         }
 
+        return actionsForEval(fromToolCalls: toolCalls, transcript: transcript)
+    }
+
+    /// Tool calls in, actions out — the whole deterministic layer.
+    ///
+    /// Named for the eval because that is why it is not private. The
+    /// harness feeds real tool-call JSON through this exact function via
+    /// `--parse-actions`, so what it scores is what production does rather
+    /// than a Python reimplementation of some of it. Everything that used
+    /// to drift — pane correction, search-URL decomposition, invented due
+    /// dates, personal pages — is on this side of the line.
+    func actionsForEval(fromToolCalls toolCalls: [[String: Any]],
+                        transcript: String) -> [AgentAction] {
         let parsed = correctedSettingsPane(toolCalls.compactMap(parseAction), transcript: transcript)
         return droppingInventedDueDates(parsed, transcript: transcript)
     }
