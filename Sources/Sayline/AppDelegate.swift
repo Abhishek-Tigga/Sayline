@@ -239,7 +239,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+    /// True when we may actually record. Says why when we may not.
+    ///
+    /// Checked on every hold rather than once at launch. Without this the
+    /// app records silence quite happily and then blames the input device,
+    /// which is the most misleading thing it can say: the device is fine,
+    /// the permission is missing, and the two have completely different
+    /// fixes.
+    private func microphoneIsUsable() -> Bool {
+        switch AudioRecorder.micAuthorization {
+        case .authorized:
+            return true
+
+        case .notDetermined:
+            // Never asked, or the grant was lost with the last rebuild.
+            // Ask now; this hold is spent either way, so say so plainly.
+            SaylineLog.log("microphone not yet authorized — prompting")
+            audioRecorder.requestMicPermission { [weak self] granted in
+                guard let self else { return }
+                self.isMicAuthorized = granted
+                SaylineLog.log("microphone prompt answered -> \(granted ? "granted" : "denied")")
+                self.indicatorWindow.showNotice(
+                    granted ? "Microphone allowed" : "Microphone denied",
+                    detail: granted ? "Hold the key again and speak"
+                                    : "Dictation can't work without it",
+                    pill: "Microphone", duration: 3.4)
+            }
+            return false
+
+        default:
+            // Denied or restricted. macOS will not show the prompt a second
+            // time, so System Settings is the only route left.
+            SaylineLog.log("microphone access is off — recording refused")
+            isMicAuthorized = false
+            indicatorWindow.askFollowUp(
+                FollowUpRequest(
+                    question: "Microphone access is off",
+                    detail: "Sayline can't hear anything until it's turned on in System Settings.",
+                    kind: .confirm(primary: "Open Settings", secondary: "Not now")
+                )
+            ) { answer in
+                guard answer == .confirmed,
+                      let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+                else { return }
+                NSWorkspace.shared.open(url)
+            }
+            return false
+        }
+    }
+
     private func beginRecording() {
+        // Before anything else, and before the sound: starting a recording
+        // we cannot capture wastes the hold and produces a confident,
+        // wrong diagnosis at the end of it.
+        guard microphoneIsUsable() else {
+            // Nothing was started, so make sure the hotkey-up handler does
+            // not find a stale file from an earlier hold and try to
+            // transcribe it.
+            audioRecorder.discardLastRecording()
+            return
+        }
         SoundEffectPlayer.shared.playHotkeyDown()
         isRecording = true
         transcriptionError = nil
@@ -296,8 +355,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // when the real cause is that their input device gave us nothing.
         guard !audioRecorder.capturedNoAudio else {
             let device = audioRecorder.lastInputDeviceName
-            SaylineLog.log("no audio captured from \(device) over \(audioRecorder.lastRecordingDuration)s — check the input device")
-            indicatorWindow.show(state: .message("No audio from \(device)"))
+            // Silence has two causes and they need different fixes. A
+            // permission that was revoked mid-session lands here rather
+            // than in the guard above, so name it rather than sending
+            // someone to check a cable that is fine.
+            let authorized = AudioRecorder.micAuthorization == .authorized
+            SaylineLog.log("no audio captured from \(device) over \(audioRecorder.lastRecordingDuration)s "
+                + "— mic authorized: \(authorized)")
+            indicatorWindow.show(state: .message(
+                authorized ? "No audio from \(device)" : "Microphone access is off"))
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [weak self] in
                 self?.indicatorWindow.hide()
             }

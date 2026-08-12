@@ -63,6 +63,18 @@ final class AudioRecorder {
         SaylineLog.log("swept \(orphans.count) leftover recording(s) from previous runs")
     }
 
+    /// The live answer, not a cached one.
+    ///
+    /// The launch-time check goes stale the moment someone changes the
+    /// setting in System Settings — and after a rebuild it is stale
+    /// immediately, because the new signature loses the grant. On
+    /// 2026-08-12 that produced three recordings of pure silence, each
+    /// reported as "check the input device", while the microphone was
+    /// perfectly fine and simply not permitted.
+    static var micAuthorization: AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:

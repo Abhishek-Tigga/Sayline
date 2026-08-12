@@ -1691,3 +1691,45 @@ All seven check suites green, including `media-checks` (24) and the 24 new
 **Not verified by its author, as ever.** Nothing here has been run by a
 human against a real playing track, a real browser tab, or a real empty
 calendar. Every claim above is checks-and-tracing only.
+
+---
+
+## 2026-08-12 — the microphone bug that blocked all live testing (Opus)
+
+**Symptom:** hotkey worked, pill appeared, recording "started" — and every
+recording captured `frames: 0`. Three holds, two different input devices,
+no dictation, no agent mode, no microphone prompt.
+
+**Cause, two parts.** `requestMicPermission` is called once at launch and
+only stores a flag. `beginRecording()` never reads that flag — it calls
+`audioRecorder.start()` unconditionally. So with access off, the engine
+runs, captures silence, and the failure surfaces as **"No audio from
+MacBook Air Microphone — check the input device"**: a confident diagnosis
+pointing at hardware that was working perfectly.
+
+The permission was lost the way it always is here — the rebuild changed
+the signature. And a `.denied` status never prompts, which is why no
+dialog appeared to say so.
+
+**Fixed:** authorization is now checked on **every hold**, live, not cached
+from launch. `.notDetermined` prompts and says the hold was spent;
+`.denied`/`.restricted` offers System Settings through the follow-up
+primitive, since macOS will not prompt twice. The zero-frame message now
+distinguishes the two causes, for the case where access is revoked
+mid-session.
+
+Pre-existing, not introduced today — the launch-only check predates this
+work. It stayed invisible because the grant only disappears on rebuild,
+which is exactly when a developer expects things to be odd and a user
+never sees it.
+
+`claimed-fixed`. Not verified — the fix is about what happens when
+permission is missing, and confirming it needs a human to hold the key
+with access off and then on.
+
+**Also caught, unrelated and unresolved:** `MAIN THREAD STALLED — no
+heartbeat for 2.2s`, returning after **7.8s**, immediately before
+`[accounts] raw calendars:`. This is the first time the watchdog has fired
+since it was built, and it points at an EventKit call on the main thread
+rather than at the event tap. Not investigated yet; recorded so it is not
+lost.
