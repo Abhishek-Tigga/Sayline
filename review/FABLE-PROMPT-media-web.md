@@ -1,4 +1,4 @@
-# Fable — design review, before any code exists
+# Fable — design review and simplicity audit, before any code exists
 
 Open `/Users/abhishektigga/Documents/Dictation/Sayline`.
 
@@ -68,6 +68,59 @@ Read that section of the design note carefully and challenge it. If
 of the five probes covered, that finding is worth more than everything else
 in this review.
 
+## Second job: is this codebase more complicated than it needs to be?
+
+The owner is a PM learning to code hands-on, and has to be able to read,
+change and maintain everything here alone. Complexity he cannot follow is a
+defect even when it is technically correct.
+
+So: **find the places where something simpler would work just as well.**
+Name them, rank them, and show the simpler version.
+
+Look for:
+
+- Abstractions with one caller that could be inlined
+- Two things doing one job, or one thing doing two
+- Files that exist only because something was split too early
+- Names that need a comment to be understood, where a better name would not
+- State stored in more than one place
+- Anything a reader has to hold three files in their head to follow
+
+**Do not make the changes.** Hand back a ranked list, with the simpler
+version written out for the top few. This is deliberate:
+
+1. Nobody verifies their own work — the rule in `review/LEDGER.md`. A
+   reviewer who also refactors leaves nothing independently checked.
+2. The user is about to test new media and calendar behaviour. A cleanup
+   landing in the same build makes a failure impossible to attribute.
+3. Coverage is uneven. `WebsiteCatalog`, `FollowUp`, `LocalTimestamp`,
+   `Meeting`, `MeetingLink`, `CalendarScope` and `FastRoute` all have
+   runnable checks. `AppDelegate`, every SwiftUI view, `MeetingStore` and
+   the executor's side effects have none. Say which column each of your
+   suggestions falls in — it decides what is safe to accept.
+
+### The trap, stated plainly
+
+Several things here look like over-engineering and are not. Each was paid
+for with a real bug:
+
+- `refreshSourcesIfNecessary()` is documented as *not* working — that is a
+  measurement, not an assumption
+- a 503 counts as "page exists", because treating it as missing threw away
+  valid Amazon URLs
+- Escape is observed rather than consumed, so the focused app still gets it
+- `SurfaceStyle.parkedGlass` is dead-looking code kept deliberately
+- the router's fallbacks fail open on purpose
+
+**The reasoning lives in the comments, and the rejected alternatives live
+only there.** Deleting a comment that records why something is not simpler
+is itself a regression, even when the code is untouched. If a comment reads
+as noise to you, say so — but separate "this comment is redundant" from
+"this comment is the only surviving record of a decision".
+
+Judge the comment density honestly either way. It is heavy by design and
+may be heavier than it needs to be.
+
 ## Standards
 
 Judge against the pillars in `CLAUDE.md`, not against taste:
@@ -86,9 +139,19 @@ defect.
 
 ## What to hand back
 
-For each finding: what breaks, the concrete case that breaks it, and what
-you would do instead. Rank them — the user has limited time and will act on
-the top of your list first.
+Two separate lists, not one merged list. They get acted on at different
+times and by different rules.
+
+**A — design findings.** For each: what breaks, the concrete case that
+breaks it, and what you would do instead. Rank them; the user acts on the
+top of the list first.
+
+**B — simplifications.** For each: what to simplify, the simpler version,
+and whether it sits in the tested or untested column. Rank by
+reader-effort saved per unit of risk, not by lines removed.
+
+If a finding in A and a suggestion in B touch the same code, say so. A
+gets built first, so B should assume that code has already changed.
 
 Append to `review/LEDGER.md`. One rule is not optional: you may mark your
 own work `claimed-fixed`, never `VERIFIED`. Only a different reviewer
