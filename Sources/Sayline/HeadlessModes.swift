@@ -66,6 +66,31 @@ enum HeadlessModes {
 
             let transcript = request["transcript"] as? String ?? ""
             let toolCalls = request["toolCalls"] as? [[String: Any]] ?? []
+
+            // Complain about the wrong shape instead of printing "[]".
+            //
+            // `parseAction` wants OpenAI's own tool call, where `arguments`
+            // is a JSON *string*. Feed it a dict — the obvious mistake, and
+            // one made within an hour of this mode existing — and every
+            // call parses to nil and this prints an empty array. "The app
+            // does nothing" and "you fed me garbage" then look identical,
+            // which is the exact confusion this whole mode was built to
+            // end. So it is an error, loudly, on stderr.
+            for call in toolCalls {
+                guard let function = call["function"] as? [String: Any],
+                      function["name"] is String,
+                      function["arguments"] is String else {
+                    FileHandle.standardError.write(Data("""
+                        --parse-actions: malformed tool call. Expected OpenAI's shape
+                          {"function": {"name": "...", "arguments": "<json string>"}}
+                        with `arguments` as a STRING, not an object. Got:
+                          \(call)
+
+                        """.utf8))
+                    exit(2)
+                }
+            }
+
             let actions = router.actionsForEval(fromToolCalls: toolCalls, transcript: transcript)
             emit(actions.map(describe))
         }

@@ -10,8 +10,40 @@ of them are one bug wearing four hats.
 | "play music" | Opened YouTube, played nothing | Request is incomplete; we guessed instead of asking |
 | "play lo-fi music on YouTube" | Worked | — |
 | "stop the music on YouTube" | Opened another YouTube tab | **No concept of acting on what is already running** |
-| "Open Gmail" | Nothing useful | Unknown — we do not log what the app decided |
+| "Open Gmail" | Nothing useful | **Routing flips on capitalisation** — see below |
 | "when is my next meeting" | "No meetings" | True, but indistinguishable from "I can't see your calendar" |
+
+## Traced, not guessed
+
+Ran the real system prompt and tool schema from the built binary through
+the live model, then through the app's own `parseAction`. The whole
+production path, minus the app. Results:
+
+| Transcript | Model chose | App did |
+|---|---|---|
+| "Open Gmail" | `open_website(mail.google.com)` | opens Gmail — **correct** |
+| "open gmail" | `open_app("Gmail")` | tries to launch an app that does not exist — **nothing** |
+| "Open my email" | no tool call at all | nothing |
+| "play music" | no tool call; *"Could you specify which song or artist?"* | nothing |
+| "Stop the music on YouTube" | `open_website(youtube.com)` | opens YouTube again |
+| "Open Amazon" | `open_website(amazon.**com**)` | corrected to amazon.**in** — working |
+
+**Gmail is a capitalisation coin-flip.** Identical request, different tool,
+depending only on a capital O. There is no Gmail app on macOS, so the
+`open_app` branch does nothing at all. This is the strongest argument yet
+for decision 5 — but note the fix it demands is a *fallback* when the app
+is missing, not a blanket ban on opening apps.
+
+**The model already asks the right question and we throw it away.** For
+"play music" it replied "Could you specify which song or artist?" — almost
+exactly the follow-up decision 3 calls for. The router discards message
+content whenever there is no tool call, so a perfectly good question dies
+silently. Surfacing it may be nearly free, and cheaper than a second round
+trip.
+
+**"Open my email" gets a refusal**, because no tool matches a provider
+nobody named. It should either ask which provider or use a default, not
+apologise.
 
 ## The shape of the problem
 
