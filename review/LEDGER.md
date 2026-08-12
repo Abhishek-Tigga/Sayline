@@ -1317,3 +1317,257 @@ the per-case method written down.
 
 Open for a reviewer: whether splitting it this way was right, or whether a
 half-migrated harness is its own trap.
+
+---
+
+## Design review + simplicity audit (Fable, 2026-08-12)
+
+Reviewed `DESIGN-media-and-web.md` before any code exists, plus a
+simplicity pass over the codebase. Nothing here is built; everything is
+`claimed` reasoning, and the two re-probes named in A1 and A2 are the
+highest-value actions in this entry. I could not read Opus's probe
+scripts (they live in another session's scratchpad), so my analysis of
+the media-key and WKWebView results works from the quoted outputs only —
+if the scripts contradict my reconstruction, the scripts win.
+
+### A — design findings, ranked
+
+**A1 · The WKWebView dead-end conclusion may be an artifact of the test
+videos — re-probe before accepting it.** The five probes share two
+possible confounds. First: YouTube's error-150 family means "the owner of
+THIS video disallows embedding" — a per-video permission, not a blanket
+WKWebView refusal; music-label videos are disproportionately
+embed-restricted, while lo-fi live streams (the actual use case) are
+typically embeddable. "A freshly fetched, live video ID" does not
+establish the video was embed-allowed. Second: a `WKWebView` blocks
+programmatic autoplay unless
+`configuration.mediaTypesRequiringUserActionForPlayback = []` is set, and
+probe 1's result (player loads, `paused:true, duration:0`) is exactly
+what that misconfiguration looks like. The decisive re-probe is ten
+minutes: a known embed-allowed ID (the IFrame API demo video, or the
+Lofi Girl stream) inside a WKWebView with that flag set and a real
+`Origin`. If it plays, the floating always-on-top player returns as the
+primary music path — zero focus theft, no browser, our window — with the
+browser route as fallback for embed-restricted videos. If it still
+refuses, the dead end is confirmed with the confounds removed and the
+design stands. Either result is worth more than the rest of this review.
+
+**A2 · The play-worked-pause-didn't asymmetry has two testable
+explanations — and a design hedge that removes it from the load-bearing
+path.** (a) A system-defined media-key event is a key-down/key-up PAIR
+encoded in `data1` (state 0xA then 0xB). A probe that posts only the
+down half can be delivered as "play" rather than "toggle" — and a bare
+"play" is idempotent: it resumes a paused tab and does nothing to a
+playing one. That reproduces the observed asymmetry exactly. (b) After
+the first press, Now Playing ownership may have moved (Control Center's
+widget names the owner; `log stream --predicate 'process == "rcd"'`
+shows routing) — subsequent presses then went somewhere else. Re-probe
+with the full pair and the widget visible.
+Regardless of the answer, the design should not make one broadcast key
+load-bearing for "control anything, anywhere": **route per target.**
+The audio-process detector names the audible app; when it is Music or
+Spotify, use their AppleScript transport (`playpause`, `next track`) —
+already proven in this repo's history, per-app Automation grant, and the
+player state is *queryable*, so the answer can be exact. The media key
+is then only the browser/unknown fallback, and a flaky key degrades one
+segment instead of the whole feature. This also answers the
+multiple-sources case the note doesn't cover (Spotify audible AND a tab
+playing): control the detected app, and when two are audible, ask —
+the follow-up primitive exists.
+
+**A3 · Media control must not pay the router round trip.** The note
+never says where these commands route. "Stop", "pause", "next",
+"louder" are fixed vocabulary with no arguments — FastRoute material by
+construction — and the standing pillar says a design that answers
+"stop" after a 2-second model round trip has failed regardless of
+correctness. Design addition: the media phrases go into FastRoute's
+fixed table (whole-utterance, as ever), with the router tool as backstop
+for phrasings only. Zero tokens, ~5ms.
+
+**A4 · The missing categories (the main job).** Two found, one produced
+by this design itself:
+- *(a) Sayline's own last turn as referent.* "Again", "a bit more"
+  (after volume down), "say that again" (the notice vanished after
+  4.5s), "no, not that one". Every one names no destination and assumes
+  state — but the state is *ours*, not the screen's, which is why
+  neither the media family nor the web family can ever express it. The
+  cheap, deterministic shape: a `LastTurn` record (action + timestamp,
+  ~5-minute window) consulted by a handful of FastRoute phrases —
+  "again" repeats the last action, "say that again" re-shows the last
+  notice, "more" repeats a repeatable action (volume). Not a prompt
+  feature: injecting history into the router buys latency and
+  non-determinism for the same phrases.
+- *(b) The design's own ask-flow creates an unroutable command.* "Play
+  music" → "what would you like to hear?" → reply → *search results
+  page* — and the natural next utterance is "play the first one", which
+  assumes on-screen state and has no destination. The fix is inside the
+  design: resolve the reply through the existing `playOnYouTube`
+  top-video path so music actually plays (search page only as its
+  existing fallback). This also shrinks how often the six-second
+  focus question arises at all.
+- *(c) Destination-less keystrokes need a frontmost gate.*
+  `closeCurrentTab` as Cmd+W into whatever is focused closes a document
+  window in Pages when the browser isn't frontmost — silently wrong, the
+  exact pillar violation. Rule for the whole category (and for the
+  future scroll/go-back/zoom family the note lists): verify the
+  frontmost app's class before sending any focused-app keystroke, act
+  only when it matches, and say what was done either way ("Closed the
+  Safari tab" / "The front window isn't a browser").
+
+**A5 · Decision 5 — side with the flag.** "Website in all cases" fixes
+Gmail and regresses Spotify, Slack, WhatsApp and Notion, all installed
+here. "Prefer the installed app, else website" is one
+`InstalledAppCatalog` lookup — no latency, no new state — and fixes
+Gmail identically (no Gmail app exists to prefer). If the user keeps
+the literal rule for now, the note should name the four regressions as
+accepted rather than discovered later.
+
+**A6 · Detector honesty (open question 3): phrase per mechanism, never
+per guess.** AppleScript-controlled apps have queryable state — report
+outcomes ("Paused Spotify"). The media-key/browser path cannot query —
+always report the action ("Sent pause to Chrome"), never the outcome.
+The note's own copy already leans this way; make it the rule rather
+than an example, and the over-reporting detector ships honestly.
+
+**A7 · Close-the-tab (open question 5): no confirmation — but only with
+A4c's gate.** The command is explicit and precise, the cost is mild and
+usually reversible (Cmd+Shift+T), and a confirmation on every "close
+the tab" is nagging that teaches people to stop using it. The real
+hazard was never ambiguity of intent; it is delivery to the wrong app,
+which the frontmost gate removes. Separately: the note contradicts
+itself — `mediaMute` appears in the new case list two sentences after
+"volume already exists and should be reused". Drop `mediaMute`;
+`setVolume(.mute)` is already routed, FastRouted, and tested.
+
+**A8 · Six seconds (open question 6): don't decide yet — one more probe
+first.** The probes establish that a media key resumes a *paused*
+background tab. Untested: a *freshly opened* background tab that has
+loaded but never played — if YouTube registers a MediaSession handler on
+load, background-tab + media-key starts playback with zero focus theft,
+beating both options on the table. If that fails and A1's re-probe also
+fails, then foreground-with-handback is right — but cap it: give up and
+report honestly if no audio is detected within ~10 seconds, because
+"waits forever on a silent tab" is the silent-wrongness pillar again.
+With A4b resolving replies to a direct `/watch` URL, this path runs
+rarely either way.
+
+**A9 · Calendar half: agreed, two tightenings.** The three-answer split
+is right and closes the last "silently wrong" case. Gate the setup card
+on *connection* (≥1 non-birthday, non-subscription source — exactly what
+`connectedAccounts()` computes) rather than dismissal, as the note says.
+Account counting after the grant, as the note says. One addition: when
+access is denied, the three-way split must still not collapse — denied
+is a fourth state with its own sentence, and the existing
+`offerSettings` pattern already owns it.
+
+### B — simplifications, ranked by reader effort saved per unit of risk
+
+**B1 · CalendarScope: store the exclusions, delete the bookkeeping.**
+(Tested column — it has a check suite.) The current shape stores the
+*included* set plus a second `knownSources` set whose only job is to
+notice new accounts and add them to the inclusion — two defaults keys,
+set algebra in `noteSources`, and the subtle `guard isNarrowed,
+!seen.isEmpty` dance. Inverting the storage makes all of it fall out:
+
+```swift
+enum CalendarScope {
+    // Excluded account IDs. Empty = read everything (the default).
+    static var excluded: Set<String>
+    static func isSelected(_ id: String) -> Bool { !excluded.contains(id) }
+    // set(_:enabled:) refuses to exclude the last remaining account,
+    // same guard as today, no allKnown parameter needed.
+}
+```
+
+A new account is included *by construction* (it is not in the excluded
+set), so `knownSources`, `noteSources`, and `noteNewAccounts` in
+`MeetingStore` all disappear — roughly 40 lines and one defaults key —
+and the "announce new accounts" behaviour, if still wanted, reduces to
+comparing this launch's sources against the excluded set's residue. The
+check suite's *behaviours* (default reads everything, can't empty the
+scope, rename-safe) transfer unchanged; only their setup changes. One
+migration line reads the old key once.
+
+**B2 · One `SpokenText` helper for the seven normalizers.** (Mixed
+column.) `normalize` is defined in `AgentRouter`, `FastRoute`,
+`InstalledAppCatalog`, `WebsiteCatalog`, `SettingsPaneCatalog`, plus
+`normalizedAppName` in `AgentExecutor` and `tokens` in `ReminderStore`
+and `SettingsPaneCatalog`. Four are byte-identical
+(lowercase-alphanumerics); the others differ deliberately (the pane
+matcher folds "&"/"and"; FastRoute strips politeness). A reader cannot
+tell the deliberate differences from drift. One file:
+
+```swift
+enum SpokenText {
+    static func normalized(_ s: String) -> String        // the common one
+    static func tokens(_ s: String, noise: Set<String>) -> [String]
+}
+```
+
+Adopt it for the four identical copies now (mechanical, and the
+catalog/fastroute suites cover two of them); leave the deliberate
+variants in place with a one-line comment naming *why* they differ,
+which is the actual information a reader lacks today.
+
+**B3 · APIKeyProvider: three copy-pasted cache pairs → one helper.**
+(Untested column, trivial risk.) `hasResolved`/`cachedKey` ×3 becomes
+one `CachedCredential` struct with a `lookup` closure; ~95 lines → ~50,
+and `invalidateCache` stops being a list that must be remembered when a
+fourth key arrives.
+
+**B4 · Move the ~280-line `tools` array out of `AgentRouter` into its
+own file.** (Tested column — the eval covers it end-to-end, and since
+`--dump-config` reads the built binary there is no harness file list to
+break.) `AgentRouter` is 919 lines and the logic a reader actually
+needs — parsing, corrections, the HTTP call — starts a third of the way
+in. Pure data move, no signature changes. Do it only *after* the media
+tools land, so the diff is a move and not a move-plus-edit.
+
+**B5 · `flashMessage` vs `showNotice`: write the rule, don't merge.**
+(Untested column.) The de-facto rule already exists — pill flash for a
+one-line status, notice box for anything with a detail line or an
+outcome someone must read — but it lives nowhere, and Opus's own ledger
+records migrating one call site and leaving the rest. One doc comment
+on each method stating when to use the other. Zero risk; merging the
+two is the risky version and is not worth it.
+
+**B6 · The Groq arm and its retry scaffolding: flag, don't delete.**
+(Tested column.) `RetryableToolFailure`, `routeWithRetry`, and the
+temperature-0.6 retry exist solely for a provider that has never
+completed a scored run and is one hardcoded constant away from dead
+code. The repo's own conventions (branch-don't-delete,
+measure-before-deciding) say the comparison should be run once or
+formally abandoned — either outcome then deletes ~60 lines or
+un-deadens them. Recording it here so the decision gets made instead of
+the code quietly aging.
+
+**B7 · The follow-up state machine inside `FloatingIndicatorWindow` —
+the biggest one, deliberately deferred.** (Untested column, and the
+component two features are about to lean on.) Six pieces of state
+(timer, deadline, remaining, retry flag, queue, notice timestamp) plus
+pause/resume live in the window; Opus's O5 called it, and it is still
+true. But it has no suite, media and calendar testing is about to
+exercise it live, and a refactor landing in the same window as new
+behaviour makes any failure unattributable — the exact trap this
+review's brief names. Sequence: F6 test target first, then extract a
+`Conversation` type with the window as renderer. Not before.
+
+**Comment density, judged honestly:** heavy, and the majority earns it —
+the measured-not-working note on `refreshSourcesIfNecessary`, the 503
+rule, the parked glass are exactly the survival records the trap
+section defends, and this review was materially faster because of them.
+The minority that could go: comments that restate the next line
+("Sorted, not raw dictionary order" and kin) and the handful that
+narrate control flow a rename would make obvious. Keep the practice;
+trim narration in *new* code rather than sweeping old files, because a
+sweep risks deleting a decision record misread as noise — the
+regression the brief itself names.
+
+**Overlaps between the lists:** A4c and A7 touch the same new gate
+(build once, in the media family). A5 touches `FastRoute`/
+`InstalledAppCatalog`, which B2 also touches — A5 first, B2 assumes it.
+A9's connection-gating touches `CalendarSetupState`, which B1 borders —
+B1 assumes A9 landed. B4 waits for the media tools from A2/A3.
+
+Per the ledger rule: everything above is analysis, marked claimed;
+nothing is VERIFIED, including by me.

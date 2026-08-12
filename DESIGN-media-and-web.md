@@ -240,6 +240,47 @@ user gesture or `webkitSetPresentationMode`, which requires "Allow
 JavaScript from Apple Events" — a hidden Develop-menu setting no consumer
 will have on. If PiP is wanted, someone presses the button.
 
+### Re-probed after Fable's review (A1, A2, A8)
+
+Three probes run with the confounds Fable named removed. Results below;
+they changed one decision and confirmed two.
+
+**A1 — the WKWebView dead end is real.** Re-run with a known
+embed-allowed video (`M7lc1UVf-VE`, YouTube's own IFrame API demo) and
+with the Lofi Girl stream, `mediaTypesRequiringUserActionForPlayback = []`
+set in every probe, and a real origin. Both returned error 152 *after*
+`onReady` fired — a per-video embed restriction is 101/150 and arrives
+before ready, so this is not per-video permission. The plain embed path
+was decisive: YouTube renders its own error page reading **"Error 153 —
+Video player configuration error"**, with `readyState: 0` and
+`networkState: 0`. A forced `play()` and a synthetic click on the play
+button changed nothing, because no media had loaded to play.
+
+YouTube will not serve playback to a `WKWebView`. **The floating player
+we own is out**, and the browser is the only route for YouTube.
+
+**A8 — zero-focus-theft playback does not exist.** A fresh Safari tab,
+created in the background, loaded but never played, does not start when
+the play key is posted. The key only resumes media that has already been
+engaged, which is why the earlier probe *did* resume a paused Chrome tab.
+So the foreground-then-hand-focus-back path is the only one that plays,
+and the ~6s cost stands.
+
+**A2 — unresolved, and the failure to resolve it is the answer.**
+Fable's hypothesis (a) does not hold: the probe already posted the full
+down/up pair, states 0xA then 0xB. Beyond that, repeated attempts could
+not get a browser tab into a reproducible playing state at all — the same
+script that made Safari audible in six seconds earlier failed three times
+afterwards with no change to it.
+
+That is the finding. Browser playback state is not reliably observable or
+reproducible, so **the media key must never be load-bearing**. Fable's
+per-target routing is adopted on this evidence rather than in spite of
+the gap: AppleScript transport for Music and Spotify, where state is
+queryable and the answer can be exact; the media key only as the
+browser/unknown fallback, reporting the action taken and never an
+outcome.
+
 ### The reframe worth arguing about
 
 For **music**, the video is not the point. PiP was a means; the end was
