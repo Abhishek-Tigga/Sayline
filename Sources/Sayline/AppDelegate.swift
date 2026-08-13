@@ -626,10 +626,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     SaylineLog.log("cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }
 
+                // Both copied to lets before crossing to the main actor.
+                // `producedBy` already was; `finalText` was missed, which
+                // Swift 6 makes an error rather than a warning.
                 let produced = producedBy
+                let text = finalText
                 await MainActor.run {
                     self.isCleaningUp = false
-                    self.finishDictation(with: finalText, producedBy: produced, url: url,
+                    self.finishDictation(with: text, producedBy: produced, url: url,
                                          usedLocal: usingLocal)
                 }
             } catch {

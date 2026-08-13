@@ -763,6 +763,52 @@ and [CHANGELOG.md](CHANGELOG.md).
   enrollment, not yet done
 - Monetization
 
+## DEFERRED · Listen-only tap surgery — the actual freeze fix (Fable, 2026-08-14)
+
+**Status: not built. Instrumentation was built instead** (2026-08-14, user's
+call). This entry exists so the fix is not re-derived from scratch.
+
+**The premise that changed.** Every earlier freeze conclusion rested on
+`main ok 0.0s` logged beside a tap disable. That measured the wrong thread:
+the watchdog heartbeat only ever watched main, while the event tap runs on
+its own thread that nothing watched. A healthy main thread said nothing
+about whether the tap was being serviced. The heartbeat could not see tap
+starvation by construction.
+
+**Mechanism candidate.** macOS holds keyboard events for an *active* tap
+that is slow to service. When delivery backs up — tap-thread stall, or
+WindowServer-side pressure around wake and display changes, where both
+disable codes are known to fire spuriously — the system disables the tap to
+protect the user. Our polite one-per-second re-enable then re-arms the same
+slow tap, converting a single hiccup into a sustained keyboard freeze with a
+perfectly healthy main thread throughout. That matches every observation,
+including the two different disable codes.
+
+**The fix, and why it is architectural rather than another mitigation.**
+
+1. Make the permanent tap **listen-only** (`.listenOnly` rather than
+   `.defaultTap`). A listen-only tap cannot hold or drop events, so it
+   cannot freeze the keyboard — ever. This is the whole point: it removes
+   the failure mode rather than reducing its odds.
+2. Run a **tiny active tap only during a hold**, which is the only time
+   anything needs swallowing (Space, so it is not typed while dictating).
+   Freeze surface drops from all-day to seconds-per-day.
+3. Split `HotkeyManager` at the same time — Fable is explicit that this is
+   **one operation, not two**, because the split falls out of the two-tap
+   shape and doing it separately means touching the riskiest file twice.
+
+**Already built, so do not rebuild it** (commit on `ui-speech-back`,
+2026-08-14): tap-thread heartbeat in `StallWatchdog`, delivery-lag and
+callback-cost measurement in the tap callback, proof-of-life gate plus
+exponential backoff before any re-enable.
+
+**What the instrumentation should tell us before the surgery.** If Fable's
+mechanism is right, `delivery lag` climbs in the seconds before a disable
+and `tap ok` degrades. If lag stays flat and both threads read healthy, the
+cause is outside the process and the listen-only change is still correct but
+for a different reason. Either way the next freeze produces evidence instead
+of another theory.
+
 ## Longer-term "grand vision" (explicitly one-step-at-a-time, not this phase)
 
 - Email search ("look through my emails for anything from a recruiter")

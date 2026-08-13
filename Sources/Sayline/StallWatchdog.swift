@@ -30,6 +30,22 @@ final class StallWatchdog {
     private var lastBeat = Date()
     private var stallStarted: Date?
     private var timer: Timer?
+
+    /// The tap thread's own heartbeat, and why it exists.
+    ///
+    /// Fable, 2026-08-14: every freeze conclusion drawn from "main ok 0.0s"
+    /// beside a tap disable was drawn from the wrong thread. This watchdog
+    /// measured the main thread only. The event tap runs on its own thread,
+    /// which nothing watched — so a healthy main thread said nothing at all
+    /// about whether the tap was being serviced. The heartbeat could not
+    /// see tap starvation by construction, which is exactly the mechanism
+    /// now suspected.
+    ///
+    /// nil until the tap thread starts, so a machine without Accessibility
+    /// granted does not report a permanently stalled tap that does not
+    /// exist.
+    private var lastTapBeat: Date?
+    private var tapStallStarted: Date?
     /// Its own background timer rather than borrowing the tap thread's
     /// loop. The first version rode on that loop, which does not run until
     /// the event tap installs — so on a machine without Accessibility
@@ -59,10 +75,10 @@ final class StallWatchdog {
             queue: DispatchQueue(label: "com.abhishektigga.sayline.watchdog", qos: .utility)
         )
         checker.schedule(deadline: .now() + 1, repeating: 0.5)
-        checker.setEventHandler { [weak self] in self?.checkFromBackgroundThread() }
+        checker.setEventHandler { [weak self] in self?.check() }
         checker.resume()
         self.checker = checker
-        SaylineLog.log("stall watchdog started — main heartbeat 1s, check 0.5s, threshold \(Int(threshold))s")
+        SaylineLog.log("stall watchdog started — main + tap heartbeats, check 0.5s, threshold \(Int(threshold))s")
     }
 
     private func beat() {
@@ -77,15 +93,44 @@ final class StallWatchdog {
         }
     }
 
+    /// Stamped by the tap thread on every run-loop slice, so roughly every
+    /// 250ms. If this goes quiet the tap is not being serviced, which is
+    /// the condition macOS disables a tap for.
+    func tapBeat() {
+        lock.lock()
+        let wasStalledFor = tapStallStarted.map { Date().timeIntervalSince($0) }
+        lastTapBeat = Date()
+        tapStallStarted = nil
+        lock.unlock()
+
+        if let wasStalledFor, wasStalledFor >= threshold {
+            SaylineLog.log(String(format: "tap thread came back after %.1fs", wasStalledFor))
+        }
+    }
+
     /// How long the main thread has been silent. Safe from any thread.
     var mainThreadSilence: TimeInterval {
         lock.lock(); defer { lock.unlock() }
         return Date().timeIntervalSince(lastBeat)
     }
 
-    /// Called from the tap thread between run-loop slices. Logs the moment
-    /// a stall starts, once, rather than every 250ms.
-    func checkFromBackgroundThread() {
+    /// How long the tap thread has been silent, or nil if it never started.
+    var tapThreadSilence: TimeInterval? {
+        lock.lock(); defer { lock.unlock() }
+        return lastTapBeat.map { Date().timeIntervalSince($0) }
+    }
+
+    /// Checks both threads. Called from the tap thread between run-loop
+    /// slices *and* from this class's own timer — the timer is what matters
+    /// for the tap, since a stalled tap thread cannot report itself.
+    ///
+    /// Each stall is logged once when it starts, not every pass.
+    func check() {
+        checkMain()
+        checkTap()
+    }
+
+    private func checkMain() {
         let silence = mainThreadSilence
         guard silence >= threshold else { return }
 
@@ -99,12 +144,34 @@ final class StallWatchdog {
         }
     }
 
+    private func checkTap() {
+        guard let silence = tapThreadSilence, silence >= threshold else { return }
+
+        lock.lock()
+        let alreadyReported = tapStallStarted != nil
+        if !alreadyReported { tapStallStarted = Date().addingTimeInterval(-silence) }
+        lock.unlock()
+
+        if !alreadyReported {
+            SaylineLog.log(String(format:
+                "TAP THREAD STALLED — no heartbeat for %.1fs (the tap is not being serviced)", silence))
+        }
+    }
+
     /// A one-line description for other log lines to carry, so an event and
-    /// the main thread's state at that instant sit on the same line.
+    /// both threads' states at that instant sit on the same line.
+    ///
+    /// Carries the tap thread as well as main. A disable logged with only
+    /// main's state is the evidence that misled this project for two days.
     var snapshot: String {
-        let silence = mainThreadSilence
-        return silence >= threshold
-            ? String(format: "main STALLED %.1fs", silence)
-            : String(format: "main ok %.1fs", silence)
+        let main = mainThreadSilence
+        let mainPart = main >= threshold
+            ? String(format: "main STALLED %.1fs", main)
+            : String(format: "main ok %.1fs", main)
+        guard let tap = tapThreadSilence else { return mainPart + ", tap thread not started" }
+        let tapPart = tap >= threshold
+            ? String(format: "tap STALLED %.1fs", tap)
+            : String(format: "tap ok %.1fs", tap)
+        return mainPart + ", " + tapPart
     }
 }

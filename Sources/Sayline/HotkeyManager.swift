@@ -45,12 +45,84 @@ final class HotkeyManager {
     private var tapNeedsReenable = false
     private var lastTapReenable = Date.distantPast
     private var loggedSecureInputWait = false
+    /// So the proof-of-life refusal is logged once per stall, not every
+    /// 250ms slice for as long as the main thread is out.
+    private var loggedProofOfLifeWait = false
     /// When the tap was disabled, most recent last. Backs the circuit
     /// breaker below.
     private var recentDisables: [Date] = []
     private var tappedOut = false
     /// So the breaker's disable happens exactly once, off the callback.
     private var hasTurnedTapOff = false
+
+    // MARK: - Tap health
+    //
+    // All tap-thread only: written in the callback, read in
+    // `reenableTapIfSafe` and `noteDisable`, both of which run on that same
+    // thread. No locking, and none should be added without checking that
+    // still holds.
+    //
+    // These exist because `tapDisabledByTimeout` means "your callback took
+    // too long" and this project has never known what its callback cost or
+    // how stale its events were. Two days of freeze analysis rested on a
+    // measurement of the main thread, which is neither of those things.
+    private var callbackCount = 0
+    private var lastCallbackMillis = 0.0
+    private var worstCallbackMillis = 0.0
+    private var lastDeliveryLagMillis = 0.0
+    private var worstDeliveryLagMillis = 0.0
+    private var lastLagWarning = Date.distantPast
+
+    /// Mach ticks to nanoseconds. Computed once; the ratio never changes
+    /// for the life of the process.
+    private static let machTimebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
+
+    /// One line describing how well the tap is being serviced, for any log
+    /// that needs it. Cheap enough to build on a disable.
+    private var tapHealth: String {
+        String(format: "callback last %.1fms worst %.1fms over %d events; "
+                     + "delivery lag last %.0fms worst %.0fms",
+               lastCallbackMillis, worstCallbackMillis, callbackCount,
+               lastDeliveryLagMillis, worstDeliveryLagMillis)
+    }
+
+    /// Records what one callback cost, and how stale the event already was
+    /// when it arrived.
+    ///
+    /// The lag is the interesting half. Fable's mechanism candidate is that
+    /// macOS holds keyboard events for an active tap that is slow to
+    /// service, and disables the tap once delivery backs up. If that is
+    /// right, lag climbs before a disable — so this number should be rising
+    /// in the seconds before the next freeze, and flat if the cause is
+    /// outside this process.
+    fileprivate func recordDelivery(event: CGEvent, spentNanos: UInt64) {
+        let spent = Double(spentNanos) / 1_000_000
+        callbackCount += 1
+        lastCallbackMillis = spent
+        worstCallbackMillis = max(worstCallbackMillis, spent)
+
+        let timebase = Self.machTimebase
+        let now = mach_absolute_time()
+        let created = event.timestamp
+        guard timebase.denom != 0, now > created else { return }
+        let lag = Double(now - created) * Double(timebase.numer)
+                / Double(timebase.denom) / 1_000_000
+        lastDeliveryLagMillis = lag
+        worstDeliveryLagMillis = max(worstDeliveryLagMillis, lag)
+
+        // Rate-limited: a backed-up queue produces many late events at
+        // once, and a log line per event would itself slow the callback
+        // down — turning the diagnostic into the disease.
+        if lag > 250, Date().timeIntervalSince(lastLagWarning) > 5 {
+            lastLagWarning = Date()
+            SaylineLog.log(String(format:
+                "event arrived %.0fms late — delivery is backing up (%@)", lag, StallWatchdog.shared.snapshot))
+        }
+    }
     /// Fired when the breaker trips, so the app can tell the user their
     /// hotkey is gone and why.
     var onTapGaveUp: (() -> Void)?
@@ -102,13 +174,29 @@ final class HotkeyManager {
             guard self.tapDidInstall else { return }
             // A plain CFRunLoopRun() would never return, so the loop is
             // driven in short slices to stay cancellable.
+            var slices = 0
             while !Thread.current.isCancelled {
                 CFRunLoopRunInMode(.defaultMode, 0.25, false)
+                // Stamped before anything else in the slice: this is the
+                // proof that the tap thread is still turning, and it is the
+                // measurement the freeze investigation was missing.
+                StallWatchdog.shared.tapBeat()
+
+                // One line, once, about twenty slices in. Instrumentation
+                // that only speaks during a failure cannot be trusted at the
+                // moment of failure — this is the proof it was running all
+                // along, and the baseline the next disable gets compared to.
+                slices += 1
+                if slices == 20 {
+                    SaylineLog.log("tap instrumentation live — " + StallWatchdog.shared.snapshot
+                                   + "; " + self.tapHealth)
+                }
                 self.reenableTapIfSafe()
                 // This thread wakes every 250ms anyway, so it is the
                 // cheapest place to notice the main thread going quiet —
                 // and it keeps running even when main is the thing stuck.
-                StallWatchdog.shared.checkFromBackgroundThread()
+                // The watchdog's own timer covers the reverse case.
+                StallWatchdog.shared.check()
             }
             self.uninstallTap()
         }
@@ -139,7 +227,15 @@ final class HotkeyManager {
             callback: { _, type, event, refcon in
                 guard let refcon else { return Unmanaged.passUnretained(event) }
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
-                return manager.handle(event: event, type: type)
+                // Measured around every callback, because the number macOS
+                // acts on is how long we take to answer. `tapDisabledByTimeout`
+                // canonically means "your callback took too long", and this
+                // project has never once known what its callback cost.
+                let began = DispatchTime.now().uptimeNanoseconds
+                let result = manager.handle(event: event, type: type)
+                manager.recordDelivery(event: event,
+                                       spentNanos: DispatchTime.now().uptimeNanoseconds - began)
+                return result
             },
             userInfo: selfPointer
         ) else {
@@ -264,12 +360,45 @@ final class HotkeyManager {
             SaylineLog.log("secure input ended")
         }
 
+        // Proof of life before re-arming.
+        //
+        // Fable's mechanism candidate: macOS disables a tap that is slow to
+        // service, and a prompt re-enable puts the same slow tap straight
+        // back in the keyboard's path — turning one hiccup into a sustained
+        // freeze. Re-enabling is only safe if there is reason to believe the
+        // next callback will be answered promptly.
+        //
+        // The main thread is the check that matters, because the callback
+        // hands work to it. Re-arming while main is stalled is precisely how
+        // one hiccup is converted into a freeze. The tap thread needs no
+        // check here — this code runs on it, so it is provably alive.
+        let mainSilence = StallWatchdog.shared.mainThreadSilence
+        if mainSilence >= 2 {
+            if !loggedProofOfLifeWait {
+                loggedProofOfLifeWait = true
+                SaylineLog.log(String(format:
+                    "not re-enabling the tap while the main thread is stalled (%.1fs) — "
+                    + "re-arming a tap we cannot service is what freezes the keyboard", mainSilence))
+            }
+            return
+        }
+        if loggedProofOfLifeWait {
+            loggedProofOfLifeWait = false
+            SaylineLog.log("main thread answering again — the tap may be re-enabled")
+        }
+
+        // Backoff, not a fixed second. Repeated disables mean the last
+        // re-enable did not help, so trying again at the same rate is the
+        // tight loop this is meant to avoid. Doubles per disable in the
+        // window, capped so recovery still happens within a few seconds.
+        let backoff = min(pow(2, Double(max(0, recentDisables.count - 1))), 8)
         let now = Date()
-        guard now.timeIntervalSince(lastTapReenable) >= 1 else { return }
+        guard now.timeIntervalSince(lastTapReenable) >= backoff else { return }
         lastTapReenable = now
         tapNeedsReenable = false
         CGEvent.tapEnable(tap: eventTap, enable: true)
-        SaylineLog.log("event tap re-enabled")
+        SaylineLog.log(String(format: "event tap re-enabled after %.0fs — %@; %@",
+                              backoff, StallWatchdog.shared.snapshot, tapHealth))
     }
 
     private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
@@ -313,12 +442,16 @@ final class HotkeyManager {
             //
             // So: mark it and let the thread loop decide, rather than
             // fighting the window server from inside the callback.
-            // The main thread's state at this instant is the fact three
-            // investigations lacked. Alive means our callback is not
-            // blocked by the app and the refusal came from outside the
-            // process; stalled means it is ours to find.
+            //
+            // Both threads' states go on this line, plus what the callback
+            // has actually been costing. Earlier versions logged the main
+            // thread alone and concluded from "main ok" that the refusal
+            // came from outside the process — a conclusion the measurement
+            // could not support, because the tap thread was never watched.
+            // Read the tap figures first now: they are the ones macOS acts
+            // on.
             SaylineLog.log("event tap was disabled by the system (\(type.rawValue)) — "
-                           + StallWatchdog.shared.snapshot)
+                           + StallWatchdog.shared.snapshot + "; " + tapHealth)
             noteDisable()
             return Unmanaged.passUnretained(event)
         default:
