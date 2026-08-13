@@ -102,7 +102,10 @@ final class FloatingIndicatorWindow {
     // and consistent everywhere. Tradeoff: if the Dock is visible
     // (not auto-hidden) and tall, it can now sit on top of the pill —
     // accepted since the alternative was inconsistent positioning.
-    private let bottomMargin: CGFloat = 16
+    /// 12, down from 16 — the user asked for the pill 4px lower
+    /// (2026-08-14). Lower on screen means a smaller margin, since this is
+    /// measured up from the bottom edge.
+    private let bottomMargin: CGFloat = 12
 
     func show(state: RecordingIndicatorState) {
         viewModel.state = state

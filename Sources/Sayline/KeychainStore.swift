@@ -47,24 +47,30 @@ enum KeychainStore {
             // something else entirely.
             // An item we cannot unlock is worse than no item.
             //
-            // -25293 (errSecAuthFailed) means the entry exists but belongs
-            // to a different build: macOS binds a Keychain item to the code
-            // signature that created it, and ad-hoc signing gives every
-            // rebuild a new one. The stale entry then sits there refusing
-            // every read, and re-entering the key in Settings only works
-            // because `save` deletes first — so the user pays a dialog and
-            // a re-entry for something the app could clear itself.
+            // -25293 (errSecAuthFailed) used to be treated as "this entry
+            // belongs to an older build" and the entry was DELETED here.
             //
-            // Deleting it here makes the next save unambiguous and stops
-            // the app prompting for a passphrase it can never accept.
+            // That is removed, and the reason it existed is gone. It was
+            // written when the app was ad-hoc signed, so every rebuild
+            // produced a new code signature and genuinely orphaned the
+            // item. Since the Apple Development identity landed
+            // (2026-08-13) the signature is stable across rebuilds, and
+            // deleting on a failed read became pure downside: any transient
+            // refusal silently destroys the user's API key.
+            //
+            // It did exactly that on 2026-08-14 at 02:55. The key had been
+            // working minutes earlier; one failed read during a rebuild
+            // wiped it, dictation stopped with "No Groq API key set", and
+            // the log line blamed "an older build" — which was no longer
+            // true and sent the diagnosis the wrong way.
+            //
+            // An unreadable item is now reported, not destroyed. Re-entering
+            // the key still works regardless, because `save` deletes before
+            // writing. Deleting a credential is the user's call to make.
             if status == errSecAuthFailed || status == errSecInteractionNotAllowed {
-                SaylineLog.log("keychain entry for \(key.rawValue) belongs to an older build — "
-                    + "removing it so re-entering the key works cleanly")
-                SecItemDelete([
-                    kSecClass as String: kSecClassGenericPassword,
-                    kSecAttrService as String: service,
-                    kSecAttrAccount as String: key.rawValue,
-                ] as CFDictionary)
+                SaylineLog.log("keychain entry for \(key.rawValue) exists but cannot be read "
+                    + "-> OSStatus \(status). NOT deleting it. Re-enter the key in Settings to "
+                    + "replace it, or unlock the login keychain if it is locked.")
             } else if status != errSecItemNotFound {
                 SaylineLog.log("keychain read for \(key.rawValue) failed -> OSStatus \(status) "
                     + "(\(SecCopyErrorMessageString(status, nil) as String? ?? "no description"))")
