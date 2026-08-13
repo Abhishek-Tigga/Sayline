@@ -253,6 +253,64 @@ check("two negations down to zero fires",
                  "We should ship and I support it.")
         .contains(where: { if case .negationLost = $0 { return true }; return false }))
 
+print("\nFable review 2 — the subset rule: nothing quantifiable may be invented")
+
+// The finding that stopped stage 3. Real output from llama-3.3-70b on
+// the user's real-1: a faithful rewrite with an invented sentence
+// appended, which the guard called clean because it only ever asked
+// whether the user's facts survived.
+check("the real-1 invented number is caught",
+      violations("Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish.",
+                 "Rohan can no longer make it on Wednesday, so we are moving the design review to Friday morning at 11. This change may not work for everyone, as there are 2 potential issues with the new time.")
+        .contains(.inventedNumber(2)))
+
+// made-15: an appended sentence, same shape.
+check("an invented day is caught",
+      violations("the deck needs another pass", "The deck needs another pass before Monday.")
+        .contains(.inventedDay("monday")))
+check("an invented month is caught",
+      violations("we should ship soon", "We should ship in April.")
+        .contains(.inventedMonth("april")))
+check("an invented unit is caught",
+      violations("the export is too big", "The export is 400 megs, too big for email.")
+        .contains(.inventedUnit("megs")))
+
+// Normalization, or the rule storms on faithful rewrites.
+check("both -> 2 is not an invention",
+      !violations("both teams signed off", "2 teams signed off")
+        .contains(.inventedNumber(2)))
+check("a couple -> 2 is not an invention",
+      !violations("a couple of people asked", "2 people asked")
+        .contains(.inventedNumber(2)))
+check("11ish -> 11:00 is not an invented zero",
+      violations("Friday morning like 11ish", "Friday morning at 11:00").isEmpty)
+check("a bare zero is never an invention",
+      !violations("the callback returns four zero three", "The callback returns 403.")
+        .contains(.inventedNumber(0)))
+
+print("\nconditional negations are restructuring, not reversal")
+// real-8, a faithful rewrite flagged by the first version of the rule.
+check("if-not phrasing is allowed",
+      !violations("finance needs it cleared before the 30th or it slips to the next month cycle",
+                  "The invoice must be cleared before the 30th. If it is not cleared, it will slip to next month.")
+        .contains(where: { if case .negationAdded = $0 { return true }; return false }))
+check("but a bare assertion reversed still fires",
+      violations("we should ship on Friday", "We shouldn't ship on Friday.")
+        .contains(where: { if case .negationAdded = $0 { return true }; return false }))
+
+print("\n\"one\" is prose unless a unit follows")
+check("quick one is not a number", !FactGuard.extract(from: "hey quick one for you").numbers.contains(1))
+check("the last one is not a number", !FactGuard.extract(from: "he wasn't on the last one").numbers.contains(1))
+check("no one is not a number", !FactGuard.extract(from: "no one clicked it").numbers.contains(1))
+check("one more thing is not a number", !FactGuard.extract(from: "one more thing before we go").numbers.contains(1))
+check("one week IS a number", FactGuard.extract(from: "give it one week").numbers.contains(1))
+check("one hour IS a number", FactGuard.extract(from: "it took one hour").numbers.contains(1))
+check("twenty one still resolves", FactGuard.extract(from: "due on the twenty first").numbers.contains(21))
+// The hole this leaves is closed from the other side.
+check("one bug -> two bugs is caught by the subset rule",
+      violations("there is one bug in checkout", "There are two bugs in checkout.")
+        .contains(.inventedNumber(2)))
+
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))
 check("pinned block names the number", pinned.contains("15"))

@@ -70,6 +70,13 @@ enum FactGuard {
         /// A negation that was NOT said. Reversing meaning by adding one
         /// is as complete a reversal as dropping one.
         case negationAdded(said: Int, kept: Int)
+        /// A quantifiable that appears in the rewrite and nowhere in the
+        /// speech. The mirror of the survival checks, and the half that
+        /// caught a model appending "there are 2 potential issues".
+        case inventedNumber(Int)
+        case inventedDay(String)
+        case inventedMonth(String)
+        case inventedUnit(String)
         /// A person the speaker never named. Worse than a dropped name:
         /// the model put someone in the user's mouth.
         case inventedName(String)
@@ -89,6 +96,10 @@ enum FactGuard {
             case .unitLost(let u): return "the unit \(u) was changed"
             case .negationAdded:
                 return "it added a negation that was never spoken, reversing the meaning"
+            case .inventedNumber(let n): return "it introduced the number \(n), which was never said"
+            case .inventedDay(let d): return "it introduced \(d.capitalized), which was never said"
+            case .inventedMonth(let m): return "it introduced \(m.capitalized), which was never said"
+            case .inventedUnit(let u): return "it introduced the unit \(u), which was never said"
             case .inventedName(let n):
                 return "it named \(n.capitalized), who was never mentioned"
             case .negationLost(let said, let kept):
@@ -109,6 +120,10 @@ enum FactGuard {
             case .timeLost: return "relative-time"
             case .unitLost: return "unit"
             case .negationAdded: return "negation-added"
+            case .inventedNumber: return "invented-number"
+            case .inventedDay: return "invented-day"
+            case .inventedMonth: return "invented-month"
+            case .inventedUnit: return "invented-unit"
             case .inventedName: return "invented-name"
             case .negationLost: return "negation"
             case .inventedCommitment: return "invented-commitment"
@@ -128,7 +143,7 @@ enum FactGuard {
         facts.names = properNouns(in: raw)
         facts.units = Set(words.filter(unitWords.contains))
         facts.relativeTimes = relativeTimes(in: words)
-        facts.negationCount = words.filter(negationMarkers.contains).count
+        facts.negationCount = countNegations(in: words)
         return facts
     }
 
@@ -222,7 +237,7 @@ enum FactGuard {
         // strict version fired on correct rewrites and was 8 of 13
         // violations across every model — the guard fighting the mode it
         // protects. Going to zero is still the meaning-reversal case.
-        let keptNegations = words.filter(negationMarkers.contains).count
+        let keptNegations = countNegations(in: words)
         if facts.negationCount > 0 && keptNegations == 0 {
             violations.append(.negationLost(said: facts.negationCount, kept: keptNegations))
         } else if facts.negationCount == 0 && keptNegations > 0 {
@@ -249,6 +264,33 @@ enum FactGuard {
             violations.append(.inventedName(name))
         }
 
+        // The subset rule: nothing quantifiable may appear that was not
+        // said. The mirror of the survival checks above, and the half that
+        // was missing — a model appended "there are 2 potential issues
+        // with the new time" to a faithful rewrite and the guard called it
+        // clean, because it only ever asked whether the user's facts
+        // survived, never whether new ones had arrived.
+        //
+        // Deliberately limited to quantifiables. Deciding "substantive
+        // claim" against "connective tissue" is semantics, and word lists
+        // cannot do it — see `sentenceNovelty` for the bounded, measured
+        // attempt at the rest.
+        let rawFacts = extract(from: raw)
+        let newFacts = extract(from: rewrite)
+        for number in newFacts.numbers.subtracting(rawFacts.numbers).sorted()
+        where number != 0 {   // a bare 0 is punctuation of a time, never a claim
+            violations.append(.inventedNumber(number))
+        }
+        for day in newFacts.days.subtracting(rawFacts.days).sorted() {
+            violations.append(.inventedDay(day))
+        }
+        for month in newFacts.months.subtracting(rawFacts.months).sorted() {
+            violations.append(.inventedMonth(month))
+        }
+        for unit in newFacts.units.subtracting(rawFacts.units).sorted() {
+            violations.append(.inventedUnit(unit))
+        }
+
         let rawLower = raw.lowercased()
         let rewriteLower = rewrite.lowercased()
         for phrase in commitmentPhrases
@@ -261,6 +303,42 @@ enum FactGuard {
         }
         return violations
     }
+
+    // MARK: - The bounded attempt at qualitative invention
+
+    /// How much of each rewrite sentence appeared in the speech.
+    ///
+    /// The subset rule catches an invented *number*. It cannot catch "The
+    /// api is affected by these issues" — deciding a substantive claim
+    /// from connective tissue is semantics, and word lists do not do
+    /// semantics. This is the bounded attempt: a sentence whose content
+    /// words are mostly absent from the raw is a candidate invention.
+    ///
+    /// Returns the novelty fraction per sentence (1.0 = nothing in it was
+    /// said). **Deliberately not wired into `verify`** until the numbers
+    /// justify a threshold — the expected false positive is a faithful
+    /// compression that uses synonyms ("60% done" → "more than half
+    /// complete"), and shipping this unmeasured would trade a real
+    /// invention for a pile of thrown-away good rewrites.
+    static func sentenceNovelty(raw: String, rewrite: String) -> [(sentence: String, novelty: Double)] {
+        let spoken = Set(tokenize(raw)).subtracting(noveltyStopwords)
+        var out: [(String, Double)] = []
+        for sentence in rewrite.split(whereSeparator: { ".!?\n".contains($0) }) {
+            let content = tokenize(String(sentence)).filter { !noveltyStopwords.contains($0) }
+            guard content.count >= 3 else { continue }   // too short to judge
+            let unseen = content.filter { !spoken.contains($0) }.count
+            out.append((sentence.trimmingCharacters(in: .whitespaces),
+                        Double(unseen) / Double(content.count)))
+        }
+        return out
+    }
+
+    /// Words too common to signal anything about novelty.
+    private static let noveltyStopwords: Set<String> = grammarWords
+        .union(modals)
+        .union(discourseWords)
+        .union(["to", "of", "in", "on", "at", "by", "be", "been", "as",
+                "not", "no", "or", "up", "out", "we", "us", "them"])
 
     // MARK: - Pieces
 
@@ -275,6 +353,10 @@ enum FactGuard {
         "dollars", "dollar", "euros", "pounds", "lakh", "lakhs", "crore",
         "crores", "k", "seconds", "minutes", "mins", "hours", "hrs",
         "days", "weeks", "months", "years", "am", "pm",
+        // Singulars, so "one week" and "one hour" pin their number. The
+        // pronoun rule consults this lexicon, and it held only plurals.
+        "second", "minute", "min", "hour", "hr", "day", "week", "month",
+        "year", "percent", "meg", "gig",
     ]
 
     /// Single words and the first word of the two-word phrases below.
@@ -329,6 +411,31 @@ enum FactGuard {
     /// Monday", which is a faithful rendering of a group intention, not a
     /// promise the speaker never made. The cost of flagging it is a
     /// fallback on good output; the safety gain is nil.
+    /// Negations, minus the ones a conditional brought with it.
+    ///
+    /// "or it slips to the next month cycle" rewritten as "**if** it is
+    /// **not** cleared by then, it will slip" is the same sentence; the
+    /// negation belongs to the conditional, not to a reversal of meaning.
+    /// That fired once falsely in the first bake-off and never truly, so
+    /// the exclusion gives up almost nothing.
+    ///
+    /// The case the rule exists for — a bare assertion reversed, "we
+    /// should ship" becoming "we shouldn't ship" — is essentially never
+    /// phrased conditionally.
+    private static func countNegations(in words: [String]) -> Int {
+        var count = 0
+        for (index, word) in words.enumerated() where negationMarkers.contains(word) {
+            let window = words[max(0, index - 3)..<index]
+            if window.contains(where: conditionalMarkers.contains) { continue }
+            count += 1
+        }
+        return count
+    }
+
+    private static let conditionalMarkers: Set<String> = [
+        "if", "unless", "whether", "until", "otherwise", "in case",
+    ]
+
     private static let commitmentPhrases: [String] = [
         "i'll", "i will", "i promise", "i guarantee", "i commit",
     ]
@@ -409,6 +516,12 @@ enum FactGuard {
         // produced that same two-normalizations bug twice; both paths run
         // through `normalizeWords` for exactly that reason.
         normalizeWords(stripThousandsSeparators(text))
+            // A time separator splits rather than fuses: "11:00" must not
+            // become the number 1100, which is what removing the colon
+            // produced. It yields 11 and 0, and 0 is excluded from the
+            // invention rule precisely so a written time cannot look like
+            // a new fact.
+            .replacingOccurrences(of: ":", with: " ")
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
             .flatMap { splitDigitsFromLetters(String($0)) }
     }
@@ -533,6 +646,17 @@ enum FactGuard {
         "seventy": 70, "eighty": 80, "ninety": 90,
     ]
 
+    /// Words that carry a quantity without being numbers.
+    ///
+    /// Without these the subset rule storms: a faithful rewrite of "both
+    /// options" as "2 options" would report an invented 2. Mapped on both
+    /// sides, so the two spellings of one quantity compare equal — the
+    /// same reason "fifteen" and 15 do.
+    private static let quantityWords: [String: Int] = [
+        "both": 2, "pair": 2, "couple": 2, "dozen": 12, "twice": 2,
+        "half": 1, "single": 1, "once": 1, "thrice": 3,
+    ]
+
     private static let spokenOrdinals: [String: Int] = [
         "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
         "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
@@ -570,6 +694,26 @@ enum FactGuard {
             // invisible to the guard entirely.
             if let ordinal = ordinalValue(word) {
                 found.insert(ordinal)
+                index += 1
+                continue
+            }
+            // "one" is usually prose, not a quantity. "quick one", "the
+            // last one", "no one", "one more thing" — all pinned the
+            // number 1 and then reported it lost when a faithful rewrite
+            // dropped the phrase. It counts only when a unit follows.
+            //
+            // The apparent hole this leaves — "one bug" rewritten as "two
+            // bugs" — is closed from the other side: the subset rule flags
+            // the invented 2. Compound spoken numbers reach the tens+units
+            // path above and never consult this.
+            if word == "one" {
+                let next = index + 1 < words.count ? words[index + 1] : ""
+                if unitWords.contains(next) { found.insert(1) }
+                index += 1
+                continue
+            }
+            if let quantity = quantityWords[word] {
+                found.insert(quantity)
                 index += 1
                 continue
             }

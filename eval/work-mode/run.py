@@ -56,14 +56,25 @@ speaker did not say it, it does not appear.
 "we should".
 - Bullets ONLY if the speaker dictated an actual list. Never invent \
 headers, greetings, or sign-offs.
+- Never add information. Connect ideas using only the speaker's own words.
 - Output only the rewritten text. No preamble, no explanation, no quotes.
 """
 
 
 def rewrite(model, url, key, raw, pinned, correction=None):
-    messages = [{"role": "system", "content": SYSTEM}]
-    user = raw if not pinned else f"{pinned}\n\n---\n\n{raw}"
-    messages.append({"role": "user", "content": user})
+    """Constraints in the system message, transcript alone in the user one.
+
+    The first version appended the pinned-facts block to the user content
+    with a " | " delimiter, and a model echoed it verbatim into a rewrite:
+    "...until we actually talk to sales. | negations: 2 — do not reverse
+    any statement". Escaping the delimiter would treat the symptom; the
+    disease is content-role confusion. Facts the model must respect are
+    instructions, so they live where instructions live — which also makes
+    a "do not echo this" instruction unnecessary.
+    """
+    system = SYSTEM if not pinned else f"{SYSTEM}\n{pinned}"
+    messages = [{"role": "system", "content": system},
+                {"role": "user", "content": raw}]
     if correction:
         messages.append({"role": "assistant", "content": correction["previous"]})
         messages.append({"role": "user", "content":
@@ -95,7 +106,7 @@ def pinned_block(raw):
     """
     proc = subprocess.run([str(VERIFIER), "--pin"], input=json.dumps({"raw": raw}) + "\n",
                           capture_output=True, text=True)
-    return proc.stdout.strip() if proc.returncode == 0 else ""
+    return proc.stdout.strip().replace(" | ", "\n") if proc.returncode == 0 else ""
 
 
 def main():
@@ -109,10 +120,15 @@ def main():
           f"({sum(1 for c in cases if c['id'].startswith('real'))} real)")
 
     if args.dry_run:
-        print("\n--- system prompt ---")
-        print(SYSTEM)
-        print(f"--- example user turn ({cases[0]['id']}) ---")
-        print(f"{pinned_block(cases[0]['raw'])}\n\n---\n\n{cases[0]['raw']}")
+        # Printed from the same builder the real call uses. A preview with
+        # its own formatting is a preview that can lie about the payload,
+        # which is how the pin-block leak survived a dry run.
+        example = cases[0]
+        system = SYSTEM + "\n" + pinned_block(example["raw"])
+        print(f"\n--- system message ({example['id']}) ---")
+        print(system)
+        print("\n--- user message ---")
+        print(example["raw"])
         return
 
     candidates = [c for c in CANDIDATES if not args.model or c[0] == args.model]
@@ -123,6 +139,10 @@ def main():
     for model, url, provider in candidates:
         print(f"\n=== {model} ===")
         first_pass, latencies, failures = [], [], []
+        # Saved so the novelty gate can be scored offline against real
+        # output rather than invented examples — the same reason the
+        # transcripts came from the user.
+        saved = globals().setdefault("_saved", [])
         for case in cases:
             try:
                 out, ms = rewrite(model, url, keys[provider], case["raw"], pinned_block(case["raw"]))
@@ -133,6 +153,9 @@ def main():
                 continue
             first_pass.append((case, out))
             latencies.append(ms)
+            saved.append({"model": model, "id": case["id"], "cohort":
+                          "real" if case["id"].startswith("real") else "made",
+                          "raw": case["raw"], "rewrite": out, "ms": ms})
 
         if len(first_pass) < len(cases) * 0.8:
             # Refuse to report a number built on missing data. The first
@@ -142,6 +165,15 @@ def main():
             if failures:
                 print(f"  first error: {failures[0]}")
             continue
+
+        # real-7 leaked the pin block into a rewrite. Now an assertion:
+        # no fragment of the instructions may appear in any output.
+        leaks = [c["id"] for c, o in first_pass
+                 if any(marker in o.lower() for marker in
+                        ("do not reverse", "must appear unchanged", "negations:",
+                         "pinned", "timing:", "units:"))]
+        if leaks:
+            print(f"  PROMPT LEAKED into {len(leaks)} rewrite(s): {', '.join(leaks[:4])}")
 
         results = verify_many([(c["raw"], o) for c, o in first_pass])
         broke = [(c, o, v) for (c, o), v in zip(first_pass, results) if v]
@@ -158,8 +190,20 @@ def main():
             if not verify_many([(case["raw"], retry)])[0]:
                 rescued += 1
 
+        # Reported separately, not blended: every discriminating bug so
+        # far came from the ten the user actually dictated.
+        real_ids = {c["id"] for c, _ in first_pass if c["id"].startswith("real")}
+        broke_ids = {c["id"] for c, _, _ in broke}
+        real_broke = len(broke_ids & real_ids)
+        made_broke = len(broke_ids) - real_broke
+        made_n = len(first_pass) - len(real_ids)
+
         n = len(first_pass) or 1
         row = {
+            "real": f"{real_broke}/{len(real_ids)}",
+            "made": f"{made_broke}/{made_n}",
+            "invented": sum(1 for _, _, vs in broke
+                            if any(v["kind"].startswith("invented") for v in vs)),
             "model": model,
             "n": len(first_pass),
             "hallucination": len(broke) / n * 100,
@@ -169,7 +213,9 @@ def main():
             "errors": len(failures),
         }
         rows.append(row)
-        print(f"  broke a fact   {len(broke)}/{row['n']}  ({row['hallucination']:.0f}%)")
+        print(f"  broke a fact   {len(broke)}/{row['n']}  ({row['hallucination']:.0f}%)"
+              f"   real {row['real']} · invented-set {row['made']}")
+        print(f"  inventions     {row['invented']}  (the guard could not see these before)")
         print(f"  retry rescued  {rescued}/{len(broke)}  ({row['rescued']:.0f}%)")
         print(f"  ends in fallback              {row['fallback']:.0f}%")
         print(f"  median latency {row['median_ms']:.0f} ms")
@@ -188,12 +234,14 @@ def main():
     with RESULTS.open("a") as fh:
         fh.write(f"\n### Work mode model bake-off — {time.strftime('%Y-%m-%d %H:%M')}\n\n")
         fh.write(f"{len(cases)} transcripts, temperature 0, scored by FactGuard.\n\n")
-        fh.write("| model | broke a fact | retry rescued | ends in fallback | median |\n")
-        fh.write("|---|---|---|---|---|\n")
+        fh.write("| model | real 10 | invented 15 | inventions | retry rescued | fallback | median |\n")
+        fh.write("|---|---|---|---|---|---|---|\n")
         for r in rows:
-            fh.write(f"| `{r['model']}` | {r['hallucination']:.0f}% | {r['rescued']:.0f}% "
-                     f"| {r['fallback']:.0f}% | {r['median_ms']:.0f} ms |\n")
-    print(f"\nappended to {RESULTS.relative_to(REPO)}")
+            fh.write(f"| `{r['model']}` | {r['real']} | {r['made']} | {r['invented']} "
+                     f"| {r['rescued']:.0f}% | {r['fallback']:.0f}% | {r['median_ms']:.0f} ms |\n")
+    outputs = HERE / "rewrites.json"
+    outputs.write_text(json.dumps(globals().get("_saved", []), indent=2))
+    print(f"\nappended to {RESULTS.relative_to(REPO)}; rewrites saved to {outputs.name}")
 
 
 if __name__ == "__main__":

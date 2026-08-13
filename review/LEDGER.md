@@ -2871,3 +2871,104 @@ distinct models and both exist. Caught by the user, not by me.
 **Not verified by its author:** ten clips, one speaker, one room, one
 session. Enough to rank, not enough to conclude anything about accents
 generally.
+
+---
+
+## 2026-08-13 — FactGuard repaired, bake-off rerun (Opus)
+
+`claimed-fixed`. Every item from Fable's answers built, suite cases in the
+same commit. Suite **55 → 73**, all green.
+
+**1 · Subset rule.** Nothing quantifiable may appear that was not said:
+`inventedNumber/Day/Month/Unit`. The real-1 "there are 2 potential
+issues" invention is now caught. Normalization landed with it or it
+storms — quantity words on the raw side ("both"→2, "a couple"→2,
+"dozen"→12, "twice"→2), times split rather than fuse, bare 0 never an
+invention. Two bugs found by the cases: removing the colon turned
+"11:00" into the number **1100**, and the unit lexicon held only plurals
+so "one week" did not pin.
+
+**2 · Conditional exclusion.** A negation whose preceding three tokens
+contain if/unless/whether/until/otherwise no longer counts as added. The
+real-8 faithful conditional passes; a bare reversal still fires.
+
+**3 · Pronoun "one".** A number only when a unit follows. "quick one",
+"the last one", "no one", "one more thing" unpinned; "one week" pinned;
+"twenty first" unaffected. The hole this opens is closed from the other
+side — "one bug" → "two bugs" is caught as an invented 2, asserted.
+
+**4 · Pin-block shape.** Constraints and pinned facts moved to the system
+message; the user message carries the transcript alone. The leak is now
+an assertion over every rewrite, not something noticed by reading. **Zero
+leaks in the rerun.** The dry-run preview was also rebuilt to print from
+the real builder — a preview with its own formatting is how the leak
+survived a dry run in the first place.
+
+### 5 · Sentence-novelty gate: measured, and REJECTED for v1
+
+Scored over the 97 saved rewrites:
+
+| threshold | fired on | known inventions caught |
+|---|---|---|
+| 0.6 | 10 / 97 (10.3%) | 0 |
+| 0.7 | 5 / 97 (5.2%) | 0 |
+| 0.8–1.0 | 3 / 97 (3.1%) | 0 |
+
+**Zero, at every threshold — and the reason matters more than the
+number.** The two known inventions did not recur: the prompt fix (system
+message + "never add information") eliminated them. So I was scoring new
+data for old failures and had **no positive control**. That is a
+measurement I cannot draw a threshold from.
+
+What it does fire on, at 0.8, all three inspected by hand:
+- `made-15` — already caught by the subset rule (number, number, unit).
+- `made-1` "We do not expect to meet the initial deadline" — a mild
+  invention the guard misses. The one real catch.
+- `made-14` "This happens 2 times" for "I lost my test order twice" —
+  **a false positive**, faithful and reworded.
+
+One marginal catch and one false fire out of 97, no positive control.
+**Recommendation: do not ship it.** `sentenceNovelty` stays in the file,
+documented and unwired, in the manner of `SurfaceStyle.parkedGlass`, so
+the fallback log can justify it later on evidence.
+
+### The rerun, cohorts separated
+
+| model | real 10 | invented 15 | inventions seen | retry rescued | fallback | median |
+|---|---|---|---|---|---|---|
+| `llama-3.1-8b-instant` | 7/10 | 6/12 | 2 | 8% | 55% | 198 ms |
+| `llama-3.3-70b-versatile` | 3/10 | 3/15 | 3 | 83% | 4% | **341 ms** |
+| `gpt-4o-mini` | **2/10** | 4/15 | 2 | 83% | 4% | 1319 ms |
+| `gpt-4.1-mini` | 4/10 | 2/15 | 3 | **100%** | **0%** | 1210 ms |
+
+**The winner did not change: `llama-3.3-70b-versatile`.** Said plainly
+because the brief asked for the delta either way — the stop-and-review
+did not overturn the pick, but it changed the reasoning and what is known:
+
+- The 8B baseline got **worse** under the repaired instrument, 39% → 59%,
+  and 7 of its 10 failures are on real speech. It is not a candidate.
+- **On the real cohort `gpt-4o-mini` is better** (2/10 against 3/10), and
+  that is the half that has found every discriminating bug. It loses on
+  the budget, not on accuracy: 1319 ms first pass, and a retry on a
+  quarter of dictations lands near 2.6 s, which decision 7 calls "reads
+  as broken". `llama-3.3-70b` at 341 ms retries inside budget.
+- Inventions are visible for the first time — 2 to 3 per model, in every
+  candidate including the strongest. The old table structurally could not
+  show this.
+
+**The operational tiebreak, per PRODUCT.md's standing lesson.**
+`llama-3.3-70b` rides Groq's free tier, which eval work alone capped
+twice at 100K tokens/day. The recommendation is therefore conditional:
+**it wins on latency and is the only candidate that fits decision 7 with
+a retry, but it inherits a daily ceiling until the backend exists.** If
+that ceiling is hit in real use before the backend lands, `gpt-4o-mini`
+is the fallback and the mode gets slower rather than broken. That is a
+product decision, not a benchmark one.
+
+**Not verified by its author:** no human has judged rewrite quality.
+Every number here is fact survival and invention, not whether the writing
+is good.
+
+**Decision 2 amendment surfaced to the user, awaiting acknowledgment:**
+qualitative inventions are bounded, not eliminated. Stage 3 frozen until
+recorded.
