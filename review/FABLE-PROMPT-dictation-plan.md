@@ -89,6 +89,54 @@ change mid-session.
 I do not want my judgement on this to be the deciding one. Pick, and say
 why.
 
+## Audit every feature that touches the dictation path
+
+Voice processing is the one I *know* broke dictation, because I watched it
+happen three times. Do not assume it is the only one. Dictation is the
+product; anything that can take it down is a liability regardless of how
+good the feature is on its own.
+
+Go through everything that touches the path from hotkey to text and say,
+for each, whether it can break dictation and how badly. At minimum:
+
+- **Voice processing** (`setVoiceProcessingEnabled`) — three failures so far
+- **Preferred input device pinning** — `kAudioOutputUnitProperty_CurrentDevice`,
+  the `-10851` failure; note the pinned device was already the default
+- **Media control** (`NowPlaying.swift`) — enumerates CoreAudio process
+  objects; runs off-main and only on media commands, but it is new and it
+  touches the same subsystem
+- **Sound effects** (`SoundEffectPlayer`) — plays audio in the same process
+  that is trying to record
+- **Local transcription** (WhisperKit) — model loading during a hold
+- **Agent mode and spoken follow-up answers** — share the recorder and add
+  states the recording lifecycle has to survive
+- **The stall watchdog** and the event-tap circuit breaker — diagnostics
+  that could themselves interfere
+- Anything else you find that I have not listed
+
+For each, give:
+
+1. **Can it break dictation?** Yes / no / unproven, with the mechanism.
+2. **Severity if it does** — dictation dead, degraded, or cosmetic. Dead
+   means the product does not work.
+3. **How often** — every hold, only in some device configuration, only on
+   first run.
+4. **The options**, in this order of preference:
+   - keep the feature and fix the interaction,
+   - keep it but make it opt-in or gated so a failure cannot reach
+     dictation,
+   - remove it.
+
+**Default to keeping features and fixing them.** They were each built for a
+real reason and the user wants them. Recommend removal only where the risk
+to dictation is high and no gate is cheap — and say plainly which it is,
+rather than hedging. Where a feature can be kept behind a switch that
+fails safe, prefer that to removal.
+
+Rank the whole list by severity × frequency, so the user can see at a
+glance what is actually endangering the product versus what is merely
+untidy.
+
 ## Constraints that shape the plan
 
 - **This Mac's audio environment is unstable and is part of the story.** A
@@ -111,11 +159,13 @@ why.
 
 1. **A decision on voice processing**: keep as-is, keep with the
    launch-once shape, or revert — with the reasoning.
-2. **A sequenced plan** for the rest, ordered by what unblocks the user
+2. **The feature audit above**, ranked by severity × frequency, with a
+   keep-and-fix / gate / remove call on each.
+3. **A sequenced plan** for the rest, ordered by what unblocks the user
    fastest, saying for each step what must be proven before the next.
-3. **What to verify and how**, given experiments cost the user their
+4. **What to verify and how**, given experiments cost the user their
    permissions. Name the measurement, not just the intent.
-4. **Where I went wrong as a process**, not just in the code. Three fixes,
+5. **Where I went wrong as a process**, not just in the code. Three fixes,
    three new failures, each shipped with a verification that looked
    adequate. Something about how I am checking these is not working, and I
    would rather hear it plainly.
