@@ -33,7 +33,7 @@ struct StatusPill: View {
     var breathes: Bool = false
 
     /// How long the announcement holds, and how long it takes to hand over.
-    private static let announcementHold = 0.85
+    private static let announcementHold = 0.5
     private static let crossfade = 0.45
     /// "Pronounced · Slow" from the breathing-options prototype, and the
     /// same values the pill used before the redesign dropped it.

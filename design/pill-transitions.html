@@ -1,0 +1,306 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayline — work-mode handover transitions</title>
+<style>
+  :root { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#e0a89f; }
+  }
+  :root[data-theme="dark"]  { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#e0a89f; }
+  :root[data-theme="light"] { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+
+  body { margin:0; padding:34px 24px 70px; background:var(--bg); color:var(--ink);
+         font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:24px; }
+  h1 { font-size:20px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  h2 { font-size:11.5px; margin:0 0 12px; font-weight:650; letter-spacing:.09em;
+       text-transform:uppercase; color:var(--muted); }
+  p  { margin:0; color:var(--muted); font-size:13.5px; }
+
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .card .name { font-size:13.5px; font-weight:650; }
+  .card .desc { font-size:11.5px; color:var(--muted); line-height:1.45; }
+
+  /* The pill is measured and sized in JS so the width can be animated
+     frame by frame. A CSS transition would race the label animation and
+     the two would drift apart at different durations. */
+  .stage { background:#000; border-radius:10px; padding:18px; display:flex;
+           justify-content:center; }
+  .pill { background:rgba(20,20,20,.75); border:1px solid rgba(102,102,102,.25);
+          border-radius:8px; height:36px; display:flex; align-items:center;
+          padding:0 12px; gap:8px; overflow:hidden; box-sizing:border-box; }
+  .grid { display:grid; grid-template-columns:repeat(3,5px); grid-template-rows:repeat(3,5px);
+          flex:none; }
+  .cell { border-radius:0; }
+  .labels { position:relative; flex:1 1 auto; height:22px; }
+  .labels span { position:absolute; left:0; top:0; white-space:nowrap; line-height:22px;
+                 font-size:16px; color:#f2f2f2; will-change:opacity,transform,filter; }
+  .measure { position:absolute; visibility:hidden; white-space:nowrap; font-size:16px;
+             font-family:inherit; }
+
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+              gap:14px 22px; background:var(--card); border:1px solid var(--line);
+              border-radius:12px; padding:18px 20px; }
+  .ctl label { font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
+  .ctl label b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin-top:5px; }
+  input[type=text] { width:100%; margin-top:5px; padding:5px 8px; border-radius:6px;
+                     border:1px solid var(--line); background:var(--bg); color:var(--ink);
+                     font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  input[type=text].bad { border-color:#c0392b; }
+
+  .buttons { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .buttons button { font:inherit; font-size:13px; padding:7px 16px; border-radius:8px;
+           border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  .buttons button:hover { border-color:var(--accent); }
+  .buttons button.primary { background:var(--accent); border-color:var(--accent); color:#231a18; font-weight:600; }
+  .buttons button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <h1>Work-mode handover</h1>
+    <p>Entering work mode shows <b>Work Mode</b>, then hands over to
+       <b>Listening</b>. The pill hugs its text, so it is wider while the
+       announcement is up and shrinks as it leaves. Six ways to run that
+       handover — all replay together so they can be compared rather than
+       remembered.</p>
+  </div>
+
+  <div class="buttons">
+    <button id="replay" class="primary">Replay all</button>
+    <button id="loop" aria-pressed="false">Loop</button>
+    <span id="status" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="cards" id="cards"></div>
+
+</div>
+
+<script>
+(() => {
+  const LOADER_COLOUR_DEFAULT = "#F9F0E0";
+  const P = {
+    hold: 500,        // ms the announcement stays up — settled at 0.5s
+    fade: 450,        // ms of handover
+    widthLag: 0,      // ms the width change trails the label change
+    colour: LOADER_COLOUR_DEFAULT,
+  };
+
+  const smooth = k => k * k * (3 - 2 * k);
+  const clamp01 = k => Math.min(1, Math.max(0, k));
+
+  /// Each returns styles for the outgoing (a) and incoming (b) label.
+  /// `e` is the eased 0..1 progress of the handover.
+  const VARIANTS = [
+    {
+      id: "crossfade",
+      name: "Crossfade",
+      desc: "Opacity only — what is built today. The quietest, and the one that reads as the same object changing rather than two things swapping.",
+      style: e => ({
+        a: { opacity: 1 - e, transform: "none", filter: "none" },
+        b: { opacity: e, transform: "none", filter: "none" },
+      }),
+    },
+    {
+      id: "slideUp",
+      name: "Slide up",
+      desc: "The old label rises out, the new one rises in behind it — a departure board. Direction implies replacement, which is exactly what happened.",
+      style: e => ({
+        a: { opacity: 1 - e, transform: `translateY(${-14 * e}px)`, filter: "none" },
+        b: { opacity: e, transform: `translateY(${14 * (1 - e)}px)`, filter: "none" },
+      }),
+    },
+    {
+      id: "slideDown",
+      name: "Slide down",
+      desc: "The same, falling. Reads as settling rather than advancing — softer, and arguably the better fit for going back to a resting state.",
+      style: e => ({
+        a: { opacity: 1 - e, transform: `translateY(${14 * e}px)`, filter: "none" },
+        b: { opacity: e, transform: `translateY(${-14 * (1 - e)}px)`, filter: "none" },
+      }),
+    },
+    {
+      id: "scaleFade",
+      name: "Scale and fade",
+      desc: "The announcement shrinks away while the label grows in. Draws slightly more attention to the moment than a plain crossfade.",
+      style: e => ({
+        a: { opacity: 1 - e, transform: `scale(${1 - 0.16 * e})`, filter: "none" },
+        b: { opacity: e, transform: `scale(${0.84 + 0.16 * e})`, filter: "none" },
+      }),
+    },
+    {
+      id: "blurFade",
+      name: "Blur and fade",
+      desc: "Each label defocuses as it leaves. Softest of the set, and the most expensive to render — worth knowing before it ships on a HUD.",
+      style: e => ({
+        a: { opacity: 1 - e, transform: "none", filter: `blur(${3 * e}px)` },
+        b: { opacity: e, transform: "none", filter: `blur(${3 * (1 - e)}px)` },
+      }),
+    },
+    {
+      id: "pushLeft",
+      name: "Push left",
+      desc: "Horizontal, in the direction the pill is shrinking. The motion and the width change agree, which makes the resize feel caused rather than incidental.",
+      style: e => ({
+        a: { opacity: 1 - e, transform: `translateX(${-12 * e}px)`, filter: "none" },
+        b: { opacity: e, transform: `translateX(${12 * (1 - e)}px)`, filter: "none" },
+      }),
+    },
+  ];
+
+  // ---- one shared clock ------------------------------------------------
+  let startedAt = null, looping = false;
+
+  // ---- the ring spin, so the pill is judged as it will look ------------
+  const RING_ORDER = [0, 1, 2, 5, 8, 7, 6, 3];
+  const wrap01 = x => ((x % 1) + 1) % 1;
+  function ringSpin(i, phase) {
+    if (i === 4) return 0.55;
+    const step = RING_ORDER.indexOf(i);
+    const t = wrap01(phase - step / RING_ORDER.length);
+    const d = Math.min(t, 1 - t);
+    const x = Math.min(1, d / 0.35);
+    return 0.12 + 0.88 * (0.5 + 0.5 * Math.cos(Math.PI * x));
+  }
+
+  // ---- build ----------------------------------------------------------
+  const cards = document.getElementById("cards");
+  const built = VARIANTS.map(variant => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const stage = document.createElement("div");
+    stage.className = "stage";
+    const pill = document.createElement("div");
+    pill.className = "pill";
+
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    const cells = Array.from({ length: 9 }, () => {
+      const d = document.createElement("div");
+      d.className = "cell";
+      grid.appendChild(d);
+      return d;
+    });
+
+    const labels = document.createElement("div");
+    labels.className = "labels";
+    const a = document.createElement("span"); a.textContent = "Work Mode";
+    const b = document.createElement("span"); b.textContent = "Listening";
+    labels.append(a, b);
+
+    pill.append(grid, labels);
+    stage.appendChild(pill);
+
+    const name = document.createElement("div");
+    name.className = "name"; name.textContent = variant.name;
+    const desc = document.createElement("div");
+    desc.className = "desc"; desc.textContent = variant.desc;
+
+    card.append(stage, name, desc);
+    cards.appendChild(card);
+    return { variant, pill, cells, a, b, labels };
+  });
+
+  // Measure both labels once, in the pill's own font, so the hug is real
+  // rather than guessed. 15 loader + 8 gap + 12 padding each side.
+  const measure = document.createElement("span");
+  measure.className = "measure";
+  document.body.appendChild(measure);
+  function textWidth(s) {
+    measure.textContent = s;
+    return measure.getBoundingClientRect().width;
+  }
+  const WIDTHS = { work: 0, listening: 0 };
+  function remeasure() {
+    WIDTHS.work = Math.ceil(textWidth("Work Mode")) + 15 + 8 + 24;
+    WIDTHS.listening = Math.ceil(textWidth("Listening")) + 15 + 8 + 24;
+    document.getElementById("status").textContent =
+      `hug: ${WIDTHS.work}px while announcing, ${WIDTHS.listening}px after — ` +
+      `${WIDTHS.work - WIDTHS.listening}px of shrink`;
+  }
+  remeasure();
+
+  // ---- loop -----------------------------------------------------------
+  requestAnimationFrame(function tick(now) {
+    const spinPhase = wrap01(now / 800);
+    const elapsed = startedAt === null ? Infinity : now - startedAt;
+
+    // Progress of the handover, and of the width, which may trail it.
+    const e = smooth(clamp01((elapsed - P.hold) / P.fade));
+    const eW = smooth(clamp01((elapsed - P.hold - P.widthLag) / P.fade));
+    const width = WIDTHS.work + (WIDTHS.listening - WIDTHS.work) * eW;
+
+    built.forEach(({ variant, pill, cells, a, b, labels }) => {
+      cells.forEach((cell, i) => {
+        cell.style.background = P.colour;
+        cell.style.opacity = ringSpin(i, spinPhase).toFixed(3);
+      });
+      // Before the first replay the pill sits at its resting size.
+      pill.style.width = (startedAt === null ? WIDTHS.listening : width) + "px";
+      labels.style.width = (pill.getBoundingClientRect().width - 15 - 8 - 24) + "px";
+      const s = variant.style(startedAt === null ? 1 : e);
+      Object.assign(a.style, s.a);
+      Object.assign(b.style, s.b);
+    });
+
+    if (looping && elapsed > P.hold + P.fade + 900) startedAt = now;
+    requestAnimationFrame(tick);
+  });
+
+  // ---- controls -------------------------------------------------------
+  const SLIDERS = [
+    ["hold",     100, 1500, 10, "Announcement hold", v => v + " ms"],
+    ["fade",     100, 1200, 10, "Handover",          v => v + " ms"],
+    ["widthLag", -300, 400,  10, "Width trails by",   v => v + " ms"],
+  ];
+  const controls = document.getElementById("controls");
+  SLIDERS.forEach(([key, min, max, step, name, fmt]) => {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = fmt(P[key]);
+    label.append(document.createTextNode(name), out);
+    const input = document.createElement("input");
+    Object.assign(input, { type: "range", min, max, step, value: P[key] });
+    input.addEventListener("input", () => {
+      P[key] = parseFloat(input.value);
+      out.textContent = fmt(P[key]);
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  });
+  {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = P.colour;
+    label.append(document.createTextNode("Loader colour"), out);
+    const input = document.createElement("input");
+    input.type = "text"; input.value = P.colour; input.spellcheck = false;
+    input.addEventListener("input", () => {
+      const raw = input.value.trim().replace(/^#/, "");
+      const ok = /^([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw);
+      input.classList.toggle("bad", !ok);
+      out.textContent = ok ? "#" + raw.toLowerCase() : "not a hex code";
+      if (ok) P.colour = "#" + raw;
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  }
+
+  document.getElementById("replay").addEventListener("click", () => {
+    startedAt = performance.now();
+  });
+  const loopBtn = document.getElementById("loop");
+  loopBtn.addEventListener("click", () => {
+    looping = !looping;
+    loopBtn.setAttribute("aria-pressed", String(looping));
+    loopBtn.textContent = looping ? "Stop looping" : "Loop";
+    if (looping) startedAt = performance.now();
+  });
+})();
+</script>
