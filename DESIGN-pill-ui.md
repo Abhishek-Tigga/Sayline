@@ -232,3 +232,34 @@ this is the paragraph to come back to.
 **Mono in every mode, for now** (2026-08-14). Agent mode previously took
 `.ocean`. The modes are already carried by the loader's motion and colour,
 so a coloured beam was a third signal saying the same thing.
+
+## The command header
+
+Node 35:1648 adds a header to the speech box, marking the transcript as a
+command rather than dictation.
+
+| | |
+|---|---|
+| icon | `>_` drawn on an 8×8 pixel grid, **12 × 12** |
+| gap, icon to label | 2 |
+| label | "Command", IBM Plex Mono Medium, 10 |
+| colour | `#E6E6E6` — brighter than the transcript's `#CCCCCC` |
+| gap, header to transcript | 4 |
+| alignment | leading, with the transcript |
+
+**IBM Plex Mono, chosen over the pixel faces** from
+`design/command-label.html`, which compared eight candidates. It says
+terminal without the costume, and will age better than an 8-bit face if
+the app grows up around it. Bundled like Inter — Regular and Medium, SIL
+Open Font License 1.1, OFL.txt beside them.
+
+**The icon is drawn, not imported.** A vector glyph beside a monospaced
+terminal label reads as an icon that happened to land there; drawing it on
+a pixel grid makes it part of the same idea. At 12pt over 8 cells each
+cell is 1.5pt — three device pixels on Retina, so every cell lands whole
+and the edges stay hard. Only exact on Retina, which is every Mac this
+ships to.
+
+The box hugs the **wider of the header and the transcript**. Sizing to the
+transcript alone clips the header whenever the transcript is shorter,
+which a one-word command usually is.

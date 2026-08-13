@@ -31,4 +31,28 @@ enum Typeface {
             ? .custom(familyName, fixedSize: size).weight(weight)
             : .system(size: size, weight: weight)
     }
+
+    // MARK: - Monospace
+
+    /// IBM Plex Mono, bundled the same way and for the same reason.
+    ///
+    /// Used only for the speech box's "Command" header, chosen over the
+    /// pixel faces: it says terminal without the costume, and it will age
+    /// better than an 8-bit face if the app grows up around it. Regular and
+    /// Medium ship; nothing asks for another weight.
+    static let monoFamilyName = "IBM Plex Mono"
+
+    static let isMonoAvailable: Bool = {
+        let available = NSFont(name: monoFamilyName, size: 10) != nil
+        SaylineLog.log(available
+            ? "IBM Plex Mono registered from the app bundle"
+            : "IBM Plex Mono NOT registered — falling back to the system monospace.")
+        return available
+    }()
+
+    static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        isMonoAvailable
+            ? .custom(monoFamilyName, fixedSize: size).weight(weight)
+            : .system(size: size, weight: weight, design: .monospaced)
+    }
 }

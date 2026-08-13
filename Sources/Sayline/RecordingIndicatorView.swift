@@ -267,20 +267,23 @@ private struct SpeechBackBox: View {
         let metrics = Self.metrics(for: fitted)
 
         TimelineView(.animation) { timeline in
-            Text(Self.attributed(fitted, elapsed: timeline.date.timeIntervalSince(setAt)))
-                .font(Typeface.ui(Self.fontSize))
+            VStack(alignment: .leading, spacing: CommandHeader.gapToTranscript) {
+                CommandHeader()
+                Text(Self.attributed(fitted, elapsed: timeline.date.timeIntervalSince(setAt)))
+                    .font(Typeface.ui(Self.fontSize))
                 .lineSpacing(Self.lineHeight - Self.fontSize - 2)
                 .fixedSize(horizontal: false, vertical: true)
                 // An explicit width, not a maximum. `.frame(maxWidth:)`
                 // expands to whatever the parent offers, so a two-word
                 // transcript sat in a full-width box; the indicator hands
                 // down the whole screen width, so the cap became the size.
-                .frame(width: Self.textWidth(fitted,
-                                             horizontalPadding: metrics.horizontalPadding),
-                       alignment: .leading)
-                .padding(.horizontal, metrics.horizontalPadding)
-                .padding(.vertical, metrics.verticalPadding)
-                .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
+                    .frame(width: Self.contentWidth(fitted,
+                                                     horizontalPadding: metrics.horizontalPadding),
+                           alignment: .leading)
+            }
+            .padding(.horizontal, metrics.horizontalPadding)
+            .padding(.vertical, metrics.verticalPadding)
+            .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
         }
     }
 
@@ -358,6 +361,17 @@ private struct SpeechBackBox: View {
         let available = maxWidth - horizontalPadding * 2
         let bounds = measured(text, width: available)
         return min(available, bounds.width.rounded(.up))
+    }
+
+    /// The wider of the transcript and the "Command" header.
+    ///
+    /// The box hugs its content, and the header is content — sizing to the
+    /// transcript alone clips the header whenever the transcript is the
+    /// shorter of the two, which a one-word command usually is.
+    static func contentWidth(_ text: String, horizontalPadding: CGFloat) -> CGFloat {
+        let available = maxWidth - horizontalPadding * 2
+        return min(available, max(textWidth(text, horizontalPadding: horizontalPadding),
+                                  CommandHeader.width))
     }
 
     private static func lineCount(_ text: String, horizontalPadding: CGFloat) -> Int {

@@ -13,10 +13,10 @@ targets:
     platform: macOS
     sources:
       - Sources/Sayline
-      # Bundled so the app does not depend on Inter being installed — it
-      # is not, on any machine tested. SIL Open Font License 1.1, which
-      # permits redistribution in a commercial app; OFL.txt ships beside
-      # the font as that licence requires.
+      # Bundled so the app does not depend on Inter or IBM Plex Mono being
+      # installed — neither was, on any machine tested. Both are SIL Open
+      # Font License 1.1, which permits redistribution in a commercial app;
+      # each ships with its OFL.txt beside it as that licence requires.
       - path: Resources
         buildPhase: resources
     dependencies:
