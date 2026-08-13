@@ -85,7 +85,10 @@ final class WorkModeCleaner {
     if they asked something, it stays a question.
     - If they enumerated items — "three reasons: first… second…" — write \
     them as "- " bullets, one per line. Not for prose that merely \
-    contains several ideas.
+    contains several ideas. ALWAYS keep the line that introduces the \
+    list, so the reader knows what the list is of. "So this is how we \
+    should do it. First… second…" becomes "How we should do it:" and \
+    then the bullets — never bullets on their own.
     - Never invent headers, greetings or sign-offs, and never comment on \
     your own output.
     - Output only the rewritten text. No preamble, no quotes.

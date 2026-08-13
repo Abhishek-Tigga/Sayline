@@ -3794,3 +3794,34 @@ understand why" and "I do not".
 and B2 and a first look at H1's badge. **Rebuilds reset the Accessibility
 grant** — `tccutil reset Accessibility com.abhishektigga.sayline`, then
 the grant button, before the next session.
+
+---
+
+## 2026-08-13 — bullets lost their lead-in (Opus)
+
+`claimed-fixed`. User report: "in work mode if I say anything it is
+cutting the first context and it is just giving me the bullet points."
+
+Correct, and the cause was my prompt. "So this is how we should do it.
+First… second… third…" came back as three bare bullets — the model read
+the introducing sentence as filler, which the prompt told it to cut.
+Bullets with no lead-in leave the reader without knowing what the list
+is *of*.
+
+Fixed with one clause: a list always keeps the line that introduces it.
+Live on the user's own sentence:
+
+```
+said : "So this is how we should do first work out the benches
+        Second clean the grass Third clean the house"
+work : "How we should do it:
+        - First, work out the benches
+        - Second, clean the grass
+        - Third, clean the house"
+```
+
+**A note on how I nearly misread this.** My first look at the log used
+`grep "[work]"`, which matches only the first line of a multi-line
+rewrite — so the output appeared to be a single bullet and I nearly
+reported truncation. The other two bullets were on the following lines,
+unmatched. A filtered log is not the log.
