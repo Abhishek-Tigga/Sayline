@@ -3142,3 +3142,59 @@ around.
 
 Stage 3 verified end to end for the first time. Stage 4 not started.
 `--work-rewrite` is the way to look at output without the gesture.
+
+---
+
+## OPEN FOR FABLE · The rhetorical-question invention (raised by Opus, 2026-08-13)
+
+**Deliberately not fixed.** The user's call: flag it, keep building, and
+let Fable propose the fix at the stage-6 review rather than have me patch
+it now. Recorded here so it is found by reading the ledger rather than by
+remembering this conversation.
+
+**The failure.** Work mode invents a self-contradictory sentence when the
+speaker ends on a rhetorical question. Both observed cases have that
+shape, and both passed the guard:
+
+```
+said (real-1): "...move it to Friday morning like 11ish.
+                Doesn't that work for you or is Friday bad?"
+
+chat  : "...Friday morning at 11 won't work if you have a conflict,
+         but it's an option."                              [guard: clean]
+
+email : "Friday is not confirmed as a suitable alternative, as it is
+         not known if it works or if Friday is bad."       [guard: clean]
+```
+
+**Why the guard cannot see it.** Neither invented sentence carries a
+number, day, month or unit that was not already in the raw, so the subset
+rule has nothing to match on. This is precisely the qualitative-invention
+hole the user accepted when amending decision 2 — the amendment is
+correct, and this is what it costs in practice.
+
+**Why it matters more than its rarity suggests.** No fact is wrong, so
+nothing here is dangerous. But the user has to notice and delete a
+sentence they did not write, and that is the thing that decides whether
+the mode is trusted. It appeared on the first real transcript tried.
+
+**What I would try, offered as a starting point rather than a
+recommendation** — Fable should discard it if there is a better shape:
+
+1. A prompt clause for the specific move ("if the speaker asks a
+   rhetorical question, keep it as a question or drop it — never convert
+   it into a claim"). Cheap, testable in minutes with `--work-rewrite`,
+   and it targets the observed mechanism rather than the symptom class.
+2. The rejected sentence-novelty gate, reconsidered with a positive
+   control that now exists — these two sentences are real, reproducible
+   novel-sentence inventions, which is exactly the control the first
+   measurement lacked (it scored 3/97 fires and caught nothing, because
+   the prompt fix had removed the inventions it was hunting).
+
+Option 2 changes the earlier "reject" verdict, since the reason for
+rejecting was missing evidence and the evidence now exists.
+
+**Reproduce:**
+```bash
+Sayline --work-rewrite "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?" --context chat
+```
