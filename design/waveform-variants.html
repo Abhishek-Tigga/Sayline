@@ -139,15 +139,24 @@
       fn: (i, ph) => dipAt(wrap01(ph - REGION[i] * 0.15) / 0.90),
     },
     {
-      id: "rowRise",
-      name: "Row rise",
-      desc: "A band climbs bottom to top, like a level meter filling. Reads as “taking something in” rather than “working on it”.",
-      fn: (i, ph) => P.floor + (1 - P.floor) * pulse(ph - (2 - row(i)) * 0.28, P.width),
-    },
-    {
       id: "upwardSweep",
       name: "Upward sweep",
-      desc: "Fills from the bottom up, holds, then drains. Different from row rise: that is a band travelling through the grid, this is a level accumulating in it — rows stay lit as the next one joins.",
+      desc: "A band travels bottom to top — the diagonal sweep rotated a quarter turn. Same construction: one pulse, delayed by how far up the cell sits.",
+      // Built exactly like the diagonal sweep so the two are siblings: take
+      // the cell's position along the direction of travel, normalise it to
+      // 0..1 by the furthest step, and delay the pulse by that fraction of
+      // `spread`. The diagonal divides by 4 because (row+col) reaches 4;
+      // rows divide by 2. An earlier version used a flat 0.28 per row —
+      // 0.56 across the grid against the diagonal's 0.6 — which sounds
+      // close but staggers far more per step, so it read as three rows
+      // blinking in turn rather than one band travelling.
+      fn: (i, ph) => P.floor + (1 - P.floor)
+        * pulse(ph - ((2 - row(i)) / 2) * 0.6, P.width),
+    },
+    {
+      id: "upwardFill",
+      name: "Upward fill",
+      desc: "Fills from the bottom up, holds, then drains. Not a band travelling through the grid but a level accumulating in it — rows stay lit as the next one joins.",
       fn: (i, ph) => {
         // Level runs 0..3 over the first 70% of the cycle and drains over
         // the rest, so the fill is unhurried and the reset is quick —
