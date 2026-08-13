@@ -46,8 +46,27 @@ gets its own:
    chosen by measurement* — see decision 7 and the eval section.
 3. *The fact guard*: deterministic code, no second LLM. Every number
    (spoken forms normalized — "fifteen" = 15), day-name, name and
-   negation from the raw words must survive intact; nothing substantive
-   may appear that was never said. Structure is completely free.
+   negation from the raw words must survive intact. Structure is
+   completely free.
+
+   **Amended 2026-08-13, accepted by the user.** This decision originally
+   read "nothing substantive may appear that was never said". That is not
+   enforceable by deterministic code: telling a substantive claim from
+   ordinary connective writing is semantics, and word lists do not do
+   semantics. The enforceable promise, and the one now implemented:
+
+   > **Anything invented that carries a number, date, day, month or unit
+   > is caught mechanically. Purely qualitative invention — a sentence
+   > like "The api is affected by these issues" — is made much less
+   > likely by the prompt, but is not guaranteed to be caught.**
+
+   A sentence-novelty gate was built and measured as the bound on the
+   remainder: it fired on 3 of 97 real rewrites, one of which was a
+   faithful rewrite it wanted to discard, and caught none of the known
+   inventions because the prompt fix had already eliminated them — no
+   positive control, so no defensible threshold. Rejected for v1 and left
+   unwired in `FactGuard.sentenceNovelty`, to be revisited if the fallback
+   log ever justifies it. Numbers in `review/LEDGER.md`.
 4. *One corrective retry.* A violation sends one follow-up naming the
    broken fact; the retry is re-checked. Pass → insert, ~a second late.
    Fail → fall back.

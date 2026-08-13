@@ -2972,3 +2972,20 @@ is good.
 **Decision 2 amendment surfaced to the user, awaiting acknowledgment:**
 qualitative inventions are bounded, not eliminated. Stage 3 frozen until
 recorded.
+
+---
+
+## 2026-08-13 — decision 2 amendment ACCEPTED by the user (Opus)
+
+Put to the user in one sentence, as Fable's follow-up required, and
+accepted: *"anything invented with a number or date in it is caught;
+other invented text is much less likely but not impossible."* Their
+answer: **yes**.
+
+`DESIGN-work-mode.md` decision 2 amended in place, with the rejected
+sentence-novelty gate and its measurements recorded as the reason the
+weaker promise is the honest one.
+
+**Stage 3 is unblocked.** The gates were: a ranking from the repaired
+instrument (done — rerun with cohorts separated), and this
+acknowledgment (done).
