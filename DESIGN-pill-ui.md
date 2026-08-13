@@ -109,3 +109,38 @@ Motion, unchanged: 800 ms cycle, dip 90% of cycle, ring lag 15%, white,
 
 Note the older speech-box variants in the file draw the loader at 4 px
 cells (12 px total). 15 px is the settled size; 12 px is superseded.
+
+## The loader: two motions, three colours
+
+Settled with the user 2026-08-14 from `design/waveform-variants.html`.
+
+| mode | motion | colour |
+|---|---|---|
+| plain dictation | ring spin | `#F9F0E0` warm off-white |
+| work | ring spin | `#90CAF9` cool blue |
+| agent | outward dip | `#FFFFFF` |
+
+**Ring spin** is a highlight travelling clockwise around the eight outer
+cells with the centre held at 0.55. Pulse width 1, which the spin narrows
+to 0.7 internally — a full-width pulse across eight cells lights the whole
+ring at once and the travel disappears. Cells floor at 0.12 so the grid
+stays legible as a grid.
+
+The split is deliberate: agent mode is *doing* something and gets the
+outward dip, which reads as thinking; dictation and work are *waiting* and
+get the spin. Motion separates agent from the rest, hue separates
+dictation from work. That matters more than it used to, because the pill's
+text no longer breathes and the border beam is the only other mode signal.
+
+### Keep `design/waveform-variants.html`
+
+It renders nine motions side by side, each inside a pill at shipping size,
+all animating off one clock — outward dip, upward sweep, upward fill,
+column sweep, ring spin, breathe, diagonal sweep and its reverse, and
+twinkle. Controls for cycle, size, gap, glow, dim floor and pulse width,
+plus a hex field.
+
+It is the library for the next one of these, not a throwaway: there are
+more states coming that will each want their own motion, and the value is
+in comparing them animating together rather than imagining them one at a
+time.

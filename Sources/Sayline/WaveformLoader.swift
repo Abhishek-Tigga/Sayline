@@ -17,6 +17,24 @@ import SwiftUI
 /// prototype in `design/waveform.html`, which carries the full working and
 /// the sliders. `DESIGN-pill-ui.md` records the numbers.
 struct WaveformLoader: View {
+    /// Which motion the grid runs.
+    ///
+    /// Two, deliberately: the mode has to be readable from the corner of
+    /// an eye. Chosen from `design/waveform-variants.html`, which renders
+    /// nine candidates side by side inside a pill — keep that page, it is
+    /// the library for the next one of these.
+    enum Motion {
+        /// Darkness travelling outward from the centre. Agent mode. Reads
+        /// as thinking.
+        case outwardDip
+        /// A highlight travelling clockwise around the eight outer cells,
+        /// centre steady. Plain dictation and work mode. Reads as waiting
+        /// rather than working, which is the distinction that matters —
+        /// agent mode is doing something, dictation is listening.
+        case ringSpin
+    }
+
+    var motion: Motion = .outwardDip
     /// Whole grid. 15 means 5pt cells, matching the Figma placeholder.
     var size: CGFloat = 15
     var colour: Color = .white
@@ -61,6 +79,18 @@ struct WaveformLoader: View {
     /// 0 centre, 1 edge, 2 corner — read row by row.
     private static let ring = [2, 1, 2, 1, 0, 1, 2, 1, 2]
 
+    /// The eight outer cells clockwise from top-left, for `ringSpin`.
+    private static let ringOrder = [0, 1, 2, 5, 8, 7, 6, 3]
+    /// Settled with the user on the prototype: pulse width 1, which the
+    /// spin narrows to 0.7 — a full-width pulse on eight cells lights the
+    /// whole ring at once and the travel disappears.
+    private static let pulseWidth = 1.0
+    /// Cells never go fully dark; the grid stays legible as a grid.
+    private static let floor = 0.12
+    /// The centre holds while the ring travels. It is the still point the
+    /// motion reads against — animate it too and the shape dissolves.
+    private static let centreOpacity = 0.55
+
     var body: some View {
         let cell = size / 3
         TimelineView(.animation) { timeline in
@@ -76,7 +106,7 @@ struct WaveformLoader: View {
                             Rectangle()
                                 .fill(colour)
                                 .frame(width: cell, height: cell)
-                                .opacity(Self.opacity(at: row * 3 + column, phase: phase))
+                                .opacity(Self.opacity(at: row * 3 + column, phase: phase, motion: motion))
                         }
                     }
                 }
@@ -87,11 +117,28 @@ struct WaveformLoader: View {
     }
 
     /// Opacity of one cell at a phase in turns.
-    static func opacity(at index: Int, phase: Double) -> Double {
-        let local = ((phase - Double(ring[index]) * ringLag)
-            .truncatingRemainder(dividingBy: 1) + 1)
-            .truncatingRemainder(dividingBy: 1)
-        return dipValue(at: local / dipFraction)
+    static func opacity(at index: Int, phase: Double, motion: Motion = .outwardDip) -> Double {
+        switch motion {
+        case .outwardDip:
+            let local = wrap01(phase - Double(ring[index]) * ringLag)
+            return dipValue(at: local / dipFraction)
+        case .ringSpin:
+            guard let step = ringOrder.firstIndex(of: index) else { return centreOpacity }
+            let offset = Double(step) / Double(ringOrder.count)
+            return floor + (1 - floor) * pulse(phase - offset, width: pulseWidth * 0.7)
+        }
+    }
+
+    private static func wrap01(_ x: Double) -> Double {
+        (x.truncatingRemainder(dividingBy: 1) + 1).truncatingRemainder(dividingBy: 1)
+    }
+
+    /// A smooth bump: 1 at t = 0, falling to 0 at ±width/2, wrapping at 1.
+    private static func pulse(_ t: Double, width: Double) -> Double {
+        let w = wrap01(t)
+        let distance = min(w, 1 - w)
+        let x = min(1, distance / (width / 2))
+        return 0.5 + 0.5 * cos(.pi * x)
     }
 
     /// Catmull-Rom through `dip`, clamped at both ends so the curve leaves

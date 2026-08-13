@@ -73,6 +73,23 @@ enum PillStyle {
     static let tintBase = Color(red: 0, green: 0, blue: 0)
     static let defaultTintOpacity: Double = 0.70
     static let cornerRadius: CGFloat = 8
+
+    /// The loader's colour per mode, settled with the user 2026-08-14.
+    ///
+    /// Colour and motion together carry the mode now that the text no
+    /// longer breathes: agent is white and thinking, dictation and work
+    /// both spin, and are told apart by hue. Warm for plain dictation,
+    /// cool for work — a deliberate pairing, since work mode is the one
+    /// that rewrites what you said and should not look like the ordinary
+    /// path.
+    enum Loader {
+        /// #F9F0E0 — warm off-white. Plain dictation.
+        static let dictation = Color(red: 0xF9 / 255, green: 0xF0 / 255, blue: 0xE0 / 255)
+        /// #90CAF9 — cool blue. Work mode.
+        static let work = Color(red: 0x90 / 255, green: 0xCA / 255, blue: 0xF9 / 255)
+        /// Unchanged. Agent mode keeps the original white.
+        static let agent = Color.white
+    }
 }
 
 /// The container treatment.
@@ -680,7 +697,9 @@ private struct PillView: View {
     let surface: SurfaceStyle
 
     var body: some View {
-        StatusPill(text: label, surface: surface)
+        StatusPill(text: label, surface: surface,
+                   motion: viewModel.isAgentMode ? .outwardDip : .ringSpin,
+                   loaderColour: loaderColour)
             // Restored 2026-08-14 at the user's request, having been
             // dropped when the new surface landed. It sits over the
             // surface's static 25% stroke rather than replacing it: the
@@ -707,6 +726,12 @@ private struct PillView: View {
         if viewModel.isAgentMode { return "Agent Listening" }
         if viewModel.isWorkMode { return "Work Listening" }
         return "Listening"
+    }
+
+    private var loaderColour: Color {
+        if viewModel.isAgentMode { return PillStyle.Loader.agent }
+        if viewModel.isWorkMode { return PillStyle.Loader.work }
+        return PillStyle.Loader.dictation
     }
 }
 

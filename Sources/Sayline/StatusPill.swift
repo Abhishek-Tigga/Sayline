@@ -22,6 +22,8 @@ struct StatusPill: View {
     /// radius is not settable on NSVisualEffectView, so the material is
     /// chosen by eye instead — see `BackdropBlur`.
     var material: NSVisualEffectView.Material = .underWindowBackground
+    var motion: WaveformLoader.Motion = .ringSpin
+    var loaderColour: Color = PillStyle.Loader.dictation
     /// 12 × 8, settled on the rendered pill by the user 2026-08-14.
     ///
     /// Deliberately NOT node 23:1234's `padding: 8px 16px`. Judged on
@@ -33,7 +35,7 @@ struct StatusPill: View {
 
     var body: some View {
         HStack(spacing: Self.gap) {
-            WaveformLoader()
+            WaveformLoader(motion: motion, colour: loaderColour)
             Text(text)
                 .font(Typeface.ui(16))
                 .foregroundStyle(PillStyle.foreground)
