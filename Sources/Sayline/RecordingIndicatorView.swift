@@ -17,7 +17,17 @@ final class IndicatorViewModel: ObservableObject {
     @Published var isAgentMode: Bool = false
     /// Work mode gets its own label and accent, set the instant the
     /// double-tap registers rather than when the text arrives.
-    @Published var isWorkMode: Bool = false
+    @Published var isWorkMode: Bool = false {
+        didSet {
+            // Stamped on the transition, not on every set — the flag is
+            // reassigned per hold and re-announcing on an unchanged value
+            // would replay the flash mid-dictation.
+            if isWorkMode && !oldValue { workModeAnnouncedAt = Date() }
+        }
+    }
+    /// When work mode was entered, so the pill can say so briefly and then
+    /// settle back to "Listening".
+    @Published var workModeAnnouncedAt: Date = .distantPast
     /// What the user said, shown in the speech-back box above the pill.
     /// Only set in agent mode, and only once transcription returns — we
     /// have no words before then (Groq Whisper is batch, not streaming).
@@ -699,7 +709,10 @@ private struct PillView: View {
     var body: some View {
         StatusPill(text: label, surface: surface,
                    motion: viewModel.isAgentMode ? .outwardDip : .ringSpin,
-                   loaderColour: loaderColour)
+                   loaderColour: loaderColour,
+                   announcement: announcement,
+                   announcedAt: viewModel.workModeAnnouncedAt,
+                   breathes: true)
             // Restored 2026-08-14 at the user's request, having been
             // dropped when the new surface landed. It sits over the
             // surface's static 25% stroke rather than replacing it: the
@@ -714,18 +727,27 @@ private struct PillView: View {
             // badly against this surface.
             .borderBeam(
                 viewModel.isAgentMode ? .sm : .pulseInner,
-                colorVariant: viewModel.isAgentMode ? .ocean
-                    : viewModel.isWorkMode ? .ocean : .mono,
+                // Mono for both dictation modes. Work used to take agent's
+                // ocean, which made the two look related when they are not:
+                // agent is the one doing something to your words. Work is
+                // now distinguished by the loader's blue instead.
+                colorVariant: viewModel.isAgentMode ? .ocean : .mono,
                 active: true,
                 borderRadius: Double(PillStyle.cornerRadius),
                 strength: viewModel.isAgentMode ? 1.0 : 0.4
             )
     }
 
+    /// What the pill settles on. Work mode says "Listening" like plain
+    /// dictation does — the mode is announced once and then carried by the
+    /// loader's colour, rather than spelled out for the whole hold.
     private var label: String {
-        if viewModel.isAgentMode { return "Agent Listening" }
-        if viewModel.isWorkMode { return "Work Listening" }
-        return "Listening"
+        viewModel.isAgentMode ? "Agent Listening" : "Listening"
+    }
+
+    /// Shown for a moment when work mode is entered, then crossfaded away.
+    private var announcement: String? {
+        viewModel.isWorkMode && !viewModel.isAgentMode ? "Work Mode" : nil
     }
 
     private var loaderColour: Color {

@@ -24,6 +24,21 @@ struct StatusPill: View {
     var material: NSVisualEffectView.Material = .underWindowBackground
     var motion: WaveformLoader.Motion = .ringSpin
     var loaderColour: Color = PillStyle.Loader.dictation
+    /// Shown for a moment and then crossfaded away, leaving `text`. Used to
+    /// announce a mode change without the pill carrying the announcement
+    /// for the whole hold.
+    var announcement: String? = nil
+    var announcedAt: Date = .distantPast
+    /// Whether the settled label breathes.
+    var breathes: Bool = false
+
+    /// How long the announcement holds, and how long it takes to hand over.
+    private static let announcementHold = 0.85
+    private static let crossfade = 0.45
+    /// "Pronounced · Slow" from the breathing-options prototype, and the
+    /// same values the pill used before the redesign dropped it.
+    private static let breatheCycle = 2.6
+    private static let breatheFloor = 0.3
     /// 12 × 8, settled on the rendered pill by the user 2026-08-14.
     ///
     /// Deliberately NOT node 23:1234's `padding: 8px 16px`. Judged on
@@ -36,14 +51,63 @@ struct StatusPill: View {
     var body: some View {
         HStack(spacing: Self.gap) {
             WaveformLoader(motion: motion, colour: loaderColour)
-            Text(text)
-                .font(Typeface.ui(16))
-                .foregroundStyle(PillStyle.foreground)
-                .fixedSize()          // never wrap; the pill grows instead
+            label
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
         .surfaceBackground(surface, cornerRadius: PillStyle.cornerRadius, material: material)
+    }
+
+    /// Both labels live in a ZStack whichever is showing, so the pill's
+    /// width is settled from the first frame. Swapping the views instead
+    /// would resize the pill mid-crossfade, which is the one moment the
+    /// eye is already on it.
+    ///
+    /// TimelineView rather than `@State` + `withAnimation`: an explicit
+    /// transaction here was found live to bleed into the material and fade
+    /// the whole pill toward transparent. Anything animating inside this
+    /// tree has to be a pure function of the clock.
+    private var label: some View {
+        TimelineView(.animation) { timeline in
+            let now = timeline.date
+            let elapsed = now.timeIntervalSince(announcedAt)
+            let (announceAlpha, settledAlpha) = Self.crossfadeAlphas(
+                elapsed: elapsed, hasAnnouncement: announcement != nil)
+
+            let breathAlpha: Double = {
+                guard breathes else { return 1 }
+                let t = now.timeIntervalSinceReferenceDate
+                let phase = (sin(t * 2 * .pi / Self.breatheCycle) + 1) / 2
+                return 1 - phase * (1 - Self.breatheFloor)
+            }()
+
+            ZStack {
+                if let announcement {
+                    // Never breathes: it is on screen for under a second and
+                    // has one job, which is to be read.
+                    text(announcement).opacity(announceAlpha)
+                }
+                text(text).opacity(settledAlpha * breathAlpha)
+            }
+        }
+    }
+
+    private func text(_ string: String) -> some View {
+        Text(string)
+            .font(Typeface.ui(16))
+            .foregroundStyle(PillStyle.foreground)
+            .fixedSize()          // never wrap; the pill grows instead
+    }
+
+    /// Announcement first, then a smoothstep handover. Split out so the
+    /// timing can be reasoned about without the view around it.
+    static func crossfadeAlphas(elapsed: Double, hasAnnouncement: Bool) -> (Double, Double) {
+        guard hasAnnouncement, elapsed >= 0 else { return (0, 1) }
+        if elapsed < announcementHold { return (1, 0) }
+        let k = (elapsed - announcementHold) / crossfade
+        guard k < 1 else { return (0, 1) }
+        let eased = k * k * (3 - 2 * k)
+        return (1 - eased, eased)
     }
 
     // MARK: - The shared surface
@@ -97,60 +161,41 @@ final class PillPreviewWindowController {
 ///
 /// Showing `StatusPill` alone would prove only that the pill draws; this
 /// goes through the same view the floating window uses.
+/// Renders the REAL indicator, not `StatusPill` on its own, so the label
+/// logic and the shared surface are exercised too.
 private struct PillPreview: View {
-    /// Fill opacities to choose between.
-    ///
-    /// The material is settled; this is the remaining lever on how much
-    /// blurred backdrop shows. Figma asks for a 16 background blur (which
-    /// it exports as `blur(8px)` — Figma writes CSS at half its own
-    /// value), and NSVisualEffectView has no radius to set, so "less
-    /// blur" has to be bought by letting less of the backdrop through the
-    /// fill. 0.75 is the spec.
-    private static let fills: [Double] = [0.75, 0.82, 0.88, 0.94, 1.0]
+    /// Held in @State, created once. Building them inside `body` meant a
+    /// fresh view model on every frame — and since entering work mode
+    /// stamps the announcement time, the "Work Mode" flash would restart
+    /// forever and never hand over to "Listening".
+    @State private var plain = IndicatorViewModel()
+    @State private var work = PillPreview.workModel()
+    @State private var agent = PillPreview.agentModel()
 
-    private static func surface(_ opacity: Double) -> SurfaceStyle {
-        .flat(fill: Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255)
-            .opacity(opacity))
+    private static func workModel() -> IndicatorViewModel {
+        let m = IndicatorViewModel(); m.isWorkMode = true; return m
+    }
+    private static func agentModel() -> IndicatorViewModel {
+        let m = IndicatorViewModel(); m.isAgentMode = true; return m
     }
 
     var body: some View {
         ZStack {
-            // Near-white to near-black on purpose: a blurred backdrop and a
-            // darkening shadow both have to be judged at each end.
             LinearGradient(colors: [Color(white: 0.95), Color(white: 0.04)],
                            startPoint: .leading, endPoint: .trailing)
-            VStack(spacing: 18) {
+            VStack(spacing: 22) {
                 HStack(spacing: 20) {
-                    RecordingIndicatorView(viewModel: model(agent: false, work: false))
-                        .frame(height: 40)
-                    RecordingIndicatorView(viewModel: model(agent: false, work: true))
-                        .frame(height: 40)
-                    RecordingIndicatorView(viewModel: model(agent: true, work: false))
-                        .frame(height: 40)
+                    RecordingIndicatorView(viewModel: plain).frame(height: 44)
+                    RecordingIndicatorView(viewModel: work).frame(height: 44)
+                    RecordingIndicatorView(viewModel: agent).frame(height: 44)
                 }
-                Divider().opacity(0.4)
-                ForEach(Array(Self.fills.enumerated()), id: \.offset) { _, opacity in
-                    HStack(spacing: 12) {
-                        Text(opacity == 0.75 ? "75% (spec)"
-                             : opacity == 1.0 ? "100% (opaque)"
-                             : "\(Int(opacity * 100))%")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black, radius: 2)
-                            .frame(width: 110, alignment: .trailing)
-                        StatusPill(text: "Agent Listening", surface: Self.surface(opacity))
-                    }
+                Button("Replay the work-mode flash") {
+                    work.isWorkMode = false
+                    work.isWorkMode = true
                 }
             }
             .padding(20)
         }
         .ignoresSafeArea()
-    }
-
-    private func model(agent: Bool, work: Bool) -> IndicatorViewModel {
-        let viewModel = IndicatorViewModel()
-        viewModel.isAgentMode = agent
-        viewModel.isWorkMode = work
-        return viewModel
     }
 }
