@@ -1,0 +1,355 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayline — 3×3 loader variations</title>
+<style>
+  :root { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#e0a89f; }
+  }
+  :root[data-theme="dark"]  { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#e0a89f; }
+  :root[data-theme="light"] { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+
+  body { margin:0; padding:34px 24px 70px; background:var(--bg); color:var(--ink);
+         font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width:880px; margin:0 auto; display:flex; flex-direction:column; gap:26px; }
+  h1 { font-size:20px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  h2 { font-size:11.5px; margin:0 0 12px; font-weight:650; letter-spacing:.09em;
+       text-transform:uppercase; color:var(--muted); }
+  p  { margin:0; color:var(--muted); font-size:13.5px; }
+
+  /* Each variant shown inside a pill, because that is where it will live —
+     judging a loader on its own is judging it in a place it never appears. */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:14px; display:flex; flex-direction:column; gap:10px; cursor:pointer;
+          text-align:left; font:inherit; color:inherit; }
+  .card:hover { border-color:var(--accent); }
+  .card[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .card[aria-pressed="true"] .name::after { content:" · selected"; color:var(--accent); font-weight:600; }
+  .card:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .card .name { font-size:13.5px; font-weight:650; }
+  .card .desc { font-size:11.5px; color:var(--muted); line-height:1.4; }
+  .pill { background:#141414; border:1px solid rgba(102,102,102,.35); border-radius:8px;
+          padding:8px 12px; display:flex; align-items:center; gap:8px; align-self:flex-start; }
+  .pill .label { color:#f2f2f2; font-size:16px; }
+
+  .grid { display:grid; flex:none; }
+  .cell { border-radius:0; }
+
+  .stage { background:#000; border-radius:14px; padding:26px; display:flex;
+           align-items:center; justify-content:center; gap:30px; flex-wrap:wrap; }
+
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+              gap:14px 22px; background:var(--card); border:1px solid var(--line);
+              border-radius:12px; padding:18px 20px; }
+  .ctl label { font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
+  .ctl label b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin-top:5px; }
+  input[type=text] { width:100%; margin-top:5px; padding:5px 8px; border-radius:6px;
+                     border:1px solid var(--line); background:var(--bg); color:var(--ink);
+                     font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  input[type=text].bad { border-color:#c0392b; }
+  .swatch { width:100%; height:22px; margin-top:6px; border-radius:5px; border:1px solid var(--line); }
+
+  /* Scoped to the toolbar. The cards are <button>s too, so an unscoped
+     button rule filled the selected card with the accent colour and made
+     its own description unreadable. */
+  .buttons { display:flex; gap:8px; flex-wrap:wrap; }
+  .buttons button { font:inherit; font-size:13px; padding:6px 14px; border-radius:8px;
+           border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  .buttons button:hover { border-color:var(--accent); }
+  .buttons button[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#231a18; }
+  .buttons button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <h1>3×3 loader variations</h1>
+    <p>Seven motions on the same grid: hard-edged squares, no gap, opacity
+       only, colour never changes. <b>Outward dip</b> is what ships today and
+       is here as the reference — the job is picking something for plain
+       dictation that cannot be mistaken for it.</p>
+  </div>
+
+  <div class="stage">
+    <div class="pill">
+      <div class="grid" id="heroSmall"></div>
+      <div class="label" id="heroLabel">Listening</div>
+    </div>
+    <div class="grid" id="heroBig"></div>
+  </div>
+
+  <div class="buttons">
+    <button id="playBtn" aria-pressed="true">Pause</button>
+    <button id="stepBtn">Step</button>
+  </div>
+
+  <div class="controls" id="controls"></div>
+
+  <div>
+    <h2>Pick one — all animating, all at the shipping size</h2>
+    <div class="cards" id="cards"></div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const wrap01 = x => ((x % 1) + 1) % 1;
+
+  /// A smooth bump: 1 at t=0, falling to 0 at ±width/2, wrapping at 1.
+  /// Every travelling variant is built from this, so they share a feel and
+  /// only differ in what they travel along.
+  function pulse(t, width) {
+    const d = Math.min(wrap01(t), 1 - wrap01(t));
+    const x = Math.min(1, d / (width / 2));
+    return 0.5 + 0.5 * Math.cos(Math.PI * x);
+  }
+
+  const row = i => Math.floor(i / 3);
+  const col = i => i % 3;
+  /// Clockwise from top-left, centre excluded.
+  const RING = [0, 1, 2, 5, 8, 7, 6, 3];
+  /// Distance from centre: 0 centre, 1 edge, 2 corner.
+  const REGION = [2, 1, 2, 1, 0, 1, 2, 1, 2];
+  /// Fixed per-cell rates for the twinkle variant. Hard-coded rather than
+  /// random so the animation is identical every run — a loader that differs
+  /// between launches cannot be reviewed or reproduced.
+  const RATES = [1.0, 1.6, 0.8, 1.3, 2.1, 0.9, 1.7, 1.1, 1.4];
+  const PHASES = [0.0, 0.37, 0.71, 0.15, 0.52, 0.88, 0.26, 0.63, 0.44];
+
+  const DIP = [1, 0.8, 0.5, 0.3, 0.1, 0.1, 0.3, 0.6, 0.9, 1];
+  function dipAt(u) {
+    if (u <= 0 || u >= 1) return 1;
+    const n = DIP.length, x = u * (n - 1), i = Math.floor(x), t = x - i;
+    const g = k => DIP[Math.max(0, Math.min(n - 1, k))];
+    const p0 = g(i-1), p1 = g(i), p2 = g(i+1), p3 = g(i+2);
+    const v = 0.5*(2*p1 + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t*t + (-p0+3*p1-3*p2+p3)*t*t*t);
+    return Math.min(1, Math.max(0, v));
+  }
+
+  const P = { period: 1200, size: 15, gap: 0, glow: 8, floor: 0.12, width: 0.55,
+              colour: "#ffffff" };
+
+  const VARIANTS = [
+    {
+      id: "outwardDip",
+      name: "Outward dip — SHIPPING",
+      desc: "Darkness travels out from the centre. This is the agent motion; it is here so the others can be judged against it.",
+      fn: (i, ph) => dipAt(wrap01(ph - REGION[i] * 0.15) / 0.90),
+    },
+    {
+      id: "rowRise",
+      name: "Row rise",
+      desc: "A band climbs bottom to top, like a level meter filling. Reads as “taking something in” rather than “working on it”.",
+      fn: (i, ph) => P.floor + (1 - P.floor) * pulse(ph - (2 - row(i)) * 0.28, P.width),
+    },
+    {
+      id: "columnSweep",
+      name: "Column sweep",
+      desc: "A band crosses left to right. The most obviously mechanical of the set — scanning, not thinking.",
+      fn: (i, ph) => P.floor + (1 - P.floor) * pulse(ph - col(i) * 0.28, P.width),
+    },
+    {
+      id: "ringSpin",
+      name: "Ring spin",
+      desc: "A highlight travels clockwise around the eight outer cells; the centre holds steady. The most spinner-like.",
+      fn: (i, ph) => {
+        if (i === 4) return 0.55;
+        const k = RING.indexOf(i);
+        return P.floor + (1 - P.floor) * pulse(ph - k / RING.length, P.width * 0.7);
+      },
+    },
+    {
+      id: "breathe",
+      name: "Breathe",
+      desc: "The whole grid rises and falls together, the centre very slightly ahead. Calmest of the set, and the least like the agent motion.",
+      fn: (i, ph) => {
+        const lead = REGION[i] * 0.05;
+        return P.floor + (1 - P.floor) * (0.5 + 0.5 * Math.cos(2 * Math.PI * (ph - lead)));
+      },
+    },
+    {
+      id: "diagonalSweep",
+      name: "Diagonal sweep",
+      desc: "A band crosses corner to corner. Same idea as the column sweep but softer, because the diagonals are uneven.",
+      fn: (i, ph) => P.floor + (1 - P.floor)
+        * pulse(ph - ((row(i) + col(i)) / 4) * 0.6, P.width),
+    },
+    {
+      id: "twinkle",
+      name: "Twinkle",
+      desc: "Every cell breathes at its own fixed rate. Looks like a level display reacting to a voice — closest to “I am hearing you”.",
+      fn: (i, ph) => P.floor + (1 - P.floor)
+        * (0.5 + 0.5 * Math.cos(2 * Math.PI * (ph * RATES[i] + PHASES[i]))),
+    },
+  ];
+
+  let selected = VARIANTS[1];      // rowRise: a sensible default to argue with
+  let playing = true, phase = 0, last = null;
+
+  function buildGrid(px, gap) {
+    const el = document.createElement("div");
+    el.className = "grid";
+    const cell = (px - gap * 2) / 3;
+    el.style.gridTemplateColumns = `repeat(3, ${cell}px)`;
+    el.style.gridTemplateRows    = `repeat(3, ${cell}px)`;
+    el.style.gap = gap + "px";
+    el.cells = Array.from({ length: 9 }, () => {
+      const d = document.createElement("div");
+      d.className = "cell";
+      el.appendChild(d);
+      return d;
+    });
+    return el;
+  }
+
+  function paint(el, variant, ph) {
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      const v = Math.min(1, Math.max(0, variant.fn(i, ph)));
+      sum += v;
+      el.cells[i].style.background = P.colour;
+      el.cells[i].style.opacity = v.toFixed(3);
+    }
+    el.style.filter = P.glow
+      ? `drop-shadow(0 0 ${(P.glow * sum / 9).toFixed(1)}px ${P.colour})`
+      : "none";
+  }
+
+  // ---- hero -----------------------------------------------------------
+  let heroSmall = buildGrid(P.size, P.gap);
+  let heroBig = buildGrid(P.size * 4, P.gap * 4);
+  document.getElementById("heroSmall").replaceWith(heroSmall); heroSmall.id = "heroSmall";
+  document.getElementById("heroBig").replaceWith(heroBig); heroBig.id = "heroBig";
+
+  function rebuildHeroes() {
+    const s = buildGrid(P.size, P.gap); s.id = "heroSmall";
+    heroSmall.replaceWith(s); heroSmall = s;
+    const b = buildGrid(P.size * 4, P.gap * 4); b.id = "heroBig";
+    heroBig.replaceWith(b); heroBig = b;
+  }
+
+  // ---- cards ----------------------------------------------------------
+  const cards = document.getElementById("cards");
+  const cardGrids = [];
+  VARIANTS.forEach(variant => {
+    const card = document.createElement("button");
+    card.className = "card";
+    card.type = "button";
+    card.setAttribute("aria-pressed", String(variant === selected));
+
+    const pill = document.createElement("div");
+    pill.className = "pill";
+    const grid = buildGrid(P.size, P.gap);
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = "Listening";
+    pill.append(grid, label);
+
+    const name = document.createElement("div");
+    name.className = "name"; name.textContent = variant.name;
+    const desc = document.createElement("div");
+    desc.className = "desc"; desc.textContent = variant.desc;
+
+    card.append(pill, name, desc);
+    card.addEventListener("click", () => {
+      selected = variant;
+      document.getElementById("heroLabel").textContent =
+        variant.id === "outwardDip" ? "Agent Listening" : "Listening";
+      [...cards.children].forEach((c, i) =>
+        c.setAttribute("aria-pressed", String(VARIANTS[i] === selected)));
+    });
+    cards.appendChild(card);
+    cardGrids.push({ variant, grid, pill });
+  });
+
+  function rebuildCards() {
+    cardGrids.forEach(entry => {
+      const next = buildGrid(P.size, P.gap);
+      entry.pill.replaceChild(next, entry.grid);
+      entry.grid = next;
+    });
+  }
+
+  // ---- loop -----------------------------------------------------------
+  requestAnimationFrame(function tick(now) {
+    if (last === null) last = now;
+    const dt = now - last; last = now;
+    if (playing) phase = wrap01(phase + dt / P.period);
+    paint(heroSmall, selected, phase);
+    paint(heroBig, selected, phase);
+    cardGrids.forEach(e => paint(e.grid, e.variant, phase));
+    requestAnimationFrame(tick);
+  });
+
+  // ---- controls -------------------------------------------------------
+  const SLIDERS = [
+    ["period", 300, 3000, 20,   "Cycle",       v => v + " ms"],
+    ["size",   12,  40,   1,    "Size",        v => v + " px"],
+    ["gap",    0,   4,    0.2,  "Gap",         v => v.toFixed(1) + " px"],
+    ["glow",   0,   30,   1,    "Glow",        v => v ? v + " px" : "off"],
+    ["floor",  0,   0.5,  0.01, "Dim floor",   v => v.toFixed(2)],
+    ["width",  0.2, 1,    0.01, "Pulse width", v => v.toFixed(2)],
+  ];
+  const controls = document.getElementById("controls");
+  SLIDERS.forEach(([key, min, max, step, name, fmt]) => {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = fmt(P[key]);
+    label.append(document.createTextNode(name), out);
+    const input = document.createElement("input");
+    Object.assign(input, { type: "range", min, max, step, value: P[key] });
+    input.addEventListener("input", () => {
+      P[key] = parseFloat(input.value);
+      out.textContent = fmt(P[key]);
+      if (key === "size" || key === "gap") { rebuildHeroes(); rebuildCards(); }
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  });
+
+  // Hex field. Accepts #RGB, #RRGGBB, #RRGGBBAA, with or without the hash,
+  // and only commits when it parses — a half-typed value must not blank the
+  // whole page out.
+  {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = "paste a hex";
+    label.append(document.createTextNode("Colour"), out);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = P.colour;
+    input.spellcheck = false;
+    input.setAttribute("aria-label", "Indicator colour as a hex code");
+    const swatch = document.createElement("div");
+    swatch.className = "swatch";
+    swatch.style.background = P.colour;
+
+    const commit = () => {
+      const raw = input.value.trim().replace(/^#/, "");
+      const ok = /^([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw);
+      input.classList.toggle("bad", !ok);
+      out.textContent = ok ? "#" + raw.toLowerCase() : "not a hex code";
+      if (!ok) return;
+      P.colour = "#" + raw;
+      swatch.style.background = P.colour;
+    };
+    input.addEventListener("input", commit);
+    wrap.append(label, input, swatch);
+    controls.appendChild(wrap);
+  }
+
+  const playBtn = document.getElementById("playBtn");
+  playBtn.addEventListener("click", () => {
+    playing = !playing;
+    playBtn.textContent = playing ? "Pause" : "Play";
+    playBtn.setAttribute("aria-pressed", String(playing));
+  });
+  document.getElementById("stepBtn").addEventListener("click", () => {
+    playing = false;
+    playBtn.textContent = "Play"; playBtn.setAttribute("aria-pressed", "false");
+    phase = wrap01(phase + 1 / 16);
+  });
+})();
+</script>
