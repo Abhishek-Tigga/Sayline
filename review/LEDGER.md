@@ -2806,3 +2806,68 @@ all: constraints and pinned facts belong in the system message; the
 user message carries the transcript and nothing else. A model echoing
 a delimiter is a symptom; content-role confusion is the disease. This
 also makes the "do not echo" instruction unnecessary.
+
+---
+
+## 2026-08-13 — transcription bake-off (Opus)
+
+`claimed-fixed` as a measurement. Ten clips, read aloud by the user from
+a fixed script so ground truth is known, scored on word error rate and on
+whether the key terms — names, brands, figures — survived.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3` (current) | 16.6% | 61% | 326 ms |
+| `whisper-large-v3-turbo` | 15.8% | 61% | **277 ms** |
+| `gpt-transcribe` | **14.7%** | 61% | 1011 ms |
+| `gpt-4o-mini-transcribe` | 16.2% | **64%** | 887 ms |
+| `gpt-4o-transcribe` | 49.5% | 45% | 1096 ms |
+
+`gpt-live-transcribe` returns 404 on `/audio/transcriptions` — a realtime
+model, not a file endpoint.
+
+**Recommendation: do not switch the provider; take the free upgrade.**
+`whisper-large-v3-turbo` is both faster and marginally more accurate than
+the `whisper-large-v3` in production — a drop-in change with no latency
+cost. `gpt-transcribe` wins on WER by 1.9 points and costs **3.6x the
+latency** (1011 ms against 277 ms), which decision 7's budget cannot
+absorb on the dictation path.
+
+**The finding that matters more than the ranking: every model made the
+same three errors on this user's voice.**
+
+```
+said "by the thirtieth"        every model heard  "the 13th"
+said "to two forty five"       every model heard  "to 4:45"
+said "the OAuth callback"      every model heard  "auth callback"
+```
+
+A date moved from the 30th to the 13th, and a meeting from 2:45 to 4:45,
+in every candidate including the most expensive. **Work mode's fact guard
+pins whatever the transcriber produced, so it would faithfully protect
+"the 13th".** No downstream guard can recover a fact lost at this layer,
+which is the second justification for custom vocabulary and, more
+urgently, an argument that numeric dates and times deserve their own
+treatment.
+
+**Two harness bugs, both mine, both corrected before these numbers:**
+
+1. `gpt-4o-transcribe` returned the user's *English* sentences written in
+   Devanagari and Urdu ("आस्क अर्जुन टू लूप इन स्नेहा" is "Ask Arjun to
+   loop in Sneha"). I had not sent a `language` parameter. Pinning
+   `language: "en"` improved it but did **not** fix it — it still
+   transliterates Indian names — so the 49.5% is the model's, not the
+   harness's. Worth stating because I nearly reported the first number.
+2. Scoring counted "15" as an error against "fifteen". A model writing
+   digits is differently formatted, not less accurate, and for dictation
+   digits are arguably what the user wants. Numbers are now normalized on
+   both sides, as `FactGuard` already does. This moved every model several
+   points and changed nothing about the ranking.
+
+**I tested the wrong model first.** The user asked for `gpt-transcribe`
+and I ran `gpt-4o-transcribe`, assuming they were the same thing. They are
+distinct models and both exist. Caught by the user, not by me.
+
+**Not verified by its author:** ten clips, one speaker, one room, one
+session. Enough to rank, not enough to conclude anything about accents
+generally.

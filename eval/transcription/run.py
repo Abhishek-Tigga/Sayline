@@ -36,6 +36,8 @@ CANDIDATES = [
     # (label, provider, model)
     ("whisper-large-v3 (current)", "groq",   "whisper-large-v3"),
     ("whisper-large-v3-turbo",     "groq",   "whisper-large-v3-turbo"),
+    ("gpt-transcribe",             "openai", "gpt-transcribe"),
+    ("gpt-live-transcribe",        "openai", "gpt-live-transcribe"),
     ("gpt-4o-transcribe",          "openai", "gpt-4o-transcribe"),
     ("gpt-4o-mini-transcribe",     "openai", "gpt-4o-mini-transcribe"),
 ]
@@ -61,9 +63,39 @@ KEY_TERMS = {
 }
 
 
+SPOKEN_NUMBERS = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+    "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+    "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
+    "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
+    "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30",
+    "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
+    "eighty": "80", "ninety": "90", "hundred": "100", "thousand": "1000",
+    "first": "1", "second": "2", "third": "3", "fourth": "4", "fifth": "5",
+    "thirteenth": "13", "thirtieth": "30", "twentieth": "20",
+}
+
+
 def normalize(text):
-    return [w for w in "".join(
-        c.lower() if (c.isalnum() or c.isspace()) else " " for c in text).split()]
+    """Words, with numbers reduced to digits.
+
+    "fifteen" and "15" are the same answer — a model that writes digits is
+    not less accurate, it is differently formatted, and for dictation the
+    digits are arguably what the user wants typed. Scoring them as errors
+    measured my preferences rather than the model's hearing. This mirrors
+    what FactGuard already does for exactly the same reason.
+    """
+    words = "".join(c.lower() if (c.isalnum() or c.isspace()) else " " for c in text).split()
+    out = []
+    for word in words:
+        stripped = word.rstrip("stndrh")  # 13th -> 13, 30th -> 30
+        if word.isdigit():
+            out.append(word)
+        elif stripped.isdigit() and stripped:
+            out.append(stripped)
+        else:
+            out.append(SPOKEN_NUMBERS.get(word, word))
+    return out
 
 
 def wer(reference, hypothesis):
@@ -89,7 +121,12 @@ def transcribe(provider, model, key, clip):
     boundary = f"----sayline{uuid.uuid4().hex}"
     audio = clip.read_bytes()
     parts = []
-    for field, value in (("model", model), ("response_format", "text")):
+    # Pin the language. Without it, gpt-4o-transcribe heard an Indian
+    # accent and returned the user's ENGLISH sentences written in
+    # Devanagari and Urdu script — "आस्क अर्जुन टू लूप इन स्नेहा" is
+    # "Ask Arjun to loop in Sneha" transliterated. That scored 209% WER
+    # and would have condemned the model for a setting I never sent.
+    for field, value in (("model", model), ("response_format", "text"), ("language", "en")):
         parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"\r\n\r\n{value}\r\n".encode())
     parts.append(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
@@ -144,7 +181,7 @@ def main():
             wers.append(score)
             latencies.append(ms)
             words = set(normalize(heard))
-            terms = KEY_TERMS.get(clip_id, [])
+            terms = [SPOKEN_NUMBERS.get(t, t) for t in KEY_TERMS.get(clip_id, [])]
             got = sum(1 for t in terms if t in words)
             hits += got
             total_terms += len(terms)

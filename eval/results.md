@@ -152,3 +152,28 @@ attempt.
 | `llama-3.3-70b-versatile` | 20% | 80% | 4% | 380 ms |
 | `gpt-4o-mini` | 20% | 100% | 0% | 1167 ms |
 | `gpt-4.1-mini` | 24% | 83% | 4% | 1030 ms |
+
+### Transcription bake-off — 2026-08-13 18:03
+
+10 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 16.6% | 61% | 336 ms |
+| `whisper-large-v3-turbo` | 15.8% | 61% | 285 ms |
+| `gpt-4o-transcribe` | 47.8% | 45% | 1118 ms |
+| `gpt-4o-mini-transcribe` | 11.2% | 67% | 906 ms |
+
+### Transcription bake-off — 2026-08-13 18:06
+
+10 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 16.6% | 61% | 326 ms |
+| `whisper-large-v3-turbo` | 15.8% | 61% | 277 ms |
+| `gpt-transcribe` | 14.7% | 61% | 1011 ms |
+| `gpt-4o-transcribe` | 49.5% | 45% | 1096 ms |
+| `gpt-4o-mini-transcribe` | 16.2% | 64% | 887 ms |
