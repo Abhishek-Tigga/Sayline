@@ -11,17 +11,13 @@ import SwiftUI
 /// the replacement, deliberately self-contained so looking at it cannot
 /// destabilise the indicator that currently works.
 ///
-/// **When this is wired in, fold the surface into
-/// `surfaceBackground(_:cornerRadius:)` in `RecordingIndicatorView.swift`
-/// rather than keeping both.** That function already carries the same
-/// fill — `SurfaceStyle.shipping` is `.flat(#141414 @ 75%)` — and its own
-/// comment says it exists "so the pill and the speech box can't drift
-/// apart". Two surfaces drifting apart is precisely the bug that had to be
-/// resolved out of the Figma, and it would be careless to recreate it in
-/// code. It needs the stroke and drop shadow added, which it currently
-/// lacks.
+/// Used by the live indicator as well as the preview window, so the thing
+/// being reviewed and the thing that ships cannot diverge.
 struct StatusPill: View {
     var text: String
+    /// Defaults to what ships, so the preview needs no argument and the
+    /// indicator can still pass the parked glass style through.
+    var surface: SurfaceStyle = .shipping
     /// 12 × 8, against the Figma's 16 × 10. The user tried 10 × 8 first
     /// and called it crammed, so horizontal came back up to 12; vertical
     /// stays at 8. Both settled by eye on the rendered pill, 2026-08-14.
@@ -33,42 +29,23 @@ struct StatusPill: View {
             WaveformLoader()
             Text(text)
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Self.label)
+                .foregroundStyle(PillStyle.foreground)
                 .fixedSize()          // never wrap; the pill grows instead
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
-        .background(Self.surface)
+        .surfaceBackground(surface, cornerRadius: PillStyle.cornerRadius)
     }
 
     // MARK: - The shared surface
-    //
-    // Fill, stroke, blur and shadow are identical on the pill and the
-    // speech box — the user's call when the rule card and the drawn frames
-    // disagreed. Kept as one view so the two cannot drift apart again,
-    // which is exactly what had happened in the Figma.
-    /// 8, up from the Figma's 6 — settled by eye on the rendered pill.
+
+    /// Fill, blur, stroke and shadow all come from
+    /// `surfaceBackground(_:cornerRadius:)` rather than being repeated
+    /// here. That function's own comment says it exists "so the pill and
+    /// the speech box can't drift apart", and drifting apart on exactly
+    /// these values is what had to be resolved out of the Figma.
     static let gap: CGFloat = 8
-    static let label = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
 
-    @ViewBuilder
-    static func surfaceShape(radius: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        shape
-            .fill(Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255).opacity(0.75))
-            .background(.ultraThinMaterial.opacity(0.0), in: shape)
-            .overlay(
-                shape.strokeBorder(
-                    Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255).opacity(0.25),
-                    lineWidth: 1)
-            )
-            .shadow(color: Color(red: 0x61 / 255, green: 0x61 / 255, blue: 0x61 / 255).opacity(0.25),
-                    radius: 2, x: 0, y: 1)
-    }
-
-    private static var surface: some View {
-        surfaceShape(radius: 8)
-    }
 }
 
 /// A window that shows the pill on its own, for judging the visuals before
@@ -101,6 +78,12 @@ final class PillPreviewWindowController {
     }
 }
 
+/// Renders the REAL indicator, not `StatusPill` on its own.
+///
+/// Showing the pill directly would prove only that the pill draws; it
+/// would not exercise `PillView`'s label logic or the shared
+/// `surfaceBackground`, which are the parts that were just rewired. This
+/// goes through the same view the floating window uses.
 private struct PillPreview: View {
     var body: some View {
         ZStack {
@@ -109,16 +92,20 @@ private struct PillPreview: View {
             // hides them is not showing the design.
             LinearGradient(colors: [Color(white: 0.32), Color(white: 0.06)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            VStack(spacing: 26) {
-                StatusPill(text: "Agent Listening")
-                StatusPill(text: "Listening")
-                HStack(spacing: 18) {
-                    WaveformLoader(size: 15)
-                    WaveformLoader(size: 30)
-                    WaveformLoader(size: 60)
-                }
+            HStack(spacing: 22) {
+                indicator(mode: "plain")
+                indicator(mode: "work")
+                indicator(mode: "agent")
             }
         }
         .ignoresSafeArea()
+    }
+
+    private func indicator(mode: String) -> some View {
+        let viewModel = IndicatorViewModel()
+        viewModel.isAgentMode = (mode == "agent")
+        viewModel.isWorkMode = (mode == "work")
+        return RecordingIndicatorView(viewModel: viewModel)
+            .frame(height: 60)
     }
 }

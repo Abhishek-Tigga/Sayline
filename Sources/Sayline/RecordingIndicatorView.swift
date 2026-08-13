@@ -671,56 +671,22 @@ private struct FollowUpButtonStyle: ButtonStyle {
 
 // MARK: - Pill
 
+/// Chooses the wording; `StatusPill` does the drawing.
+///
+/// The pill is one implementation now, shared with the standalone preview,
+/// so the thing being reviewed and the thing that ships cannot diverge.
 private struct PillView: View {
     @ObservedObject var viewModel: IndicatorViewModel
     let surface: SurfaceStyle
 
-    /// Figma's nested 8/2.5 outer + 4 inner padding collapses to one
-    /// combined value (no intermediate background between the two).
-    private static let horizontalPadding: CGFloat = 12
-    private static let verticalPadding: CGFloat = 6.5
-    /// "Pronounced · Slow" from the breathing-options prototype.
-    private static let breatheCycleSeconds: Double = 2.6
-    private static let breatheFloor: Double = 0.3
-
     var body: some View {
-        content
-            .padding(.horizontal, Self.horizontalPadding)
-            .padding(.vertical, Self.verticalPadding)
-            .surfaceBackground(surface, cornerRadius: PillStyle.cornerRadius)
-            // BorderBeamKit on both modes: agent gets .sm/.ocean at full
-            // strength; plain dictation uses the pulse family's inward
-            // variant (.pulseInner, not .pulseOutside — the outward bloom
-            // read badly) at .mono/40%, so the two states stay distinct.
-            .borderBeam(
-                viewModel.isAgentMode ? .sm : .pulseInner,
-                colorVariant: viewModel.isAgentMode ? .ocean
-                    : viewModel.isWorkMode ? .ocean : .mono,
-                active: true,
-                borderRadius: Double(PillStyle.cornerRadius),
-                strength: viewModel.isAgentMode ? 1.0 : 0.4
-            )
+        StatusPill(text: label, surface: surface)
     }
 
-    /// TimelineView rather than `@State` + `withAnimation` on purpose: an
-    /// explicit transaction here was found live to bleed into the Liquid
-    /// Glass material, fading the whole pill toward transparent. Glass
-    /// reacts to any animation passing through its part of the tree, not
-    /// just properties it is bound to.
-    private var content: some View {
-        HStack(spacing: 6) {
-            ProcessingDotsIcon(rotated: viewModel.isAgentMode)
-            TimelineView(.animation) { timeline in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let phase = (sin(t * 2 * .pi / Self.breatheCycleSeconds) + 1) / 2
-                let opacity = 1.0 - phase * (1.0 - Self.breatheFloor)
-                Text(viewModel.isAgentMode ? "Agent Listening"
-                     : viewModel.isWorkMode ? "Work Listening" : "Listening")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(PillStyle.foreground)
-                    .opacity(opacity)
-            }
-        }
+    private var label: String {
+        if viewModel.isAgentMode { return "Agent Listening" }
+        if viewModel.isWorkMode { return "Work Listening" }
+        return "Listening"
     }
 }
 
@@ -747,12 +713,39 @@ private struct BackdropBlur: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-private extension View {
+extension View {
     /// One place for the container treatment so the pill and the speech
     /// box can't drift apart, and so the comparison only has to vary the
     /// style passed in.
+    ///
+    /// Internal rather than private since 2026-08-14: `StatusPill` lives in
+    /// its own file and must use this rather than carry its own copy. The
+    /// Figma had drifted apart on exactly these values — the speech boxes
+    /// had wandered to `#0F0F0F` with a `#525252` stroke while the pill
+    /// stayed `#141414`/`#666666` — and duplicating the treatment in code
+    /// is how that happens again.
+    ///
+    /// Stroke and drop shadow were added here at the same time, from the
+    /// settled spec in `DESIGN-pill-ui.md`. They apply to every caller:
+    /// pill, speech box, notice, setup and follow-up. That is deliberate —
+    /// they are one family of floating surfaces and the rule is written
+    /// for the family.
     @ViewBuilder
     func surfaceBackground(_ style: SurfaceStyle, cornerRadius: CGFloat) -> some View {
+        surfaceFill(style, cornerRadius: cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)
+                        .opacity(0.25), lineWidth: 1)
+            )
+            // #616161 at 25%, x0 y1 blur4. SwiftUI's radius is roughly half
+            // a CSS blur, hence 2.
+            .shadow(color: Color(red: 0x61 / 255, green: 0x61 / 255, blue: 0x61 / 255)
+                .opacity(0.25), radius: 2, x: 0, y: 1)
+    }
+
+    @ViewBuilder
+    private func surfaceFill(_ style: SurfaceStyle, cornerRadius: CGFloat) -> some View {
         switch style {
         case .liquidGlass(let tint):
             if #available(macOS 26.0, *) {
@@ -777,49 +770,5 @@ private extension View {
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             )
         }
-    }
-}
-
-/// Four static dots, one of which dips to near-invisible at a time,
-/// cycling clockwise (top-left -> top-right -> bottom-right ->
-/// bottom-left) — confirmed order after an earlier HTML prototype got it
-/// wrong (CSS grid auto-placement fills row-by-row, not the corner order
-/// its own code comment claimed). Built with explicit VStack/HStack
-/// nesting instead of a grid specifically to avoid that same class of
-/// auto-placement ambiguity.
-private struct ProcessingDotsIcon: View {
-    var rotated: Bool
-
-    private static let dotSize: CGFloat = 4
-    private static let gap: CGFloat = 2
-    private static let stepInterval: TimeInterval = 0.2 // 800ms loop / 4 steps
-    private static let dimOpacity: Double = 0.06
-
-    /// 0 = top-left, 1 = top-right, 2 = bottom-right, 3 = bottom-left.
-    @State private var dimIndex = 0
-
-    var body: some View {
-        VStack(spacing: Self.gap) {
-            HStack(spacing: Self.gap) {
-                dot(0) // top-left
-                dot(1) // top-right
-            }
-            HStack(spacing: Self.gap) {
-                dot(3) // bottom-left
-                dot(2) // bottom-right
-            }
-        }
-        .frame(width: 12, height: 12)
-        .rotationEffect(.degrees(rotated ? 45 : 0))
-        .onReceive(Timer.publish(every: Self.stepInterval, on: .main, in: .common).autoconnect()) { _ in
-            dimIndex = (dimIndex + 1) % 4
-        }
-    }
-
-    private func dot(_ index: Int) -> some View {
-        Circle()
-            .fill(PillStyle.foreground)
-            .frame(width: Self.dotSize, height: Self.dotSize)
-            .opacity(dimIndex == index ? Self.dimOpacity : 1.0)
     }
 }
