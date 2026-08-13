@@ -692,16 +692,11 @@ private struct PillView: View {
 
 // MARK: - Glass
 
-/// A plain blurred backdrop, used by the `.flat` surface.
+/// The blurred backdrop, used by the `.flat` surface.
 ///
-/// KNOWN APPROXIMATION: Figma specifies a 4px background blur, and there
-/// is no macOS API that takes a backdrop-blur radius the way CSS
-/// `backdrop-filter: blur(4px)` does. `NSVisualEffectView` is the only
-/// real backdrop blur available, and its radius is fixed by the material
-/// rather than settable. `.hudWindow` is the closest match for a small
-/// overlay. In practice the gap is small here: the fill sits at 75%
-/// opacity, so only a quarter of the backdrop shows through at all.
-/// The blurred backdrop.
+/// KNOWN APPROXIMATION, and the sources disagree about the target: the
+/// rule card says 4px, Figma node 23:1234 says 8px. Neither is reachable,
+/// so the disagreement is moot until it stops being.
 ///
 /// `backdrop-filter: blur(8px)` cannot be implemented directly. It blurs
 /// the pixels behind the window, which belong to other apps and the
@@ -715,7 +710,17 @@ private struct PillView: View {
 /// it is not offered. The material is therefore chosen by eye against the
 /// design — see `--preview-pill`, which renders the candidates together.
 struct BackdropBlur: NSViewRepresentable {
-    var material: NSVisualEffectView.Material = .hudWindow
+    /// `.underWindowBackground`, chosen 2026-08-14 by rendering six
+    /// candidates side by side over a light-to-dark gradient.
+    ///
+    /// The comparison showed the materials differ in tint and darkness far
+    /// more than in blur radius — each carries its own vibrancy, not just a
+    /// blur — so the choice was "which reads closest to a flat #141414 at
+    /// 75%", not "which is 8px". This one is the darkest and lets least
+    /// desktop colour through, so the specified fill dominates rather than
+    /// the wallpaper. `.hudWindow`, the previous default, was the lightest
+    /// and tinted the pill with whatever sat behind it.
+    var material: NSVisualEffectView.Material = .underWindowBackground
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
@@ -749,7 +754,7 @@ extension View {
     /// for the family.
     @ViewBuilder
     func surfaceBackground(_ style: SurfaceStyle, cornerRadius: CGFloat,
-                           material: NSVisualEffectView.Material = .hudWindow) -> some View {
+                           material: NSVisualEffectView.Material = .underWindowBackground) -> some View {
         surfaceFill(style, cornerRadius: cornerRadius, material: material)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)

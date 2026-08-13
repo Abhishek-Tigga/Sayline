@@ -21,7 +21,7 @@ struct StatusPill: View {
     /// Only varied by the blur comparison in `--preview-pill`. The blur
     /// radius is not settable on NSVisualEffectView, so the material is
     /// chosen by eye instead — see `BackdropBlur`.
-    var material: NSVisualEffectView.Material = .hudWindow
+    var material: NSVisualEffectView.Material = .underWindowBackground
     /// 16 × 8, matching Figma node 23:1234 (`padding: 8px 16px`).
     ///
     /// Took a detour to get here: the earlier node said 16 × 10, 10 × 8 was
@@ -99,12 +99,12 @@ private struct PillPreview: View {
     /// asked for directly, so the job is to pick whichever material reads
     /// closest to it. Named so the winner can be identified on sight.
     private static let candidates: [(String, NSVisualEffectView.Material)] = [
-        ("hudWindow (current)", .hudWindow),
+        ("hudWindow (previous)", .hudWindow),
         ("popover", .popover),
         ("menu", .menu),
         ("sidebar", .sidebar),
         ("fullScreenUI", .fullScreenUI),
-        ("underWindowBackground", .underWindowBackground),
+        ("underWindowBackground (SHIPPING)", .underWindowBackground),
     ]
 
     var body: some View {
