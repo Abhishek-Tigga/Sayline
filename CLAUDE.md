@@ -195,6 +195,15 @@ answered by talking — build the disposable version and look at it.
 
 ## Open problems
 
+- **The event tap is sometimes disabled by the system with
+  `kCGEventTapDisabledByUserInput`, cause unknown** (2026-08-13). Distinct
+  from the CoreAudio deadlock fixed the day before: the main thread was
+  healthy throughout and the disable code differs. Our circuit breaker
+  then re-entered itself and turned it into a 25,000-iteration freeze —
+  that loop is fixed; the trigger is not. Full entry and a first-response
+  checklist in `review/LEDGER.md` under "OPEN · Why macOS disabled the
+  event tap".
+
 - **The Mac freezes during use, cause unknown. Four incidents, three
   theories, all disproven** — event-tap starvation, an `NSPanel` leak (14
   created, 14 deallocated), and Secure Input contention. The fourth

@@ -3428,3 +3428,68 @@ Suite 85 cases green. Smoke test 304/87/115/117/93 ms, PASS.
 hold. The freeze fix cannot be proven without reproducing a condition
 whose trigger is still unknown — what is proven is that the response
 cannot loop.
+
+---
+
+## OPEN · Why macOS disabled the event tap 25,000 times (Opus, 2026-08-13)
+
+Recorded at the user's request as a later investigation. **The loop is
+fixed and committed** (`24177b4`); what remains unexplained is what
+started it. Symptom fixed, cause open.
+
+### What is known
+
+- Disable code **4294967295 = `kCGEventTapDisabledByUserInput`**, not the
+  `...ByTimeout` (4294967294) that three earlier freeze investigations
+  chased. Different code, likely a different mechanism.
+- `main ok 0.2–0.9s` on every single line. **The main thread was
+  healthy.** This is not the CoreAudio deadlock of 2026-08-12, and none
+  of the three theories in `CLAUDE.md`'s open-problems section fit.
+- The tap thread was alive and processing — it logged continuously.
+- It recurred at a rate of roughly **one disable per millisecond**, which
+  is faster than any user-input event stream and points at us being
+  re-enabled and re-disabled rather than at real input.
+
+### What our bug contributed, and what it did not
+
+Our `noteDisable()` re-entered itself from inside the callback and never
+checked whether the breaker had tripped — that turned N disables into
+25,000 and froze the machine. **It cannot explain the first one.**
+Something disabled the tap before any of our code misbehaved.
+
+### The evidence is gone, and that is also a bug
+
+`sayline.previous.log` begins mid-storm with the counter already at
+**18,032**, and the current log begins at 21:57:34 — also mid-storm. The
+2 MB cap plus one rotation was blown through twice by our own logging, so
+the lines showing what happened *before* the first disable have been
+overwritten.
+
+**A flood that destroys its own cause is a logging bug.** Worth fixing
+before the next occurrence, and cheap: collapse consecutive identical log
+lines into a count (`… ×2,431`), which would have preserved hours of
+context in the same 2 MB and made the storm more legible, not less.
+
+### For whoever picks this up
+
+Reproduce first, if it can be reproduced at all — the trigger is unknown
+and the app has run for hours since without recurrence. When it happens:
+
+1. `~/Library/Logs/Sayline/sayline.log` **immediately**, before the app
+   is relaunched — the relaunch is what rotated the evidence away.
+2. `IsSecureEventInputEnabled()` at that moment; the existing wait
+   logs `secure input is on` and **no such line appears anywhere in the
+   surviving logs**, so Secure Input is not implicated this time.
+3. Which app had focus, and whether a password field or Screen Sharing
+   was involved — `kCGEventTapDisabledByUserInput` is documented as
+   firing when the system decides another consumer owns input.
+4. `log stream --predicate 'process == "WindowServer"'` alongside, which
+   no investigation here has yet captured.
+
+### Related, unchanged
+
+`CLAUDE.md` still lists the freeze as an open problem with three
+disproven theories. This is a **fourth** distinct signature — different
+disable code, healthy main thread — and should not be merged with the
+CoreAudio deadlock, which was separately explained and fixed on
+2026-08-12.
