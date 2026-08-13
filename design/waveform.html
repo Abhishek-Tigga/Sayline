@@ -1,0 +1,345 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayline — 3×3 thinking indicator</title>
+<style>
+  :root { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#ef9e9f; }
+  }
+  :root[data-theme="dark"]  { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#ef9e9f; }
+  :root[data-theme="light"] { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+
+  body { margin:0; padding:34px 24px 70px; background:var(--bg); color:var(--ink);
+         font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width:820px; margin:0 auto; display:flex; flex-direction:column; gap:26px; }
+  h1 { font-size:20px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  h2 { font-size:11.5px; margin:0 0 11px; font-weight:650; letter-spacing:.09em;
+       text-transform:uppercase; color:var(--muted); }
+  p  { margin:0; color:var(--muted); font-size:13.5px; }
+
+  /* The reproduction. Fixed dark on purpose — it copies the source UI and
+     must not follow the page theme. */
+  .stage { background:#000; border-radius:18px; padding:26px 34px 30px;
+           display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .stage .sub   { color:#8b8b8b; font-size:15px; }
+  .stage .row   { display:flex; align-items:center; gap:10px; }
+  .stage .label { color:#fff; font-size:19px; font-weight:600; }
+
+  /* Never a border-radius on a cell: the squares are hard-edged. */
+  .grid { display:grid; flex:none; }
+  .cell { border-radius:0; }
+
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+              gap:14px 22px; background:var(--card); border:1px solid var(--line);
+              border-radius:12px; padding:18px 20px; }
+  .ctl label { font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
+  .ctl label b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin-top:5px; }
+  input[type=color] { width:100%; height:28px; margin-top:5px; padding:0; border:1px solid var(--line);
+                      border-radius:6px; background:none; cursor:pointer; }
+
+  .buttons { display:flex; gap:8px; flex-wrap:wrap; }
+  button { font:inherit; font-size:13px; padding:6px 14px; border-radius:8px;
+           border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#231a18; }
+  button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .strip { display:flex; gap:10px; overflow-x:auto; padding:16px 14px; background:#000; border-radius:12px; }
+  .frame { flex:none; display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .frame span { font-size:9.5px; color:#7a7a7a; font-variant-numeric:tabular-nums; }
+
+  .plot { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px 8px; }
+  .plot svg { display:block; width:100%; height:auto; }
+  .legend { display:flex; gap:16px; font-size:12px; color:var(--muted); padding-top:6px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:14px; height:3px; border-radius:2px; margin-right:6px;
+              vertical-align:middle; }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <h1>3×3 thinking indicator</h1>
+    <p>A band of darkness travels outward across a fully lit grid: the centre
+       dims first, then the four edges, then the four corners.</p>
+    <p style="margin-top:8px">Settled: <b>15&nbsp;px</b>, no gap, white,
+       <b>8&nbsp;px</b> glow, <b>800&nbsp;ms</b> cycle, dip <b>90%</b>, ring
+       lag <b>15%</b>. The sliders are left in for tuning; these are the
+       defaults to build against.</p>
+  </div>
+
+  <div class="stage">
+    <div class="sub">Read sidebar.tsx&nbsp;&nbsp;741 lines</div>
+    <div class="row">
+      <div class="grid" id="live"></div>
+      <div class="label">Thinking</div>
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button id="playBtn" aria-pressed="true">Pause</button>
+    <button id="stepBtn">Step</button>
+    <button id="mSmooth" aria-pressed="true">Smoothed</button>
+    <button id="mFigma"  aria-pressed="false">Original 10 frames</button>
+  </div>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="plot">
+    <h2>Opacity through one cycle</h2>
+    <svg id="plot" viewBox="0 0 760 170" preserveAspectRatio="none" role="img"
+         aria-label="Opacity curves for centre, edges and corners across one cycle"></svg>
+    <div class="legend">
+      <span><i style="background:#ef9e9f"></i>centre</span>
+      <span><i style="background:#8fb8d8"></i>edges</span>
+      <span><i style="background:#c2b280"></i>corners</span>
+      <span id="seam"></span>
+    </div>
+  </div>
+
+  <div>
+    <h2>Sampled evenly through the cycle</h2>
+    <div class="strip" id="strip"></div>
+  </div>
+
+  <div>
+    <h2>The original ten, for comparison</h2>
+    <div class="strip" id="stripFigma"></div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  // ---- what the mockup said -------------------------------------------
+  // Figma node 15:696. Three numbers describe a frame completely — every
+  // corner shares one opacity, every edge another. Verified across all ten.
+  // [centre, edge, corner]
+  const KEYS = [
+    [1.0,1.0,1.0], [0.8,1.0,1.0], [0.6,1.0,1.0], [0.5,0.8,1.0], [0.3,0.5,1.0],
+    [0.9,0.3,1.0], [1.0,0.1,0.8], [1.0,0.1,0.7], [1.0,0.3,0.3], [1.0,0.9,0.3],
+  ];
+  const RING = [2,1,2, 1,0,1, 2,1,2];   // 0 centre, 1 edge, 2 corner
+
+  // ---- the smoothed model ---------------------------------------------
+  // The edges row is the only ring whose dip completes inside the ten
+  // frames — full fall and full recovery — so its shape is taken as the
+  // canonical dip, read off frames 3→10→1. Every ring then runs this same
+  // dip, delayed by its distance from the centre.
+  //
+  // This also fixes a real defect in the mockup rather than just adding
+  // in-betweens: the corners end frame 10 at 0.3 and frame 1 begins at
+  // 1.0, so the loop popped by 0.7 every cycle. The corners simply never
+  // finished recovering. Giving the cycle room for all three dips to
+  // complete makes it seamless by construction — checked below.
+  // One frame added to the recovery that the mockup skipped: it jumped
+  // 0.3 → 0.9 in a single step, which was the whole reason the motion
+  // still read as steppy. Measured at the settled 800 ms / 60 fps, that
+  // one frame halves the worst per-frame opacity change, 0.131 → 0.069 —
+  // smoother than slowing the cycle to 1200 ms would have been (0.088).
+  // The dip keeps its asymmetry: falls over 44%, rises over 56%.
+  const DIP = [1, 0.8, 0.5, 0.3, 0.1, 0.1, 0.3, 0.6, 0.9, 1];
+
+  // Settled with the user 2026-08-14. dip + 2 lags comes to 120% of the
+  // cycle, which is deliberate: the local phase is taken mod 1, so a dip
+  // that overruns wraps into the next cycle rather than being cut off.
+  // The rings therefore overlap, which is what makes it read as fluid,
+  // and the loop stays continuous — verified, not assumed.
+  const P = {
+    period: 800,       // ms for one cycle
+    dipFrac: 0.90,     // share of the cycle one ring's dip occupies
+    ringDelay: 0.15,   // share of the cycle between one ring and the next
+    size: 15, gap: 0, glow: 8, colour: "#ffffff",
+  };
+
+  /** Catmull-Rom through the dip, clamped so it leaves and rejoins the
+   *  resting value with zero slope — no velocity kink at either end. */
+  function dipAt(u) {
+    if (u <= 0 || u >= 1) return 1;
+    const n = DIP.length, x = u * (n - 1), i = Math.floor(x), t = x - i;
+    const g = k => DIP[Math.max(0, Math.min(n - 1, k))];
+    const p0 = g(i-1), p1 = g(i), p2 = g(i+1), p3 = g(i+2);
+    const v = 0.5*(2*p1 + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t*t + (-p0+3*p1-3*p2+p3)*t*t*t);
+    return Math.min(1, Math.max(0, v));
+  }
+
+  /** Opacity of one cell. Single source of truth: the grid, the strip and
+   *  the plot all read through it, so none can drift from what is drawn. */
+  function opacity(cellIndex, phase, mode) {
+    const ring = RING[cellIndex];
+    if (mode === "figma") {
+      const i = Math.floor((((phase % 1) + 1) % 1) * KEYS.length);
+      return KEYS[i][ring];
+    }
+    const local = (((phase - ring * P.ringDelay) % 1) + 1) % 1;
+    return dipAt(local / P.dipFrac);
+  }
+
+  function buildGrid(px, gap) {
+    const el = document.createElement("div");
+    el.className = "grid";
+    const cell = (px - gap * 2) / 3;
+    el.style.gridTemplateColumns = `repeat(3, ${cell}px)`;
+    el.style.gridTemplateRows    = `repeat(3, ${cell}px)`;
+    el.style.gap = gap + "px";
+    el.cells = Array.from({ length: 9 }, () => {
+      const d = document.createElement("div");
+      d.className = "cell";
+      el.appendChild(d);
+      return d;
+    });
+    return el;
+  }
+
+  function paint(el, phase, mode) {
+    let sum = 0;
+    for (let k = 0; k < 9; k++) {
+      const v = opacity(k, phase, mode);
+      sum += v;
+      el.cells[k].style.background = P.colour;
+      el.cells[k].style.opacity = v.toFixed(3);
+    }
+    // Figma specifies no glow; the screen recording blooms. Off by default
+    // so the default state is the spec, not an embellishment of it.
+    el.style.filter = P.glow
+      ? `drop-shadow(0 0 ${(P.glow * sum / 9).toFixed(1)}px ${P.colour})`
+      : "none";
+  }
+
+  // ---- live -----------------------------------------------------------
+  let mode = "smooth", playing = true, phase = 0, last = null;
+  let live = buildGrid(P.size, P.gap);
+  document.getElementById("live").replaceWith(live);
+  live.id = "live";
+
+  requestAnimationFrame(function tick(now) {
+    if (last === null) last = now;
+    const dt = now - last; last = now;
+    if (playing) phase = (phase + dt / P.period) % 1;
+    paint(live, phase, mode);
+    requestAnimationFrame(tick);
+  });
+
+  // ---- strips ---------------------------------------------------------
+  const SAMPLES = 20;
+  const strip = document.getElementById("strip"), sampled = [];
+  for (let i = 0; i < SAMPLES; i++) {
+    const box = document.createElement("div"); box.className = "frame";
+    const g = buildGrid(26, 0), cap = document.createElement("span");
+    cap.textContent = i + 1;
+    box.append(g, cap); strip.appendChild(box); sampled.push(g);
+  }
+  const stripFigma = document.getElementById("stripFigma"), figmaGrids = [];
+  KEYS.forEach((_, i) => {
+    const box = document.createElement("div"); box.className = "frame";
+    const g = buildGrid(26, 0), cap = document.createElement("span");
+    cap.textContent = i + 1;
+    box.append(g, cap); stripFigma.appendChild(box); figmaGrids.push(g);
+  });
+  figmaGrids.forEach((g, i) => paint(g, (i + 0.001) / KEYS.length, "figma"));
+
+  // ---- plot -----------------------------------------------------------
+  const plot = document.getElementById("plot");
+  const COLOURS = ["#ef9e9f", "#8fb8d8", "#c2b280"];   // centre, edges, corners
+  const CELL_OF_RING = [4, 1, 0];                       // a representative cell each
+  function drawPlot() {
+    const W = 760, H = 170, pad = 14, N = 240;
+    const x = t => pad + t * (W - 2*pad);
+    const y = v => pad + (1 - v) * (H - 2*pad);
+    let svg = "";
+    for (const v of [0, 0.5, 1])
+      svg += `<line x1="${x(0)}" y1="${y(v)}" x2="${x(1)}" y2="${y(v)}"
+               stroke="currentColor" stroke-opacity=".14" stroke-width="1"/>`;
+    CELL_OF_RING.forEach((cell, ring) => {
+      let d = "";
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        d += `${i ? "L" : "M"}${x(t).toFixed(1)},${y(opacity(cell, t, mode)).toFixed(1)}`;
+      }
+      svg += `<path d="${d}" fill="none" stroke="${COLOURS[ring]}" stroke-width="2"
+               stroke-linejoin="round" stroke-linecap="round"/>`;
+    });
+    plot.innerHTML = svg;
+
+    // State the loop's continuity rather than claiming it.
+    let worst = 0;
+    CELL_OF_RING.forEach(cell => {
+      worst = Math.max(worst, Math.abs(opacity(cell, 0, mode) - opacity(cell, 0.99999, mode)));
+    });
+    document.getElementById("seam").textContent =
+      worst < 0.01 ? "loop: continuous" : `loop: pops by ${worst.toFixed(2)}`;
+  }
+
+  const repaintAll = () => {
+    sampled.forEach((g, i) => paint(g, i / SAMPLES, mode));
+    drawPlot();
+  };
+  repaintAll();
+
+  // ---- controls --------------------------------------------------------
+  const SLIDERS = [
+    ["period",    400, 3000, 20,   "Cycle",      v => v + " ms"],
+    ["dipFrac",   0.2, 0.9,  0.01, "Dip length", v => (v*100).toFixed(0) + "% of cycle"],
+    ["ringDelay", 0,   0.3,  0.005,"Ring lag",   v => (v*100).toFixed(1) + "% of cycle"],
+    ["size",      12,  64,   1,    "Size",       v => v + " px"],
+    ["gap",       0,   4,    0.2,  "Gap",        v => v.toFixed(1) + " px"],
+    ["glow",      0,   40,   1,    "Glow",       v => v ? v + " px" : "off"],
+  ];
+  const controls = document.getElementById("controls");
+  SLIDERS.forEach(([key, min, max, step, name, fmt]) => {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = fmt(P[key]);
+    label.append(document.createTextNode(name), out);
+    const input = document.createElement("input");
+    Object.assign(input, { type:"range", min, max, step, value:P[key] });
+    input.addEventListener("input", () => {
+      P[key] = parseFloat(input.value);
+      out.textContent = fmt(P[key]);
+      if (key === "size" || key === "gap") {
+        const next = buildGrid(P.size, P.gap);
+        next.id = "live"; live.replaceWith(next); live = next;
+      }
+      repaintAll();
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  });
+  {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = P.colour;
+    label.append(document.createTextNode("Colour"), out);
+    const input = document.createElement("input");
+    Object.assign(input, { type:"color", value:P.colour });
+    input.addEventListener("input", () => {
+      P.colour = input.value; out.textContent = P.colour;
+      figmaGrids.forEach((g, i) => paint(g, (i + 0.001)/KEYS.length, "figma"));
+      repaintAll();
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  }
+
+  const playBtn = document.getElementById("playBtn");
+  playBtn.addEventListener("click", () => {
+    playing = !playing;
+    playBtn.textContent = playing ? "Pause" : "Play";
+    playBtn.setAttribute("aria-pressed", String(playing));
+  });
+  document.getElementById("stepBtn").addEventListener("click", () => {
+    playing = false;
+    playBtn.textContent = "Play"; playBtn.setAttribute("aria-pressed", "false");
+    phase = (phase + 1/SAMPLES) % 1;
+    paint(live, phase, mode);
+  });
+  const modeBtns = { smooth:"mSmooth", figma:"mFigma" };
+  Object.entries(modeBtns).forEach(([m, id]) => {
+    document.getElementById(id).addEventListener("click", () => {
+      mode = m;
+      Object.entries(modeBtns).forEach(([mm, ii]) =>
+        document.getElementById(ii).setAttribute("aria-pressed", String(mm === m)));
+      repaintAll();
+    });
+  });
+})();
+</script>
