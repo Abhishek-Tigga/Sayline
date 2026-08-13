@@ -18,6 +18,10 @@ struct StatusPill: View {
     /// Defaults to what ships, so the preview needs no argument and the
     /// indicator can still pass the parked glass style through.
     var surface: SurfaceStyle = .shipping
+    /// Only varied by the blur comparison in `--preview-pill`. The blur
+    /// radius is not settable on NSVisualEffectView, so the material is
+    /// chosen by eye instead — see `BackdropBlur`.
+    var material: NSVisualEffectView.Material = .hudWindow
     /// 16 × 8, matching Figma node 23:1234 (`padding: 8px 16px`).
     ///
     /// Took a detour to get here: the earlier node said 16 × 10, 10 × 8 was
@@ -30,13 +34,13 @@ struct StatusPill: View {
         HStack(spacing: Self.gap) {
             WaveformLoader()
             Text(text)
-                .font(.system(size: 16, weight: .regular))
+                .font(Typeface.ui(16))
                 .foregroundStyle(PillStyle.foreground)
                 .fixedSize()          // never wrap; the pill grows instead
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
-        .surfaceBackground(surface, cornerRadius: PillStyle.cornerRadius)
+        .surfaceBackground(surface, cornerRadius: PillStyle.cornerRadius, material: material)
     }
 
     // MARK: - The shared surface
@@ -64,7 +68,7 @@ final class PillPreviewWindowController {
         // with a fixed window over size extrema is what crashed Settings
         // on 2026-08-12.
         hosting.sizingOptions = []
-        hosting.frame = NSRect(x: 0, y: 0, width: 520, height: 300)
+        hosting.frame = NSRect(x: 0, y: 0, width: 620, height: 420)
 
         let window = NSWindow(
             contentRect: hosting.frame,
@@ -86,49 +90,67 @@ final class PillPreviewWindowController {
 /// would not exercise `PillView`'s label logic or the shared
 /// `surfaceBackground`, which are the parts that were just rewired. This
 /// goes through the same view the floating window uses.
+/// Renders the REAL indicator plus the blur-material comparison.
+///
+/// Showing `StatusPill` alone would prove only that the pill draws; this
+/// goes through the same view the floating window uses.
 private struct PillPreview: View {
+    /// Candidates for the backdrop. `backdrop-filter: blur(8px)` cannot be
+    /// asked for directly, so the job is to pick whichever material reads
+    /// closest to it. Named so the winner can be identified on sight.
+    private static let candidates: [(String, NSVisualEffectView.Material)] = [
+        ("hudWindow (current)", .hudWindow),
+        ("popover", .popover),
+        ("menu", .menu),
+        ("sidebar", .sidebar),
+        ("fullScreenUI", .fullScreenUI),
+        ("underWindowBackground", .underWindowBackground),
+    ]
+
     var body: some View {
         ZStack {
-            // Something for the blur and the faint stroke to sit against —
-            // both are invisible on a flat backdrop, and a preview that
-            // hides them is not showing the design.
-            // Runs from near-white to near-black on purpose. A drop shadow
-            // meant to darken has to be judged at both ends: over light
-            // content it should be visible, and over dark content it must
-            // not turn into a pale halo.
+            // Near-white to near-black on purpose: a blurred backdrop and a
+            // darkening shadow both have to be judged at each end.
             LinearGradient(colors: [Color(white: 0.95), Color(white: 0.04)],
                            startPoint: .leading, endPoint: .trailing)
-            HStack(spacing: 22) {
-                indicator(mode: "plain")
-                indicator(mode: "work")
-                indicator(mode: "agent")
+            VStack(spacing: 18) {
+                HStack(spacing: 20) {
+                    RecordingIndicatorView(viewModel: model(agent: false, work: false))
+                        .frame(height: 40)
+                    RecordingIndicatorView(viewModel: model(agent: false, work: true))
+                        .frame(height: 40)
+                    RecordingIndicatorView(viewModel: model(agent: true, work: false))
+                        .frame(height: 40)
+                }
+                Divider().opacity(0.4)
+                ForEach(Array(Self.candidates.enumerated()), id: \.offset) { _, candidate in
+                    HStack(spacing: 12) {
+                        Text(candidate.0)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black, radius: 2)
+                            .frame(width: 150, alignment: .trailing)
+                        StatusPill(text: "Agent Listening", material: candidate.1)
+                            .overlay(GeometryReader { geometry in
+                                Text("\(Int(geometry.size.width.rounded()))×\(Int(geometry.size.height.rounded()))")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .padding(.horizontal, 3)
+                                    .background(.yellow)
+                                    .offset(x: geometry.size.width + 6, y: 8)
+                            })
+                    }
+                }
             }
+            .padding(20)
         }
         .ignoresSafeArea()
     }
 
-    private func indicator(mode: String) -> some View {
+    private func model(agent: Bool, work: Bool) -> IndicatorViewModel {
         let viewModel = IndicatorViewModel()
-        viewModel.isAgentMode = (mode == "agent")
-        viewModel.isWorkMode = (mode == "work")
-        return VStack(spacing: 6) {
-            RecordingIndicatorView(viewModel: viewModel)
-                .frame(height: 44)
-            // Measured, not asserted: Figma gives the agent pill as
-            // 175 x 37, and a screenshot cannot be trusted to a point.
-            StatusPill(text: label(mode))
-                .overlay(GeometryReader { geometry in
-                    Text("\(Int(geometry.size.width.rounded()))×\(Int(geometry.size.height.rounded()))")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 3)
-                        .background(.yellow)
-                        .offset(y: geometry.size.height + 2)
-                })
-        }
-    }
-
-    private func label(_ mode: String) -> String {
-        mode == "agent" ? "Agent Listening" : mode == "work" ? "Work Listening" : "Listening"
+        viewModel.isAgentMode = agent
+        viewModel.isWorkMode = work
+        return viewModel
     }
 }

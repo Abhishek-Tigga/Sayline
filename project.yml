@@ -13,6 +13,12 @@ targets:
     platform: macOS
     sources:
       - Sources/Sayline
+      # Bundled so the app does not depend on Inter being installed — it
+      # is not, on any machine tested. SIL Open Font License 1.1, which
+      # permits redistribution in a commercial app; OFL.txt ships beside
+      # the font as that licence requires.
+      - path: Resources
+        buildPhase: resources
     dependencies:
       - package: ArgmaxOSS
         product: WhisperKit
@@ -25,6 +31,10 @@ targets:
         # hardcoded to 1.0/1 while MARKETING_VERSION and
         # CURRENT_PROJECT_VERSION sat unused. The version in the log line
         # is the quickest way to tell whether a build actually took.
+        # Registers every font in Contents/Resources at launch. Without
+        # this the .ttf ships but is never loaded, and Font.custom falls
+        # back to the system face silently.
+        ATSApplicationFontsPath: "."
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSUIElement: true

@@ -701,16 +701,33 @@ private struct PillView: View {
 /// rather than settable. `.hudWindow` is the closest match for a small
 /// overlay. In practice the gap is small here: the fill sits at 75%
 /// opacity, so only a quarter of the backdrop shows through at all.
-private struct BackdropBlur: NSViewRepresentable {
+/// The blurred backdrop.
+///
+/// `backdrop-filter: blur(8px)` cannot be implemented directly. It blurs
+/// the pixels behind the window, which belong to other apps and the
+/// WindowServer, and an app cannot read them without Screen Recording
+/// permission. NSVisualEffectView is the sanctioned route precisely
+/// because the app never sees those pixels — the compositor does the blur
+/// on its behalf.
+///
+/// The cost is that the radius is not exposed. A material is a semantic
+/// role and Apple picks its blur, so "8px" is not a setting being missed;
+/// it is not offered. The material is therefore chosen by eye against the
+/// design — see `--preview-pill`, which renders the candidates together.
+struct BackdropBlur: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .hudWindow
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .hudWindow
+        view.material = material
         view.blendingMode = .behindWindow
         view.state = .active
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+    }
 }
 
 extension View {
@@ -731,8 +748,9 @@ extension View {
     /// they are one family of floating surfaces and the rule is written
     /// for the family.
     @ViewBuilder
-    func surfaceBackground(_ style: SurfaceStyle, cornerRadius: CGFloat) -> some View {
-        surfaceFill(style, cornerRadius: cornerRadius)
+    func surfaceBackground(_ style: SurfaceStyle, cornerRadius: CGFloat,
+                           material: NSVisualEffectView.Material = .hudWindow) -> some View {
+        surfaceFill(style, cornerRadius: cornerRadius, material: material)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .strokeBorder(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)
@@ -789,7 +807,8 @@ extension View {
     }
 
     @ViewBuilder
-    private func surfaceFill(_ style: SurfaceStyle, cornerRadius: CGFloat) -> some View {
+    private func surfaceFill(_ style: SurfaceStyle, cornerRadius: CGFloat,
+                             material: NSVisualEffectView.Material) -> some View {
         switch style {
         case .liquidGlass(let tint):
             if #available(macOS 26.0, *) {
@@ -809,7 +828,7 @@ extension View {
 
         case .flat(let fill):
             self.background(
-                BackdropBlur()
+                BackdropBlur(material: material)
                     .overlay(fill)
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             )
