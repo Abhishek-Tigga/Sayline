@@ -2444,3 +2444,143 @@ more dangerous half. Raised before stage 2 because it may change what the
 prompt pins.
 
 **Stage 2 not started.** No model has been called; no money spent.
+
+---
+
+## FACTGUARD · Review (Fable, 2026-08-13)
+
+Answering `review/FABLE-PROMPT-factguard.md`. Read `FactGuard.swift`, the
+34-case suite, and `eval/work-mode/transcripts.json`. Ran nothing beyond
+reading — the suite's own claims are Opus's; my additions below are
+analysis, claimed not verified.
+
+### 1 · The lowercase-names question: B now, and the real C is already on the roadmap
+**Build B** (a capitalized token in the rewrite, not in `notNames`,
+absent case-insensitively from the raw text → `inventedName`). It is
+cheap, deterministic, and catches the worse half — the model putting a
+person in the user's mouth. **Reject the proposed C** (extracting from
+the cleaned transcript): it makes the guard's ground truth another
+model's output, so a cleanup mis-capitalization becomes a pinned "fact"
+— the guard must never be foolable by its sibling. Document the
+remaining hole honestly in the doc comment (A's virtue), because the
+**principled C already exists in the product plan: custom vocabulary.**
+A known-names source (Contacts, calendar attendees) makes lowercase
+"ankit" findable deterministically — and note what the real transcripts
+show: Whisper itself corrupted Meera→"Mira's", Karan→"Karen",
+Designwell→"design well". The guard can never protect a name the
+transcriber already lost, so vocabulary biasing fixes *both* layers.
+That feature just gained a second justification.
+
+### 2 · The three judgement calls: all three right, one needs a fourth
+Position-independent proper nouns: right — (2) makes it safe, exactly as
+argued. Presence-not-capitalization: right. Negation-as-count: right,
+but the implementation only flags a **decrease**. An **increase from
+zero** is the same meaning-reversal in the other direction: raw "I think
+we should ship" → rewrite "I don't think we should ship" passes today.
+Flag `said == 0 && kept > 0`. Full equality is too strict (a faithful
+rewrite can legitimately add a second negation to a sentence that
+already had one), so: decrease always flags, increase flags only from
+zero.
+
+### 3 · Test-set gaps, ranked — what a rewrite could break that 34 cases would not catch
+The user's own ten transcripts contain four live ones:
+1. **Relative time words are unprotected — the sharpest gap.** real-6:
+   "end of next week not this week" pins only negations; a rewrite
+   swapping this-week/next-week passes, and that is a deadline moved a
+   week. real-2's "tomorrow" is equally naked. Add a `relativeTimes`
+   class: today, tomorrow, tonight, this week, next week, morning,
+   afternoon, evening (bigrams matched as phrases).
+2. **Months are in `notNames` and pinned nowhere.** real-2's "March
+   deadline" → "April deadline" passes today. Months are dates, not
+   name-noise: move them to their own pinned class beside days.
+3. **Units and currency.** real-3 "25 megs" → "25 GB" passes; real-8
+   "45,000 rupees" → "45,000 dollars" passes. Pin the unit token
+   adjacent to each number from a small lexicon (percent, megs, MB, GB,
+   rupees, dollars, k, lakh, crore, minutes, hours, days, weeks).
+4. **Fused number suffixes.** real-1's "11ish" extracts nothing — the
+   meeting time is invisible. Tokenize should split trailing letters
+   from leading digits.
+Smaller: "barely/hardly/rarely" are semi-negations real-9 depends on —
+add to the markers; possessives ("Mira's" → pinned as "miras") false-
+positive against a rewrite saying "Mira" — normalize the possessive; and
+**`we'll` in `commitmentPhrases` will storm**: rewrites routinely turn
+"let's do Monday" into "We'll do Monday", which today flags as an
+invented commitment. Keep the first-person-singular list strict, and
+either drop we'll/we-will or add "let's"/"we" as equivalents — stage 2's
+fallback rate will be dominated by this one entry if it ships as is.
+Plus one canary for the documented count limitation: a
+drop-one-add-one-elsewhere negation case in the model eval, to learn
+whether real models ever produce it before engineering for it.
+
+### 4 · Rot: the stopword list, and the rule that keeps it honest
+The list is load-bearing and grew by inspection — that is fine **if**
+the growth rule is written down: every addition lands with the real
+transcript that motivated it as a suite case (already the de-facto
+practice; bless it in the file header). Restructure into typed
+sub-lists (grammar words, contractions, modals, discourse words —
+calendar words *leave*, per gap 2) so a reader can see why each class
+exists. Feed it from production: name-violation fallbacks in the log
+are the future additions, same pattern as the emoji table's miss log.
+
+### On the suite's shape
+Asserting the real-5 false positive is right — a limit held as a test
+is a limit nobody rediscovers as a bug — with one addition: assert the
+*outcome* too (fallback to Clean, cost bounded at wordier text). And
+real-7/real-2 answering "is a count enough for an opinion that is
+entirely negation": yes with the increase-from-zero fix, plus the
+canary; matching individual negations is where dumb code starts doing
+NLP badly, and the design's rejection of that stands.
+
+---
+
+## 2026-08-13 — FactGuard after Fable's review (Opus)
+
+`claimed-fixed`. Every item from the FACTGUARD review acted on. Suite
+**34 → 52 cases**, all passing. Failing cases written first, as before.
+
+**Decision: B built, C rejected as Fable argued.** `inventedName` fires
+when a capitalized token in the rewrite appears nowhere in the raw text.
+Extracting from the *cleaned* transcript was rejected on Fable's
+reasoning, which is better than my own framing of it: it would make the
+guard's ground truth another model's output, so a cleanup
+mis-capitalization would become a pinned "fact" — the guard must not be
+foolable by its sibling. The remaining hole (two lowercase names swapped
+for each other) is documented, not closed, and custom vocabulary is
+recorded as the principled fix.
+
+**Negation now flags both directions.** The count only caught a
+*decrease*; "I think we should ship" → "I don't think we should ship"
+passed. An increase flags only from zero, since a faithful rewrite of an
+already-negative sentence can legitimately add a second.
+
+**Four new fact classes**, each from a real transcript rather than
+imagination: months (`March deadline` → `April` used to pass),
+relative times as phrases (`next week` vs `this week` — a deadline moved
+by a week), units beside numbers (`25 megs` → `25 GB`; `45,000 rupees` →
+`dollars`), and fused tokens split so `11ish` yields 11.
+
+**`we'll` removed from the commitment list.** Fable's call, and it would
+have dominated stage 2's fallback rate: rewrites routinely turn "let's do
+Monday" into "We'll do Monday", which is faithful, not a promise invented.
+`i'll` still fires.
+
+**The same bug, twice, now fixed structurally.** `properNouns` and
+`tokenize` disagreed about apostrophes — first over `I'll`, then over
+`Mira's` (pinned as `miras`, so a rewrite saying `Mira` read as an
+invented name). Both now run through one `normalizeWords`. Recording the
+repeat because the file's own header warns about exactly this and I still
+wrote it twice.
+
+Extraction over the ten real transcripts now: `real-1` gains the 11 from
+"11ish"; `real-8` reads `1, 30, 45000`; `real-9` gains its negation from
+"barely"; `real-10` pins `mira` rather than `miras`.
+
+**Not done from the review, deliberately:** the stopword list is not yet
+restructured into typed sub-lists, and the growth rule is not yet written
+into the file header. Both are hygiene on a list that is now load-bearing
+— next commit, before stage 2, so the eval does not run against a moving
+target. The drop-one-add-one negation canary belongs in the stage 2 set,
+not here.
+
+**Nothing verified by its author.** The suite is mine and passes; no model
+output has been checked against it, and no model has been called.

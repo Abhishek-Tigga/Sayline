@@ -33,12 +33,23 @@ enum FactGuard {
         var days: Set<String> = []
         /// Capitalized words that look like names, lowercased for compare.
         var names: Set<String> = []
+        /// Months are dates, not name-noise. "March deadline" becoming
+        /// "April deadline" moves a quarter and used to pass.
+        var months: Set<String> = []
+        /// "tomorrow", "next week", "this afternoon". A rewrite swapping
+        /// this-week for next-week moves a deadline by a week, and every
+        /// word of it stays plausible.
+        var relativeTimes: Set<String> = []
+        /// The unit beside a number. "25 megs" becoming "25 GB" keeps the
+        /// number and changes the meaning a thousandfold.
+        var units: Set<String> = []
         /// How many negation markers the raw speech carried. A rewrite is
         /// free to rephrase them, not to drop them.
         var negationCount: Int = 0
 
         var isEmpty: Bool {
-            numbers.isEmpty && days.isEmpty && names.isEmpty && negationCount == 0
+            numbers.isEmpty && days.isEmpty && names.isEmpty && months.isEmpty
+                && relativeTimes.isEmpty && units.isEmpty && negationCount == 0
         }
     }
 
@@ -53,6 +64,15 @@ enum FactGuard {
         /// class that silently reverses meaning ("I don't think we should"
         /// becoming "we should").
         case negationLost(said: Int, kept: Int)
+        case monthLost(String)
+        case timeLost(String)
+        case unitLost(String)
+        /// A negation that was NOT said. Reversing meaning by adding one
+        /// is as complete a reversal as dropping one.
+        case negationAdded(said: Int, kept: Int)
+        /// A person the speaker never named. Worse than a dropped name:
+        /// the model put someone in the user's mouth.
+        case inventedName(String)
         /// A commitment the speaker never made. The model must never put
         /// the user on the hook for something.
         case inventedCommitment(String)
@@ -64,6 +84,13 @@ enum FactGuard {
             case .numberLost(let n): return "the number \(n) was dropped"
             case .dayLost(let d): return "the day \(d.capitalized) was dropped"
             case .nameLost(let n): return "the name \(n) was dropped"
+            case .monthLost(let m): return "the month \(m.capitalized) was dropped"
+            case .timeLost(let t): return "\"\(t)\" was dropped or changed"
+            case .unitLost(let u): return "the unit \(u) was changed"
+            case .negationAdded:
+                return "it added a negation that was never spoken, reversing the meaning"
+            case .inventedName(let n):
+                return "it named \(n.capitalized), who was never mentioned"
             case .negationLost(let said, let kept):
                 return "a negation was lost — the speech had \(said), the rewrite has \(kept)"
             case .inventedCommitment(let phrase):
@@ -78,6 +105,11 @@ enum FactGuard {
             case .numberLost: return "number"
             case .dayLost: return "day"
             case .nameLost: return "name"
+            case .monthLost: return "month"
+            case .timeLost: return "relative-time"
+            case .unitLost: return "unit"
+            case .negationAdded: return "negation-added"
+            case .inventedName: return "invented-name"
             case .negationLost: return "negation"
             case .inventedCommitment: return "invented-commitment"
             }
@@ -91,8 +123,11 @@ enum FactGuard {
         let words = tokenize(raw)
 
         facts.numbers = numbers(in: words)
-        facts.days = Set(words.compactMap { dayNames.contains($0) ? $0 : nil })
+        facts.days = Set(words.filter(dayNames.contains))
+        facts.months = Set(words.filter(monthNames.contains))
         facts.names = properNouns(in: raw)
+        facts.units = Set(words.filter(unitWords.contains))
+        facts.relativeTimes = relativeTimes(in: words)
         facts.negationCount = words.filter(negationMarkers.contains).count
         return facts
     }
@@ -111,6 +146,15 @@ enum FactGuard {
         }
         if !facts.names.isEmpty {
             lines.append("names: " + facts.names.sorted().joined(separator: ", "))
+        }
+        if !facts.months.isEmpty {
+            lines.append("months: " + facts.months.sorted().map { $0.capitalized }.joined(separator: ", "))
+        }
+        if !facts.relativeTimes.isEmpty {
+            lines.append("timing: " + facts.relativeTimes.sorted().joined(separator: ", "))
+        }
+        if !facts.units.isEmpty {
+            lines.append("units: " + facts.units.sorted().joined(separator: ", "))
         }
         if facts.negationCount > 0 {
             lines.append("negations: \(facts.negationCount) — do not reverse any statement")
@@ -145,12 +189,36 @@ enum FactGuard {
             violations.append(.nameLost(name))
         }
 
-        // Counted, not matched. Which words carry the negation is the
-        // model's business — "I don't think we should" and "I think we
-        // shouldn't" are both faithful. Losing one entirely is not.
+        let rewriteMonths = Set(words.filter(monthNames.contains))
+        for month in facts.months.sorted() where !rewriteMonths.contains(month) {
+            violations.append(.monthLost(month))
+        }
+        let rewriteUnits = Set(words.filter(unitWords.contains))
+        for unit in facts.units.sorted() where !rewriteUnits.contains(unit) {
+            violations.append(.unitLost(unit))
+        }
+        let rewriteTimes = relativeTimes(in: words)
+        for time in facts.relativeTimes.sorted() where !rewriteTimes.contains(time) {
+            violations.append(.timeLost(time))
+        }
+
+        // Counted, not matched, and in BOTH directions. Which words carry
+        // the negation is the model's business — "I don't think we should"
+        // and "I think we shouldn't" are both faithful. Losing one is not,
+        // and neither is inventing one: "I think we should ship" rewritten
+        // as "I don't think we should ship" reverses the meaning just as
+        // completely, and the first version of this only looked for a
+        // decrease.
+        //
+        // An increase only counts from zero. A faithful rewrite of an
+        // already-negative sentence can legitimately add a second negation
+        // ("I don't think so, and I don't want to argue"), so full
+        // equality would fire constantly.
         let keptNegations = words.filter(negationMarkers.contains).count
         if keptNegations < facts.negationCount {
             violations.append(.negationLost(said: facts.negationCount, kept: keptNegations))
+        } else if facts.negationCount == 0 && keptNegations > 0 {
+            violations.append(.negationAdded(said: 0, kept: keptNegations))
         }
 
         // Invention is checked by the `raw:rewrite:` overload, which has
@@ -162,6 +230,17 @@ enum FactGuard {
     /// rather than only the extracted facts.
     static func verify(raw: String, rewrite: String) -> [Violation] {
         var violations = verify(raw: extract(from: raw), rewrite: rewrite)
+
+        // The inverse check, and the more dangerous half. A name the model
+        // introduced is a person put in the user's mouth; a dropped name
+        // is merely a loss. Compared case-insensitively against the whole
+        // raw text, because the raw may well be lowercase — which is
+        // exactly the case that leaves dropped names unprotected.
+        let rawWords = Set(tokenize(raw))
+        for name in properNouns(in: rewrite).sorted() where !rawWords.contains(name) {
+            violations.append(.inventedName(name))
+        }
+
         let rawLower = raw.lowercased()
         let rewriteLower = rewrite.lowercased()
         for phrase in commitmentPhrases
@@ -177,6 +256,48 @@ enum FactGuard {
 
     // MARK: - Pieces
 
+    private static let monthNames: Set<String> = [
+        "january", "february", "march", "april", "may", "june", "july",
+        "august", "september", "october", "november", "december",
+    ]
+
+    /// Units that change a number's meaning without changing the number.
+    private static let unitWords: Set<String> = [
+        "percent", "megs", "mb", "gb", "kb", "tb", "rupees", "rupee",
+        "dollars", "dollar", "euros", "pounds", "lakh", "lakhs", "crore",
+        "crores", "k", "seconds", "minutes", "mins", "hours", "hrs",
+        "days", "weeks", "months", "years", "am", "pm",
+    ]
+
+    /// Single words and the first word of the two-word phrases below.
+    private static let relativeTimeWords: Set<String> = [
+        "today", "tomorrow", "tonight", "yesterday", "morning",
+        "afternoon", "evening",
+    ]
+
+    /// Matched as phrases, because "this" and "next" alone mean nothing
+    /// and "next week" versus "this week" is a deadline moved.
+    private static let relativeTimePhrases: [[String]] = [
+        ["this", "week"], ["next", "week"], ["last", "week"],
+        ["this", "month"], ["next", "month"],
+        ["this", "morning"], ["this", "afternoon"], ["this", "evening"],
+        ["next", "year"], ["this", "quarter"], ["next", "quarter"],
+    ]
+
+    private static func relativeTimes(in words: [String]) -> Set<String> {
+        var found = Set(words.filter(relativeTimeWords.contains))
+        for phrase in relativeTimePhrases {
+            for index in words.indices where index + phrase.count <= words.count {
+                if Array(words[index..<(index + phrase.count)]) == phrase {
+                    found.insert(phrase.joined(separator: " "))
+                    // The bigram wins: "this week" is the fact, not "week".
+                    found.remove(phrase[1])
+                }
+            }
+        }
+        return found
+    }
+
     private static let dayNames: Set<String> = [
         "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
     ]
@@ -188,11 +309,20 @@ enum FactGuard {
         "dont", "doesnt", "didnt", "wont", "wouldnt", "cant", "cannot",
         "couldnt", "shouldnt", "isnt", "arent", "wasnt", "werent", "havent",
         "hasnt", "hadnt", "aint",
+        // Semi-negations. real-9's whole argument is "barely anyone
+        // clicked it" — losing that word reverses the finding.
+        "barely", "hardly", "rarely", "scarcely", "seldom", "without",
     ]
 
+    /// First person singular only, deliberately.
+    ///
+    /// "we'll" was in this list and would have dominated the fallback
+    /// rate: rewrites routinely turn "let's do Monday" into "We'll do
+    /// Monday", which is a faithful rendering of a group intention, not a
+    /// promise the speaker never made. The cost of flagging it is a
+    /// fallback on good output; the safety gain is nil.
     private static let commitmentPhrases: [String] = [
-        "i'll", "i will", "i promise", "i guarantee", "we'll", "we will",
-        "i commit", "you can count on",
+        "i'll", "i will", "i promise", "i guarantee", "i commit",
     ]
 
     private static let commitmentEquivalents: [String: [String]] = [
@@ -214,7 +344,7 @@ enum FactGuard {
         // Contractions, apostrophe-stripped to match `tokenize`: I'll,
         // I'm, I've, I'd, we'll, they're, you're, it's, that's, don't.
         "ill", "im", "ive", "id", "well", "theyre", "youre", "its",
-        "thats", "dont", "cant", "wont", "lets",
+        "thats", "dont", "cant", "wont", "lets", "let",
         // Everything below was found reading ten real dictations, not by
         // imagination: each was being pinned as a *name*, and a false name
         // costs a fallback on a rewrite that was perfectly good.
@@ -235,12 +365,50 @@ enum FactGuard {
         // invoice amount became two wrong numbers, and the figure that
         // mattered most in the sentence was the one being mangled. Found
         // in real dictation; no invented case had a comma in a number.
-        stripThousandsSeparators(text)
-            .lowercased()
-            .replacingOccurrences(of: "'", with: "")
-            .replacingOccurrences(of: "\u{2019}", with: "")
+        // Possessives go BEFORE apostrophes are stripped, or "Mira's"
+        // becomes "miras" here and "mira" in `properNouns` — and a rewrite
+        // saying "Mira" then reads as an invented name. This file has now
+        // produced that same two-normalizations bug twice; both paths run
+        // through `normalizeWords` for exactly that reason.
+        normalizeWords(stripThousandsSeparators(text))
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-            .map(String.init)
+            .flatMap { splitDigitsFromLetters(String($0)) }
+    }
+
+    /// The one normalization. Everything that compares words uses it, so
+    /// two callers cannot disagree about what a word is.
+    private static func normalizeWords(_ text: String) -> String {
+        text.lowercased()
+            .replacingOccurrences(of: "\u{2019}", with: "'")
+            .replacingOccurrences(of: "'s ", with: " ")
+            .replacingOccurrences(of: "'s.", with: ".")
+            .replacingOccurrences(of: "'s,", with: ",")
+            .replacingOccurrences(of: "'s", with: "s")
+            .replacingOccurrences(of: "'", with: "")
+    }
+
+    /// Splits a token where digits meet letters: "11ish" -> "11", "ish";
+    /// "3pm" -> "3", "pm"; "30th" -> "30", "th".
+    ///
+    /// "Friday morning like 11ish" is how people say times, and the whole
+    /// meeting time was invisible to the guard because the token parsed as
+    /// neither a number nor a word. Splitting also gives units for free —
+    /// "3pm" now yields both the 3 and the pm.
+    private static func splitDigitsFromLetters(_ token: String) -> [String] {
+        var parts: [String] = []
+        var current = ""
+        var currentIsDigit: Bool?
+        for character in token {
+            let isDigit = character.isNumber
+            if let was = currentIsDigit, was != isDigit {
+                parts.append(current)
+                current = ""
+            }
+            current.append(character)
+            currentIsDigit = isDigit
+        }
+        if !current.isEmpty { parts.append(current) }
+        return parts
     }
 
     /// Turns "45,000" into "45000" so a comma cannot split one number
@@ -280,8 +448,15 @@ enum FactGuard {
         // direction that actually hurts.
         var found: Set<String> = []
         for rawWord in text.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }) {
-            let word = rawWord.trimmingCharacters(
+            // The possessive goes before anything else. "Mira's team"
+            // pinned the name as "miras", which no rewrite saying "Mira"
+            // could ever satisfy — a guaranteed false positive on a
+            // faithful rewrite.
+            var word = rawWord.trimmingCharacters(
                 in: CharacterSet(charactersIn: ",;:()[]\"'.!?"))
+            for possessive in ["'s", "\u{2019}s"] where word.lowercased().hasSuffix(possessive) {
+                word = String(word.dropLast(2))
+            }
             guard let first = word.first, first.isUppercase, word.count > 1,
                   word.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "\u{2019}" })
             else { continue }

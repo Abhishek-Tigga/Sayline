@@ -147,6 +147,81 @@ check("ordinal words too",
 let times = FactGuard.extract(from: "move it from 430 to 2 but I told them 245")
 check("times are kept as spoken digits", times.numbers.contains(430) && times.numbers.contains(245))
 
+print("\nFable review, 2026-08-13 — gaps found by reading, ranked by damage")
+
+// B · an invented person is worse than a dropped one. The model must not
+// put a name in the user's mouth.
+check("invented name is caught",
+      violations("someone should pick up the migration this week",
+                 "Ankit should pick up the migration this week.")
+        .contains(.inventedName("ankit")))
+check("a name that WAS spoken is not an invention",
+      !violations("Rohan can't make Wednesday", "Rohan cannot make Wednesday.")
+        .contains(.inventedName("rohan")))
+
+// Negation, the other direction. A rewrite that ADDS a negation to a
+// sentence that had none reverses meaning just as completely.
+check("negation added from zero is caught",
+      violations("I think we should ship on Friday.",
+                 "I don't think we should ship on Friday.")
+        .contains(where: { if case .negationAdded = $0 { return true }; return false }))
+check("adding a second negation to a sentence that had one is allowed",
+      !violations("I don't think we should ship.",
+                  "I don't think we should ship, and I don't want to argue.")
+        .contains(where: { if case .negationAdded = $0 { return true }; return false }))
+
+// Gap 1 · relative time. real-6: "end of next week not this week" — a
+// rewrite swapping those moves a deadline by a week and passes today.
+check("relative weeks are pinned",
+      FactGuard.extract(from: "realistically end of next week not this week")
+        .relativeTimes.contains("next week"))
+check("this-week to next-week is caught",
+      violations("we can ship this week", "we can ship next week")
+        .contains(.timeLost("this week")))
+check("tomorrow is pinned",
+      FactGuard.extract(from: "let's discuss at the sync tomorrow").relativeTimes.contains("tomorrow"))
+
+// Gap 2 · months were in the stopword list, so "March deadline" ->
+// "April deadline" passed.
+check("months are pinned",
+      FactGuard.extract(from: "I don't think we should commit to the March deadline")
+        .months.contains("march"))
+check("a changed month is caught",
+      violations("commit to the March deadline", "commit to the April deadline")
+        .contains(.monthLost("march")))
+
+// Gap 3 · units. "25 megs" -> "25 GB" keeps the number and changes the
+// meaning by a thousand.
+check("units are pinned",
+      FactGuard.extract(from: "a file bigger than 25 megs").units.contains("megs"))
+check("a changed unit is caught",
+      violations("a file bigger than 25 megs", "a file bigger than 25 GB")
+        .contains(.unitLost("megs")))
+check("currency is a unit",
+      violations("45,000 rupees", "45,000 dollars").contains(.unitLost("rupees")))
+
+// Gap 4 · fused suffixes. real-1: "Friday morning like 11ish" — the
+// meeting time was invisible.
+check("11ish yields 11",
+      FactGuard.extract(from: "Friday morning like 11ish").numbers.contains(11))
+
+// Smaller ones Fable named.
+check("barely counts as a negation",
+      FactGuard.extract(from: "barely anyone clicked it").negationCount >= 1)
+check("possessives normalize to the name",
+      FactGuard.extract(from: "the customer calls with Mira's team").names.contains("mira"))
+check("so a rewrite saying Mira is not a dropped name",
+      violations("calls with Mira's team", "calls with Mira and her team").isEmpty)
+
+// The "we'll" storm: rewrites routinely turn "let's" into "we'll", and
+// flagging that would dominate the fallback rate for no safety gain.
+check("we'll is not treated as an invented commitment",
+      violations("let's do Monday afternoon", "We'll do Monday afternoon.")
+        .isEmpty)
+check("but I'll still is",
+      violations("the deck needs another pass", "I'll take another pass at the deck.")
+        .contains(.inventedCommitment("i'll")))
+
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))
 check("pinned block names the number", pinned.contains("15"))
