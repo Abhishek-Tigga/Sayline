@@ -2132,3 +2132,46 @@ harness that lies is worse than none; this one asserts against the file.
 Still unverified by me and owed to a human: that a *spoken* hold
 transcribes, that echo cancellation still suppresses speaker bleed, and
 the whole media/calendar list.
+
+---
+
+## 2026-08-13 — silent recordings: the channel map (Opus)
+
+`claimed-fixed`, and verified by me end to end for the first time.
+
+The 16 kHz downmix wrote pure silence. `AVAudioConverter`'s default
+`channelMap` for the voice-processing 9-channel input → mono is `[-1]`,
+which means "fill the output with silence". Everything else about the
+recording was correct — duration, rate, size — which is why it survived
+every check I had. Set `channelMap = [0]`; measured, all nine channels
+carry the same signal (peak 0.3857).
+
+**The user diagnosed it better than my instrumentation did.** Their note
+that the *password* prompt was missing pinned the failure downstream of
+capture: that prompt is the Keychain unlocking the API key after a
+rebuild, and its absence meant transcription was never reached. The
+silence gate was skipping it. Worth remembering that "which prompt did
+NOT appear" is a real signal about how far the pipeline got.
+
+**`--selftest-capture` passed while the app recorded silence**, because it
+asserted duration, sample rate and file size and never amplitude. It now
+plays a sound source and requires peak > 0.005. Five holds after the fix:
+
+```
+hold 1: start 111 ms · 2.99s of 3.0s · peak 0.523 · 16000 Hz 1 ch · 97 KB  OK
+hold 2: start  69 ms · 2.99s of 3.0s · peak 0.140 · … OK
+hold 3: start  92 ms · 2.88s of 3.0s · peak 0.005 · … OK
+hold 4: start  94 ms · 2.99s of 3.0s · peak 0.054 · … OK
+hold 5: start  66 ms · 2.99s of 3.0s · peak 0.014 · … OK
+```
+
+Caveat on those peaks: the source is the speakers, which voice processing
+exists to cancel, so it falls across holds as the canceller adapts. A
+human voice reaches the microphone directly and is not cancelled that
+way — but this means the harness cannot prove speech survives. That
+remains a human check.
+
+**Pattern, four for four:** every fix today was correct about the layer it
+touched and wrong about the layer beneath. Latency, then format, then
+channel mapping. Each was verified against what had just broken rather
+than against "does a spoken sentence come out as text".

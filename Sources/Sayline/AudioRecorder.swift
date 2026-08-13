@@ -318,6 +318,19 @@ final class AudioRecorder {
         // exactly that.
         if let processing = audioFile?.processingFormat, processing != format {
             converter = AVAudioConverter(from: format, to: processing)
+            // Tell it WHICH channel to take.
+            //
+            // Voice processing presents a 9-channel input here, and
+            // `AVAudioConverter`'s default map for 9->1 is `[-1]`, which
+            // means "fill the output with silence". It did exactly that:
+            // recordings of the right length, the right sample rate and the
+            // right file size, containing nothing at all. Every channel was
+            // measured carrying the same signal (peak 0.3857), so channel 0
+            // is as good as any.
+            if let converter, processing.channelCount == 1, format.channelCount > 1 {
+                converter.channelMap = [0]
+                SaylineLog.log("[mic] downmixing \(format.channelCount)ch -> mono from channel 0")
+            }
             if converter == nil {
                 SaylineLog.log("[mic] no converter \(Int(format.sampleRate))Hz \(format.channelCount)ch"
                     + " -> \(Int(processing.sampleRate))Hz \(processing.channelCount)ch — recording raw instead")

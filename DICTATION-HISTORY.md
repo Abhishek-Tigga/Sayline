@@ -47,6 +47,41 @@ frozen the whole app, and probably the keyboard with it.
 
 ## Entries, newest first
 
+### 2026-08-13 · Recordings full of silence, and no password prompt
+
+**Seen:** dictation produced nothing. The user's key observation was the
+useful one: *"I usually am asked for a permission, I enter my password —
+only then does dictation work. Now it's not asking."*
+
+That prompt is the **Keychain** unlocking the API key after a rebuild
+changed the app's signature. Its absence meant transcription was never
+reached — not that a permission had been refused.
+
+**Log:**
+```
+frames: 41465, file 84 KB, wrote 16000Hz 1ch     ← writing works
+audio peak 0.0 over 2.69s -> silent, skipping    ← contains nothing
+```
+
+**Cause:** the 16 kHz downmix. Voice processing presents a **9-channel**
+input here, and `AVAudioConverter`'s default `channelMap` for 9→1 is
+`[-1]` — "fill the output with silence". It did. Recordings had the right
+length, sample rate and file size, and no sound. Measured: every one of the
+nine channels carried the same signal at peak 0.3857, so there was never a
+shortage of audio to take.
+
+The map was visible in an earlier probe of mine (`channelMap: [-1]`) and I
+did not react to it.
+
+**Fix:** `converter.channelMap = [0]` whenever downmixing to mono.
+
+**The deeper miss:** `--selftest-capture` passed throughout, because it
+asserted duration, sample rate and file size — never that the audio
+contained sound. The check now measures peak amplitude and plays a sound
+source so silence cannot pass. Same blind spot as the code, one layer up.
+
+**Working until:** the 16 kHz conversion added earlier the same day.
+
 ### 2026-08-13 · Recordings truncated to a fraction of the hold
 
 **Seen:** "not capturing properly" — the first dictation of a session fine,

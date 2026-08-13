@@ -185,6 +185,21 @@ extension HeadlessModes {
     ///
     /// It answers the contract directly: did audio arrive, how fast, how
     /// much of the window was captured, and in what format.
+    /// Loudest sample in a recorded file. The one number that separates
+    /// "we recorded" from "we recorded silence".
+    private static func peakAmplitude(of file: AVAudioFile) -> Float {
+        let format = file.processingFormat
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format,
+                                            frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil,
+              let channels = buffer.floatChannelData else { return 0 }
+        var peak: Float = 0
+        for c in 0..<Int(buffer.format.channelCount) {
+            for i in 0..<Int(buffer.frameLength) { peak = max(peak, abs(channels[c][i])) }
+        }
+        return peak
+    }
+
     static func selftestCapture(seconds: Double, holds: Int = 1) {
         guard AudioRecorder.micAuthorization == .authorized else {
             print("microphone not authorized — grant it and rerun")
@@ -216,6 +231,18 @@ extension HeadlessModes {
         pump(until: { false }, limit: 2.0)
         print(String(format: "warm-up window: %.0f ms, paid once", Date().timeIntervalSince(warmStart) * 1000))
 
+        // Something for the microphone to hear. Without a sound source the
+        // check cannot tell "capture is broken" from "the room is quiet",
+        // which is precisely how a converter writing pure silence passed a
+        // self-test that only looked at duration and file size.
+        let talker = Process()
+        talker.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+        talker.arguments = ["-r", "170",
+                            String(repeating: "Testing one two three four. ",
+                                   count: Int(seconds * Double(max(1, holds))) + 6)]
+        try? talker.run()
+        defer { talker.terminate() }
+
         var failures = 0
         for hold in 1...max(1, holds) {
             var engineUp: Bool?
@@ -244,14 +271,15 @@ extension HeadlessModes {
             let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
             let kb = ((attrs?[.size] as? Int) ?? 0) / 1024
             let onDisk = Double(file.length) / file.fileFormat.sampleRate
-            // The contract: fast to start, and nearly all of the window
-            // actually on disk.
-            let ok = latency < 150 && onDisk > seconds * 0.8
+            let peak = peakAmplitude(of: file)
+            // The contract: fast to start, nearly all of the window on
+            // disk, and actual sound in it.
+            let ok = latency < 150 && onDisk > seconds * 0.8 && peak > 0.005
             if !ok { failures += 1 }
-            print(String(format: "hold %d: start %3.0f ms · on disk %.2fs of %.1fs · %d Hz %d ch · %d KB  %@",
-                         hold, latency, onDisk, seconds,
+            print(String(format: "hold %d: start %3.0f ms · %.2fs of %.1fs · peak %.3f · %d Hz %d ch · %d KB  %@",
+                         hold, latency, onDisk, seconds, peak,
                          Int(file.fileFormat.sampleRate), file.fileFormat.channelCount, kb,
-                         ok ? "OK" : "<-- BREAKS THE CONTRACT"))
+                         ok ? "OK" : (peak <= 0.005 ? "<-- SILENT" : "<-- BREAKS THE CONTRACT")))
             recorder.discardRecording(at: url)
         }
         print(failures == 0 ? "PASS — every hold met the contract"
