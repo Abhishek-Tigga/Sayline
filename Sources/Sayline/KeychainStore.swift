@@ -14,18 +14,55 @@ enum KeychainStore {
 
     private static let service = "com.abhishektigga.sayline"
 
-    static func save(_ value: String, for key: Key = .groq) {
+    /// Returns whether the value is actually retrievable afterwards.
+    ///
+    /// Both halves of that sentence were missing. `SecItemAdd`'s OSStatus
+    /// was discarded entirely, so a failed save was indistinguishable from
+    /// a successful one: Settings accepted the key, said nothing, and
+    /// dictation then failed with "No Groq API key set". The user re-entered
+    /// the key believing it had been stored, twice.
+    ///
+    /// Reported 2026-08-14, with `OPENAI_API_KEY` and `YOUTUBE_API_KEY`
+    /// sitting healthily in the same service — so this was never keychain
+    /// access in general, only this write silently going nowhere.
+    ///
+    /// Success is defined as reading the value back, not as `SecItemAdd`
+    /// returning 0. A write that reports success but cannot be read is the
+    /// failure this is meant to catch.
+    @discardableResult
+    static func save(_ value: String, for key: Key = .groq) -> Bool {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key.rawValue
         ]
-        SecItemDelete(query as CFDictionary)
+        let deleteStatus = SecItemDelete(query as CFDictionary)
+        if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
+            SaylineLog.log("keychain delete-before-save for \(key.rawValue) returned "
+                + "OSStatus \(deleteStatus) (\(message(deleteStatus)))")
+        }
 
         var newItem = query
         newItem[kSecValueData as String] = data
-        SecItemAdd(newItem as CFDictionary, nil)
+        let status = SecItemAdd(newItem as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            SaylineLog.log("KEYCHAIN SAVE FAILED for \(key.rawValue) -> OSStatus \(status) "
+                + "(\(message(status))). The key was NOT stored.")
+            return false
+        }
+
+        guard load(key) == value else {
+            SaylineLog.log("KEYCHAIN SAVE UNVERIFIABLE for \(key.rawValue): the write reported "
+                + "success but the value could not be read back.")
+            return false
+        }
+        SaylineLog.log("keychain saved \(key.rawValue) and read it back")
+        return true
+    }
+
+    private static func message(_ status: OSStatus) -> String {
+        SecCopyErrorMessageString(status, nil) as String? ?? "no description"
     }
 
     static func load(_ key: Key = .groq) -> String? {
