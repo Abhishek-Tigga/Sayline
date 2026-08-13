@@ -142,13 +142,12 @@ attempt.
 |---|---|---|---|---|
 | `gpt-4o-mini` | 44% | 73% | 12% | 1122 ms |
 
-### Work mode model bake-off — 2026-08-13 18:19
+### Work mode model bake-off — 2026-08-13 23:01
 
-25 transcripts, temperature 0, scored by FactGuard.
+31 transcripts, temperature 0, scored by FactGuard.
 
 | model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
 |---|---|---|---|---|---|---|
-| `llama-3.1-8b-instant` | 7/10 | 6/12 | 2 | 8% | 55% | 198 ms |
-| `llama-3.3-70b-versatile` | 3/10 | 3/15 | 3 | 83% | 4% | 341 ms |
-| `gpt-4o-mini` | 2/10 | 4/15 | 2 | 83% | 4% | 1319 ms |
-| `gpt-4.1-mini` | 4/10 | 2/15 | 3 | 100% | 0% | 1210 ms |
+| `llama-3.3-70b-versatile` | 3/10 | 4/19 | 0 | 0% | 24% | 291 ms |
+| `gpt-4o-mini` | 3/10 | 4/21 | 1 | 43% | 13% | 922 ms |
+| `gpt-4.1-mini` | 4/10 | 4/21 | 2 | 75% | 6% | 2244 ms |

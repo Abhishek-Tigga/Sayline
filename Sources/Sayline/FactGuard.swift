@@ -81,6 +81,22 @@ enum FactGuard {
         case inventedDay(String)
         case inventedMonth(String)
         case inventedUnit(String)
+        /// The rewrite is longer than the speech.
+        ///
+        /// Voice 2, rule 5a. Work mode compresses toward the speaker's own
+        /// words; a rewrite that grows has added something, and the thing
+        /// it adds is almost always padding. This one check would have
+        /// killed the invented meta-sentence of B2 with no prompt change
+        /// at all.
+        case longerThanSpeech(said: Int, wrote: Int)
+        /// A formality the speaker did not use.
+        ///
+        /// Voice 2, rules 2 and 3. "isn't done" must not become "remains
+        /// incomplete", and "I don't agree" must never become "I'm not
+        /// fully aligned" — softening a stated position is meaning change
+        /// wearing a politeness costume, which is the same family as the
+        /// corruption this guard exists for.
+        case formalityUpgrade(String)
         /// The speaker asked something and the rewrite answers it instead.
         ///
         /// Both observed qualitative inventions had this shape: a
@@ -110,6 +126,10 @@ enum FactGuard {
             case .unitLost(let u): return "the unit \(u) was changed"
             case .negationAdded:
                 return "it added a negation that was never spoken, reversing the meaning"
+            case .longerThanSpeech(let said, let wrote):
+                return "the rewrite is longer than what was said (\(said) words in, \(wrote) out) — cut, don't pad"
+            case .formalityUpgrade(let phrase):
+                return "it used \"\(phrase)\", which the speaker did not say — keep their words"
             case .questionLost:
                 return "the speaker asked a question and the rewrite answered it instead"
             case .inventedNumber(let n): return "it introduced the number \(n), which was never said"
@@ -136,6 +156,12 @@ enum FactGuard {
             case .timeLost: return "relative-time"
             case .unitLost: return "unit"
             case .negationAdded: return "negation-added"
+            case .longerThanSpeech(let said, let wrote):
+                return "the rewrite is longer than what was said (\(said) words in, \(wrote) out) — cut, don't pad"
+            case .formalityUpgrade(let phrase):
+                return "it used \"\(phrase)\", which the speaker did not say — keep their words"
+            case .longerThanSpeech: return "longer-than-speech"
+            case .formalityUpgrade: return "formality-upgrade"
             case .questionLost: return "question-lost"
             case .inventedNumber: return "invented-number"
             case .inventedDay: return "invented-day"
@@ -315,8 +341,31 @@ enum FactGuard {
             violations.append(.inventedUnit(unit))
         }
 
+        // Voice 2, rule 5a — the length ceiling.
+        //
+        // Under about ten words a rewrite cannot meaningfully compress
+        // ("push it to Tuesday" is already the sentence), so the ceiling
+        // is "no longer than" rather than "strictly shorter". Above that,
+        // work mode's whole job is to shorten.
+        let spokenWords = tokenize(raw).count
+        let writtenWords = tokenize(rewrite).count
+        let ceiling = spokenWords < 10 ? spokenWords : spokenWords - 1
+        if writtenWords > ceiling {
+            violations.append(.longerThanSpeech(said: spokenWords, wrote: writtenWords))
+        }
+
         let rawLower = raw.lowercased()
         let rewriteLower = rewrite.lowercased()
+
+        // Voice 2, rules 2 and 3 — formality the speaker did not use.
+        //
+        // Only when absent from the raw: a guard that forbids the user's
+        // own vocabulary is worse than no guard. "As per the contract"
+        // stays if they said it.
+        for phrase in formalityUpgrades where rewriteLower.contains(phrase)
+            && !rawLower.contains(phrase) {
+            violations.append(.formalityUpgrade(phrase))
+        }
         for phrase in commitmentPhrases
         where rewriteLower.contains(phrase) && !rawLower.contains(phrase) {
             // "I will" said aloud and written "I'll" is the same promise,
@@ -476,6 +525,25 @@ enum FactGuard {
         // Semi-negations. real-9's whole argument is "barely anyone
         // clicked it" — losing that word reverses the finding.
         "barely", "hardly", "rarely", "scarcely", "seldom", "without",
+    ]
+
+    /// Words that make a sentence sound more important without making it
+    /// mean more.
+    ///
+    /// **Growth rule, same as the stopword list:** every entry arrives
+    /// with the real rewrite that motivated it, as a suite case, in the
+    /// same commit. No entries added by imagining what a model might say.
+    ///
+    /// The first eight are the classic inflations named in the Voice 2
+    /// decision. The last two were produced by this user's own live
+    /// session on 2026-08-13 — "let's do Thursday" came back as "We will
+    /// do it on Thursday", and "we don't think" as "We do not think".
+    /// Expanding a contraction changes nothing but the temperature, which
+    /// is exactly what rule 2 forbids.
+    private static let formalityUpgrades: [String] = [
+        "utilize", "leverage", "i would like to propose", "at this stage",
+        "not fully aligned", "i have some reservations", "as per", "kindly",
+        "let us", "do not",
     ]
 
     /// First person singular only, deliberately.

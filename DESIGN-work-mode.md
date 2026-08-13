@@ -85,7 +85,22 @@ and its own hallucinations; the guard being dumb code is its virtue).
 
 **3 · Context is seasoning, never a mode.** It adjusts register on top
 of whichever mode the user chose: cosmetics only in Clean (contractions,
-dashes), tone in Work (Slack crisp, email composed). Unknown context —
+dashes), tone in Work (Slack crisp, email composed).
+
+> **Amended 2026-08-13 — "warmth only".** Context now controls exactly
+> two things in Work mode: **whether a greeting survives**, and **whether
+> sentences are complete**. Vocabulary and stance are untouchable by it.
+>
+> The reason: "composed and formal" for email produced output *longer
+> than the speech* and *softer than the position* in the first live
+> session — a stated disagreement arriving as something diplomatic.
+> Softening a position is meaning change wearing a politeness costume,
+> which is the same failure family the fact guard exists for. A register
+> that can do that is not a style knob.
+>
+> Enforced mechanically, not by prompt alone: a length ceiling
+> (`longerThanSpeech`) and a banned-upgrade list (`formalityUpgrade`) in
+> `FactGuard`, both with suite cases. Unknown context —
 an unclassifiable browser tab, a documented detector limit — gets
 neutral-professional: safe in any room. Rejected: the Wispr shape, where
 the focused window decides rewrite depth automatically. A wrong guess
@@ -105,14 +120,18 @@ selected + double-tap" has no right answer) and picker-as-default (kept
 alive as a fallback idea if Settings-buried Verbatim draws real
 complaints — that complaint would arrive with data attached).
 
-**5 · In code windows, the double-tap wins.** Single press in a code
+**5 · In code windows, the chord wins.** Single press in a code
 editor or terminal stays forced-verbatim, exactly as today. An explicit
-double-tap gets Work mode even there — a terminal is where commit
+**hold + Right Command** gets Work mode even there — a terminal is where commit
 messages and PR descriptions live, and the locked model says context
-never vetoes the user's explicit depth choice. The fumble risk (an
-accidental double-tap rewriting something exact) is bounded: it is one
-utterance, the mode is visible on the pill mid-hold, and the guard still
-freezes names and numbers. This reverses the reviewer's own first
+never vetoes the user's explicit depth choice. The fumble risk is bounded: it is one utterance, the mode is visible on
+the pill mid-hold, and the guard still freezes names and numbers.
+
+> **Amended 2026-08-13.** This decision said "double-tap". The double-tap
+> was built, used, and rejected on feel — it proved unreliable in
+> practice. The chord mirrors the agent gesture (hold + Space), has no
+> timing window to tune, no fumble case, no interaction with the 0.4s
+> mis-tap rule, and leaks nothing into the app underneath. This reverses the reviewer's own first
 recommendation, on the grounds that the Q3 model made it inconsistent.
 
 **6 · The mode is visible before you finish speaking, and flippable in

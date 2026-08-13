@@ -9,6 +9,67 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **Emoji dictation** (parked 2026-08-13 by the user's call — fully
+  designed, not built; the settled spec is `DESIGN-emoji.md`).
+
+  Four decisions, settled in a grilling session with worked examples:
+  1. *Both forms, table first.* Named ("fire emoji" → 🔥) is a
+     deterministic ~100-alias lookup, no AI, zero latency. Bare
+     ("...emoji" as the final word) delegates the pick to the AI, riding
+     the cleanup call that already runs — zero added latency.
+  2. *Placement follows risk.* Named works anywhere in the sentence;
+     bare fires only as the last word; the plural ("emojis") never
+     triggers. Accepted residual: a sentence genuinely ending in literal
+     singular "emoji" misfires — rare, visible, logged, no escape
+     phrase.
+  3. *Explicit obeys everywhere; delegated respects the room.* Named
+     works in both modes and all registers. The bare pick may decline in
+     formal registers — "no emoji" is a valid answer from a delegate —
+     consuming the trigger word either way. Verbatim contexts never see
+     triggers (no cleanup runs).
+  4. *Unsure means silence; the cap is one.* No stranded trigger word,
+     never more than one delegated emoji; 🔥🔥🔥 is reached by naming it
+     three times.
+
+  The architecture trick that makes the safety story nearly free, worth
+  not re-deriving: **the two forms live at different pipeline stages.**
+  Named substitution happens on the raw transcript, before any LLM sees
+  it — the emoji becomes part of the validator's baseline, so Clean's
+  validator needs no changes at all. Only the bare form touches guards:
+  one narrow allowance (a single trailing emoji, permitted iff code
+  determined the raw ended with the bare trigger — a deterministic flag,
+  never model-claimed) added to `TranscriptCleanupValidator` and
+  `FactGuard`. New pure file `EmojiCatalog.swift` (aliases,
+  longest-match-first, `substituteNamed`, `endsWithBareTrigger`) with an
+  `eval/emoji-checks` suite; the named-lookup miss log is how the table
+  grows from evidence.
+
+  Why parked behind work mode: it reuses work mode's plumbing (the
+  FactGuard allowance shape, register seasoning for the formal-decline
+  rule) and must not share a build with it. Unparks when work mode's
+  fix round lands and its re-test passes; the build-order handoff for
+  Opus was written 2026-08-13 and its content is reproducible from
+  `DESIGN-emoji.md` §Architecture + §Testing. Open tune-by-feel items:
+  punctuation adjacency for the bare append, and the launch table's
+  contents.
+
+- **Work mode: sequence notation ("X → Y → Z → reasoning")** (parked
+  mid-brainstorm 2026-08-13 at the user's call — one question in, not
+  abandoned).
+
+  The ask: a spoken sequence ("first we'll do X, then perhaps Y, then if
+  it goes right Z") should come out with its shape visible — arrows or
+  structure, reasoning demoted below — not as a paragraph the reader
+  re-walks. The open question when parked: notation everywhere, room
+  decides the form (arrows in chat/notes, tight prose in email), or only
+  when the speaker announces a plan. Fable's standing recommendation was
+  room-decides-the-form, with one hard boundary carried from decision 1:
+  **structure may only come from spoken structure** — sequences may be
+  drawn because "first/then/then" was said; headers, numbering, ETAs and
+  framing the speaker never said stay forbidden. Unparks when the user
+  wants to finish the brainstorm; the worked examples are in the session
+  ledger context around the Voice 2 lock.
+
 - **"Next song" does nothing** (parked 2026-08-13, low priority by the
   user's call — "we don't want to spend too much time").
 

@@ -26,8 +26,8 @@ import Foundation
 /// exists, `gpt-4o-mini` is the fallback and the mode gets slower rather
 /// than broken.
 final class WorkModeCleaner {
-    private let endpoint = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
-    private let model = "llama-3.3-70b-versatile"
+    private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
+    private let model = "gpt-4o-mini"
 
     /// What happened, so the caller can flash the right thing and the log
     /// can answer "does the guard fire too often" as a lookup.
@@ -61,43 +61,56 @@ final class WorkModeCleaner {
     /// confusion, and putting instructions where instructions live also
     /// makes a "do not echo this" instruction unnecessary.
     private static let workPrompt = """
-    You rewrite spoken dictation into clear written text.
+    You tighten spoken dictation into clear written text. You are not \
+    writing on the speaker's behalf — you are their words, minus the mess.
 
-    The speaker was thinking out loud. Restructure freely: put the \
-    conclusion first, merge rambling sentences, cut thinking-out-loud and \
-    filler. Two clear sentences are better than five vague ones.
+    Delete: fillers, repetition, false starts, and the journey ("I've \
+    been going back and forth on this all morning"). Put the conclusion \
+    first. Merge rambling sentences.
+
+    Keep: their verbs, their bluntness, their meaningful hedges — \
+    "about", "roughly", "realistically" carry information and stay.
 
     Rules you must not break:
-    - Never invent facts, names, numbers, dates, or commitments. If the \
-    speaker did not say it, it does not appear.
-    - Never reverse a statement. "I don't think we should" must not become \
-    "we should".
-    - If the speaker enumerated items — "three reasons: first… second…", \
-    "two things: X and Y" — write them as a bulleted list, one item per \
-    line starting with "- ". Do not do this for prose that merely \
+    - NEVER upgrade a word. "Isn't done" stays "isn't done" — not \
+    "remains incomplete". "Use" is not "utilize". "Like we said" is not \
+    "as per".
+    - NEVER soften a position. "I don't agree" stays "I don't agree" — \
+    not "I'm not fully aligned", not "I have some reservations". \
+    Softening what someone said is changing what they said.
+    - Your reply must be SHORTER than what they said. If you cannot cut, \
+    return their sentence tidied. Never pad.
+    - Never invent facts, names, numbers, dates, or commitments.
+    - Never reverse a statement, and never answer a question they asked — \
+    if they asked something, it stays a question.
+    - If they enumerated items — "three reasons: first… second…" — write \
+    them as "- " bullets, one per line. Not for prose that merely \
     contains several ideas.
-    - Never invent headers, greetings, or sign-offs.
-    - Never comment on your own output. No "these are the reasons", no \
-    "in summary", no restating what you just wrote. Say the thing once \
-    and stop.
-    - Never add information. Connect ideas using only the speaker's own words.
-    - Output only the rewritten text. No preamble, no explanation, no quotes.
+    - Never invent headers, greetings or sign-offs, and never comment on \
+    your own output.
+    - Output only the rewritten text. No preamble, no quotes.
     """
 
-    /// Register only — never depth.
+    /// Warmth only — two things, and nothing else.
     ///
-    /// Decision 3: context adjusts how the words dress, never how much
-    /// they are transformed. An unclassifiable window gets
-    /// neutral-professional, which is safe in any room, rather than a
-    /// guess at what kind of room it is.
+    /// Context may decide **whether a greeting survives** and **whether
+    /// sentences are complete**. It may not touch vocabulary or stance.
+    ///
+    /// Amended 2026-08-13 after the first live session. The email
+    /// register read "composed and professional", and it produced output
+    /// that was longer than the speech and softer than the position —
+    /// "I don't agree" arriving as something more diplomatic. Softening a
+    /// stated position is meaning change wearing a politeness costume,
+    /// the same failure family the guard exists for, so the register was
+    /// not a style knob at all. It is now two switches.
     private static func register(for context: AppContext) -> String {
         switch context {
         case .email:
-            return "This is going into an email. Composed and professional, full sentences."
+            return "This is going into an email. If they opened with a greeting, keep it. Complete sentences."
         case .chat:
-            return "This is going into a chat app. Crisp and direct, contractions are fine, no salutation."
+            return "This is going into a chat app. Drop any greeting. Fragments are fine."
         case .code, .general:
-            return "The destination is unknown. Use a neutral professional register: plain, unfussy, safe to paste anywhere."
+            return "Destination unknown. Complete sentences, no greeting."
         }
     }
 
@@ -122,8 +135,9 @@ final class WorkModeCleaner {
             return .rewritten(first)
         }
 
-        // One corrective retry, naming the broken fact. A retry that does
-        // not say what was wrong is just a second roll of the dice.
+        // One corrective retry, naming the broken fact — including the
+        // Voice 2 rules, which use the same machinery: a rewrite that
+        // padded or upgraded a word gets told exactly that.
         SaylineLog.log("[work] first attempt broke: "
             + firstViolations.map(\.kind).joined(separator: ", "))
         let why = firstViolations.map(\.explanation).joined(separator: "; ")
@@ -160,12 +174,15 @@ final class WorkModeCleaner {
         case "negation", "negation-added": return "Kept your exact words — the rewrite flipped a meaning"
         case "invented-name": return "Kept your exact words — the rewrite named someone you didn't"
         case "invented-commitment": return "Kept your exact words — the rewrite promised something you didn't"
+        case "longer-than-speech": return "Kept your exact words — the rewrite was longer than what you said"
+        case "formality-upgrade": return "Kept your exact words — the rewrite dressed them up"
+        case "question-lost": return "Kept your exact words — the rewrite answered your question instead"
         default: return "Kept your exact words — the rewrite changed a fact"
         }
     }
 
     private func ask(system: String, messages: [[String: String]]) async throws -> String {
-        guard let apiKey = APIKeyProvider.groqAPIKey else {
+        guard let apiKey = APIKeyProvider.openAIAPIKey else {
             throw TranscriptionError.missingAPIKey
         }
         let payload: [String: Any] = [

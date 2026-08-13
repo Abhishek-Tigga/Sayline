@@ -106,9 +106,14 @@ print("\nwhat must NOT fire — a guard that cries wolf gets ignored")
 check("pure restructuring is allowed",
       violations("So um I was thinking, maybe, that we could, you know, ship it.",
                  "We could ship it.").isEmpty)
-check("reordering is allowed",
-      violations("Ship on Tuesday because the client asked for it.",
-                 "The client asked for it, so we ship on Tuesday.").isEmpty)
+// Asserts on the property it exists for, not on total silence. The
+// Voice 2 length ceiling also fires here — the rewrite is two words
+// longer — and that is correct under rule 5a; this case is about whether
+// reordering loses a fact, which it does not. One case, one property.
+check("reordering loses no facts",
+      !violations("Ship on Tuesday because the client asked for it.",
+                  "The client asked for it, so we ship on Tuesday.")
+        .contains(where: { if case .longerThanSpeech = $0 { return false }; return true }))
 check("names and numbers surviving a heavy rewrite is fine",
       violations("um so Priya said like fifteen units by Tuesday I think",
                  "Priya needs 15 units by Tuesday.").isEmpty)
@@ -211,7 +216,10 @@ check("barely counts as a negation",
 check("possessives normalize to the name",
       FactGuard.extract(from: "the customer calls with Mira's team").names.contains("mira"))
 check("so a rewrite saying Mira is not a dropped name",
-      violations("calls with Mira's team", "calls with Mira and her team").isEmpty)
+      !violations("calls with Mira's team", "calls with Mira and her team")
+        .contains(where: { if case .nameLost = $0 { return true }
+                           if case .inventedName = $0 { return true }
+                           return false }))
 
 // The "we'll" storm: rewrites routinely turn "let's" into "we'll", and
 // flagging that would dominate the fallback rate for no safety gain.
@@ -386,6 +394,65 @@ check("digit ordinals are still facts",
       FactGuard.extract(from: "cleared before the 30th").numbers.contains(30))
 check("compound spoken ordinals are still facts",
       FactGuard.extract(from: "due on the twenty first").numbers.contains(21))
+
+print("\nVoice 2 — the length ceiling: a rewrite may not be longer than the speech")
+
+// Rule 5a. Padding cannot survive a ceiling, and the B2 meta-sentence
+// would have died on it without any prompt change at all.
+check("a padded rewrite is caught",
+      violations("there are three reasons. first the quote. second the timeline. third nobody asked for it",
+                 "There are three reasons: the quote, the timeline, and that nobody asked for it. These are the first, second, and third reasons, respectively.")
+        .contains(where: { if case .longerThanSpeech = $0 { return true }; return false }))
+check("a faithful compression passes",
+      !violations("so um I was thinking maybe that we could you know ship it on Tuesday",
+                  "We could ship it on Tuesday.")
+        .contains(where: { if case .longerThanSpeech = $0 { return true }; return false }))
+
+// A short utterance cannot meaningfully compress, so the ceiling is
+// "no longer than" rather than "strictly shorter" below ~10 words.
+check("a short utterance may stay the same length",
+      !violations("push it to Tuesday", "Push it to Tuesday.")
+        .contains(where: { if case .longerThanSpeech = $0 { return true }; return false }))
+check("but a short utterance may still not grow",
+      violations("push it to Tuesday",
+                 "I would like to propose that we push it to Tuesday if that works.")
+        .contains(where: { if case .longerThanSpeech = $0 { return true }; return false }))
+
+print("\nVoice 2 — no synonym upgrades, no softened positions")
+
+// Rule 2 and rule 3. Every entry below arrives with the real rewrite
+// that motivated it, per the standing lexicon rule.
+check("utilize is an upgrade",
+      violations("we should use the new endpoint", "We should utilize the new endpoint.")
+        .contains(.formalityUpgrade("utilize")))
+check("I would like to propose is an upgrade",
+      violations("let's move it to Thursday", "I would like to propose moving it to Thursday.")
+        .contains(.formalityUpgrade("i would like to propose")))
+check("not fully aligned is a softened position",
+      violations("I don't agree with the copy", "I'm not fully aligned on the copy.")
+        .contains(.formalityUpgrade("not fully aligned")))
+check("as per is an upgrade",
+      violations("like we said on the call", "As per the call.")
+        .contains(.formalityUpgrade("as per")))
+
+// Observed live, 2026-08-13, in this user's own session.
+check("let us, from \"let\u{2019}s do Thursday\"",
+      violations("let's do Thursday", "Let us do Thursday.")
+        .contains(.formalityUpgrade("let us")))
+check("do not, from \"we don\u{2019}t think we should\"",
+      violations("we don't think we should do it on Saturday",
+                 "We do not think we should do it on Saturday.")
+        .contains(.formalityUpgrade("do not")))
+
+// The word being banned is only a violation when the SPEAKER did not use
+// it. A guard that forbids the user's own vocabulary is worse than none.
+check("the speaker's own formal words are never flagged",
+      !violations("as per the contract we should kindly ask them",
+                  "As per the contract, we should kindly ask them.")
+        .contains(where: { if case .formalityUpgrade = $0 { return true }; return false }))
+check("and do not spoken as do not is fine",
+      !violations("we do not agree with this", "We do not agree with this.")
+        .contains(where: { if case .formalityUpgrade = $0 { return true }; return false }))
 
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))

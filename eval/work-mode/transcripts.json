@@ -113,5 +113,35 @@
     "id": "made-15",
     "class": "list",
     "raw": "three things blocking us first the API keys aren't provisioned second legal hasn't signed off on the terms and third we still don't have staging access"
+  },
+  {
+    "id": "style-1",
+    "class": "voice2",
+    "raw": "let us do Friday actually wait Friday is the offsite let's do it on Thursday"
+  },
+  {
+    "id": "style-2",
+    "class": "voice2",
+    "raw": "I don't agree with the new pricing copy I get why marketing wants it but I don't want to remove the free tier mention"
+  },
+  {
+    "id": "style-3",
+    "class": "voice2",
+    "raw": "there are three reasons. first the quote. second the timeline. third nobody asked for it"
+  },
+  {
+    "id": "style-4",
+    "class": "voice2",
+    "raw": "the backend isn't done I'd say sixty percent at best so I don't think we should commit to March yet"
+  },
+  {
+    "id": "style-5",
+    "class": "voice2",
+    "raw": "hey quick one can you approve the invoice when you get a chance finance needs it before the 30th"
+  },
+  {
+    "id": "style-6",
+    "class": "voice2",
+    "raw": "I've been going back and forth on this all morning but honestly I think we should just park it this quarter"
   }
 ]

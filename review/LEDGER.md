@@ -3675,3 +3675,122 @@ sound professional. That is a voice/register change to the prompt and
 possibly to decision 3, and it wants its own round rather than a tweak.
 
 Suite 90 cases. Smoke test PASS.
+
+---
+
+## WORK MODE · Voice 2 locked (user decision, 2026-08-13, Fable recording)
+
+Settled in a grilling session with worked examples. **Work mode speaks
+plain voice — "Voice 2" — everywhere, and context is demoted to
+warmth-only.** The user's principle, now the mode's voice contract:
+simply understood, not too long, never a word added to sound
+professional.
+
+The rules, as agreed:
+1. Your verbs, your bluntness, your meaningful hedges ("about",
+   "realistically") survive. Fillers, repetition, and the journey
+   ("I've been going back and forth all morning") are deleted.
+2. **Never a synonym upgrade.** "Isn't done" never becomes "remains
+   incomplete", in any room.
+3. **Never a softened position.** "I don't agree" never becomes "I'm
+   not fully aligned" — register-softening is meaning change wearing a
+   politeness costume, the same family as the corruption the guard
+   exists for.
+4. **Context may touch exactly two things**: whether a greeting
+   survives, and whether sentences are complete (email) or fragments
+   are fine (Slack). Vocabulary and stance are untouchable by context.
+   This amends decision 3 of `DESIGN-work-mode.md`, which read
+   "composed and formal" for email — that register was producing
+   longer-than-spoken, padded, position-softening output, observed in
+   the first live session.
+5. **Mechanically enforced, house style**: (a) work output must be
+   shorter than the raw transcript — a hard length ceiling; padding
+   cannot survive it, and the B2 invented meta-sentence would have died
+   on it; (b) a banned-upgrade list for the classic inflations
+   ("utilize", "leverage", "I would like to propose", "at this stage",
+   "not fully aligned", "I have some reservations", "as per", "kindly")
+   — additions arrive with the real rewrite that motivated them, per
+   the standing lexicon rule.
+Rejected: keeping full formal register for email (the padded cell was
+the entire complaint), and over-compression ("Push launch Tuesday. QA
+pending.") — efficient but no longer a person.
+The six worked examples from this session become style cases in the
+work-mode eval — scored before/afters, not adjectives.
+
+---
+
+## 2026-08-13 — Voice 2 built; the model changed because of it (Opus)
+
+`claimed-fixed`. Suite **90 → 102**.
+
+**Gap in the handover, flagged not filled.** The Voice 2 entry says "the
+six worked examples from this session become style cases" but the entry
+does not contain them — they stayed in the Fable session. Rather than
+invent six and present them as the agreed ones, the style cases are six
+**real** transcripts from the user's own first live session, the ones
+that produced padding, upgrades and softened positions. If the actual six
+exist, they should replace these.
+
+**Two mechanical enforcements, both in `FactGuard`:**
+
+- `longerThanSpeech` — work output may not exceed the raw word count.
+  Strictly shorter above ten words; no-longer-than below, since "push it
+  to Tuesday" cannot compress. This alone would have killed B2's invented
+  meta-sentence with no prompt change.
+- `formalityUpgrade` — the eight named inflations, plus two from the
+  user's live output: **"let us"** (from "let's do Thursday" → "We will do
+  it on Thursday") and **"do not"** (from "we don't think" → "We do not
+  think"). Expanding a contraction changes nothing but temperature, which
+  is what rule 2 forbids. Flagged only when absent from the raw — a guard
+  that forbids the speaker's own vocabulary is worse than none.
+
+**Two older cases were narrowed rather than deleted.** "reordering is
+allowed" and the Mira possessive case now assert the property they exist
+for instead of total silence; the length ceiling also fires on both,
+correctly, because their rewrites are longer than their (already tight)
+inputs. One case, one property.
+
+**Prompt rewritten to Voice 2**, and the eval now lifts it from
+`WorkModeCleaner` at build time instead of holding a copy — the
+two-copies-of-one-truth failure this project has paid for twice.
+
+**Design amended:** decision 3 to warmth-only (greeting survival and
+sentence completeness, nothing else), decisions 5 and 6 to the chord,
+each with the reason recorded in place.
+
+### The model changed, and Voice 2 is why
+
+| model | broke | rescued | fallback | median |
+|---|---|---|---|---|
+| `llama-3.3-70b-versatile` | 24% | **0%** | **24%** | 291 ms |
+| `gpt-4o-mini` | 23% | 43% | **13%** | 922 ms |
+| `gpt-4.1-mini` | 26% | 75% | 6% | 2244 ms |
+
+Under the free-rewrite prompt the 70B rescued **83%** of its own
+violations and fell back 4% of the time. Voice 2 adds the length ceiling,
+and told "cut, don't pad" the 70B **rescued 0 of 7**. A quarter of work
+dictations would silently deliver Clean.
+
+The brief predicted plain voice might shift the winner because the task
+got *easier*. It shifted because the task got **harder** — compression is
+a constraint the small model cannot satisfy on demand, while it could
+always find *something* to say when rewriting freely.
+
+**Switched to `gpt-4o-mini`.** 631 ms slower, half the fallback rate, and
+with Clean now running concurrently the user waits ~1 s against the ~2 s
+decision 7 allows. Incidentally it leaves Groq's free tier, the standing
+operational risk — the 8B baseline aborted this very run at 13 of 31
+calls.
+
+Verified live afterwards on the style cases: *"let us do Friday actually
+wait Friday is the offsite let's do it on Thursday"* → **"Let's do it on
+Thursday. Friday is the offsite."** and the disagreement case → **"I
+don't agree with the new pricing copy. I get why marketing wants it, but
+I don't want to remove the free tier."** — "let's", "I get why" and "I
+don't" all survive, where the previous model produced "We will", "I
+understand why" and "I do not".
+
+**Owed live, carried:** C1, D1, D2, E6, F3, G1, G2, plus re-testing A6
+and B2 and a first look at H1's badge. **Rebuilds reset the Accessibility
+grant** — `tccutil reset Accessibility com.abhishektigga.sayline`, then
+the grant button, before the next session.
