@@ -322,3 +322,47 @@ changes.
 - A standalone `AVAudioEngine` in another process, to tell "Sayline is
   broken" from "this Mac is broken":
   `scratchpad/mictest.swift`.
+
+### 2026-08-13 · Keyboard frozen — the circuit breaker fed itself
+
+**Seen:** hotkey unresponsive, then the whole keyboard froze on any
+keypress. A notice from Sayline saying macOS was rejecting it.
+
+**Log:** `/tmp/sayline.log` reached **10 MB in one session**:
+
+```
+24,872 ×  indicator shown -> message("Sayline")
+24,884 ×  "the system disabled the event tap N times in two minutes —
+           giving up rather than fighting for the keyboard."
+          event tap was disabled by the system (4294967295) — main ok 0.8s
+```
+
+**Cause: ours, not macOS.** `noteDisable()` called
+`CGEvent.tapEnable(enable: false)` **from inside the tap callback**, and
+disabling a tap that way delivers another `tapDisabled` event, which
+re-entered the same function. Nothing checked whether the breaker had
+already tripped, so every pass logged again and fired the user-facing
+notice again — ~25,000 pill redraws is what actually consumed the
+machine.
+
+`main ok 0.8s` throughout: **this is not the CoreAudio deadlock.** The
+main thread was healthy and being flooded with UI work from a spinning
+callback. A different failure with the same symptom.
+
+The comment above the callback said "let the thread loop decide, rather
+than fighting the window server from inside the callback". The function
+below it did exactly what that forbade.
+
+**Fix:** `noteDisable` returns immediately once `tappedOut`, so it logs
+and notifies exactly once. Every `tapEnable` call now happens in
+`reenableTapIfSafe` on the tap thread — one owner, so a disable can never
+re-enter the callback that requested it.
+
+**Note the disable code:** `4294967295` is
+`kCGEventTapDisabledByUserInput`, **not** the `...ByTimeout` (4294967294)
+that three earlier investigations chased. Why the system disabled it
+remains unexplained; what is fixed is that our response no longer harms
+the machine.
+
+**Working until:** unknown — the breaker has been present since
+2026-08-11 and this is the first time it has been seen to trip.

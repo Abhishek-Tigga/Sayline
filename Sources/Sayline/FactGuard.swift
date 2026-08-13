@@ -45,11 +45,15 @@ enum FactGuard {
         var units: Set<String> = []
         /// How many negation markers the raw speech carried. A rewrite is
         /// free to rephrase them, not to drop them.
+        /// Real questions the speaker asked. Conversational tics
+        /// ("right?", "you know?") are not counted — see `questionCount`.
+        var questionCount: Int = 0
         var negationCount: Int = 0
 
         var isEmpty: Bool {
             numbers.isEmpty && days.isEmpty && names.isEmpty && months.isEmpty
                 && relativeTimes.isEmpty && units.isEmpty && negationCount == 0
+                && questionCount == 0
         }
     }
 
@@ -77,6 +81,16 @@ enum FactGuard {
         case inventedDay(String)
         case inventedMonth(String)
         case inventedUnit(String)
+        /// The speaker asked something and the rewrite answers it instead.
+        ///
+        /// Both observed qualitative inventions had this shape: a
+        /// rhetorical question turned into a self-contradictory claim
+        /// ("Doesn't that work for you?" → "Friday morning at 11 won't
+        /// work if you have a conflict, but it's an option"). The invented
+        /// sentence carries no number or date, so the subset rule cannot
+        /// see it — but "a question went in and none came out" is
+        /// mechanical.
+        case questionLost(asked: Int)
         /// A person the speaker never named. Worse than a dropped name:
         /// the model put someone in the user's mouth.
         case inventedName(String)
@@ -96,6 +110,8 @@ enum FactGuard {
             case .unitLost(let u): return "the unit \(u) was changed"
             case .negationAdded:
                 return "it added a negation that was never spoken, reversing the meaning"
+            case .questionLost:
+                return "the speaker asked a question and the rewrite answered it instead"
             case .inventedNumber(let n): return "it introduced the number \(n), which was never said"
             case .inventedDay(let d): return "it introduced \(d.capitalized), which was never said"
             case .inventedMonth(let m): return "it introduced \(m.capitalized), which was never said"
@@ -120,6 +136,7 @@ enum FactGuard {
             case .timeLost: return "relative-time"
             case .unitLost: return "unit"
             case .negationAdded: return "negation-added"
+            case .questionLost: return "question-lost"
             case .inventedNumber: return "invented-number"
             case .inventedDay: return "invented-day"
             case .inventedMonth: return "invented-month"
@@ -141,9 +158,10 @@ enum FactGuard {
         facts.days = Set(words.filter(dayNames.contains))
         facts.months = Set(words.filter(monthNames.contains))
         facts.names = properNouns(in: raw)
-        facts.units = Set(words.filter(unitWords.contains))
+        facts.units = units(in: raw, words: words)
         facts.relativeTimes = relativeTimes(in: words)
         facts.negationCount = countNegations(in: words)
+        facts.questionCount = countQuestions(in: raw)
         return facts
     }
 
@@ -208,7 +226,7 @@ enum FactGuard {
         for month in facts.months.sorted() where !rewriteMonths.contains(month) {
             violations.append(.monthLost(month))
         }
-        let rewriteUnits = Set(words.filter(unitWords.contains))
+        let rewriteUnits = units(in: rewrite, words: words)
         for unit in facts.units.sorted() where !rewriteUnits.contains(unit) {
             violations.append(.unitLost(unit))
         }
@@ -242,6 +260,12 @@ enum FactGuard {
             violations.append(.negationLost(said: facts.negationCount, kept: keptNegations))
         } else if facts.negationCount == 0 && keptNegations > 0 {
             violations.append(.negationAdded(said: 0, kept: keptNegations))
+        }
+
+        // All-or-nothing, exactly as negations had to become. Merging two
+        // questions into one is faithful; answering them all is not.
+        if facts.questionCount > 0 && !rewrite.contains("?") {
+            violations.append(.questionLost(asked: facts.questionCount))
         }
 
         // Invention is checked by the `raw:rewrite:` overload, which has
@@ -347,6 +371,39 @@ enum FactGuard {
         "august", "september", "october", "november", "december",
     ]
 
+    /// Units found as words or as symbols.
+    ///
+    /// `tokenize` drops "%" and "₹" as separators, so a faithful rewrite
+    /// of "60 percent" as "60%" read as a *lost* unit — and models write
+    /// symbols for money and percentages almost always, so this fired on
+    /// exactly the sentences the guard most exists to protect. Confirmed
+    /// live by Fable, 2026-08-13.
+    ///
+    /// The mapping is within a currency, never across one: "rupees"
+    /// rewritten as "$" must still raise both a lost rupee and an
+    /// invented dollar.
+    private static func units(in text: String, words: [String]) -> Set<String> {
+        var found = Set(words.filter(unitWords.contains))
+        for (symbol, canonical) in unitSymbols where text.contains(symbol) {
+            found.insert(canonical)
+        }
+        // "rupee" and "rupees" are one unit; compare on the canonical form
+        // so a singular/plural shift is not a violation either.
+        return Set(found.map { unitSynonyms[$0] ?? $0 })
+    }
+
+    private static let unitSymbols: [String: String] = [
+        "%": "percent", "₹": "rupees", "$": "dollars", "£": "pounds", "€": "euros",
+    ]
+
+    private static let unitSynonyms: [String: String] = [
+        "rupee": "rupees", "dollar": "dollars", "euro": "euros", "pound": "pounds",
+        "min": "minutes", "mins": "minutes", "minute": "minutes",
+        "hr": "hours", "hrs": "hours", "hour": "hours",
+        "second": "seconds", "day": "days", "week": "weeks",
+        "month": "months", "year": "years", "meg": "megs", "mb": "megs",
+    ]
+
     /// Units that change a number's meaning without changing the number.
     private static let unitWords: Set<String> = [
         "percent", "megs", "mb", "gb", "kb", "tb", "rupees", "rupee",
@@ -422,6 +479,58 @@ enum FactGuard {
     /// The case the rule exists for — a bare assertion reversed, "we
     /// should ship" becoming "we shouldn't ship" — is essentially never
     /// phrased conditionally.
+    /// Questions worth protecting.
+    ///
+    /// A sentence ending in "?" that is not a conversational tic. "we
+    /// should ship, right?" is a statement wearing a question mark, and
+    /// pinning it would fire on every faithful rewrite of ordinary
+    /// speech.
+    private static func countQuestions(in text: String) -> Int {
+        // Only segments actually terminated by "?" count. The first
+        // version split on "?" and counted every piece, so a statement
+        // with no question mark at all yielded one question and every
+        // faithful rewrite of ordinary speech was flagged.
+        var count = 0
+        var current = ""
+        for character in text {
+            if character == "?" {
+                if isRealQuestion(current) { count += 1 }
+                current = ""
+            } else if character == "." || character == "!" || character == "\n" {
+                current = ""
+            } else {
+                current.append(character)
+            }
+        }
+        return count
+    }
+
+    /// A sentence ending in "?" that is not a conversational tic. "we
+    /// should ship, right?" is a statement wearing a question mark, and
+    /// pinning it would fire on every faithful rewrite of ordinary speech.
+    private static func isRealQuestion(_ sentence: String) -> Bool {
+        let words = tokenize(sentence)
+        guard let last = words.last else { return false }
+        guard questionTics.contains(last) else { return true }
+        // A tic ending it only disqualifies when the sentence did not
+        // *open* interrogatively. Position matters: English inverts for
+        // questions, so "Doesn't that work for you?" is one and "we
+        // should ship, right?" is not — even though both contain a modal.
+        // Checking anywhere in the sentence made every "we should…" a
+        // question.
+        return words.first.map(interrogatives.contains) == true
+    }
+
+    private static let questionTics: Set<String> = [
+        "right", "yeah", "ok", "okay", "no", "yes", "know", "mean", "see",
+    ]
+
+    private static let interrogatives: Set<String> = [
+        "what", "when", "where", "who", "why", "how", "which", "can",
+        "could", "should", "would", "will", "do", "does", "did", "is",
+        "are", "was", "were", "shall", "may", "doesnt", "dont", "isnt",
+    ]
+
     private static func countNegations(in words: [String]) -> Int {
         var count = 0
         for (index, word) in words.enumerated() where negationMarkers.contains(word) {

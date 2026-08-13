@@ -6,6 +6,18 @@ import Cocoa
 /// Accessibility permission to be granted before `start()` will succeed.
 final class HotkeyManager {
     private static let agentModeKeyCode: Int64 = 49 // kVK_Space
+    /// Work mode: hold the hotkey and press Right Command.
+    ///
+    /// Replaces the double-tap, which the user found unpleasant in use —
+    /// "the double tap option is not feeling nice". This mirrors agent
+    /// mode's shape exactly: hold to talk, add one key to change what the
+    /// hold means. Two gestures built the same way are one thing to learn
+    /// instead of two.
+    ///
+    /// Command arrives as a modifier, so it is seen in `flagsChanged`
+    /// rather than `keyDown` — it cannot be swallowed the way Space is,
+    /// and does not need to be: a bare Command press types nothing.
+    private static let workModeKeyCode: Int64 = 54 // kVK_RightCommand
     private static let escapeKeyCode: Int64 = 53 // kVK_Escape
 
     /// Changeable at runtime — the tap watches all flagsChanged events
@@ -37,6 +49,8 @@ final class HotkeyManager {
     /// breaker below.
     private var recentDisables: [Date] = []
     private var tappedOut = false
+    /// So the breaker's disable happens exactly once, off the callback.
+    private var hasTurnedTapOff = false
     /// Fired when the breaker trips, so the app can tell the user their
     /// hotkey is gone and why.
     var onTapGaveUp: (() -> Void)?
@@ -45,6 +59,7 @@ final class HotkeyManager {
     /// rapid keyDown events, not just one, so without this we'd fire
     /// onAgentModeRequested (and log) dozens of times per hold.
     private var agentModeAlreadyRequestedThisHold = false
+    private var workModeAlreadyRequestedThisHold = false
 
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
@@ -60,21 +75,6 @@ final class HotkeyManager {
     /// in progress means Work.
     var onWorkModeHold: (() -> Void)?
 
-    /// When the previous hold ended, and how long it lasted.
-    ///
-    /// A hold that begins within `doubleTapWindow` of a previous hold that
-    /// was itself shorter than `doubleTapWindow` is a double-tap. The
-    /// first tap's audio is already thrown away by the existing 0.4s
-    /// mis-tap rule, so the gesture costs nothing that was not already
-    /// being discarded.
-    private var holdStarted: Date?
-    private var previousHoldEnded: Date?
-    private var previousHoldWasBrief = false
-
-    /// 350 ms, the design's starting value, flagged there as tune-by-feel.
-    /// Long enough for a deliberate double-tap, short enough that two
-    /// separate dictations a second apart are not fused into one.
-    private let doubleTapWindow: TimeInterval = 0.35
     /// Fired when Space is pressed while the hotkey is held — flags the
     /// *current* recording as an agent request rather than dictation.
     /// Per-hold, not a persistent toggle: each new hold defaults back to
@@ -192,6 +192,27 @@ final class HotkeyManager {
     /// unexplained failure that harms the machine, giving up loudly beats
     /// persisting quietly.
     private func noteDisable() {
+        // Already given up. Every line below must not run twice.
+        //
+        // On 2026-08-13 this fired **24,884 times** and froze the user's
+        // keyboard — the exact outcome the breaker exists to prevent.
+        // Two mistakes compounded:
+        //
+        // 1. `CGEvent.tapEnable(enable: false)` was called from inside the
+        //    tap callback, and disabling a tap that way delivers another
+        //    `tapDisabled` event, which re-entered here. A loop that fed
+        //    itself.
+        // 2. Nothing checked whether the breaker had already tripped, so
+        //    each pass logged again and fired `onTapGaveUp` again — which
+        //    is the notice the user saw, drawn ~25,000 times. The pill
+        //    redraw is what actually consumed the machine.
+        //
+        // The comment on the callback said "let the thread loop decide,
+        // rather than fighting the window server from inside the
+        // callback". This function was doing exactly what that sentence
+        // forbids.
+        guard !tappedOut else { return }
+
         let now = Date()
         recentDisables.append(now)
         recentDisables.removeAll { now.timeIntervalSince($0) > 120 }
@@ -199,7 +220,9 @@ final class HotkeyManager {
         guard recentDisables.count < 4 else {
             tappedOut = true
             tapNeedsReenable = false
-            if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: false) }
+            // NOT disabled here. `reenableTapIfSafe` on the tap thread
+            // owns every call to `tapEnable`, so the disable cannot
+            // re-enter this callback.
             SaylineLog.log("the system disabled the event tap \(recentDisables.count) times in two minutes — "
                   + "giving up rather than fighting for the keyboard. Hotkey is off until relaunch.")
             onTapGaveUp?()
@@ -217,7 +240,16 @@ final class HotkeyManager {
     /// are spaced so a persistent failure cannot become a tight loop
     /// against the window server.
     private func reenableTapIfSafe() {
-        guard !tappedOut else { return }
+        // The one place `tapEnable` is called, so a disable can never
+        // re-enter the callback that asked for it.
+        if tappedOut {
+            if let eventTap, !hasTurnedTapOff {
+                hasTurnedTapOff = true
+                CGEvent.tapEnable(tap: eventTap, enable: false)
+                SaylineLog.log("event tap switched off on the tap thread")
+            }
+            return
+        }
         guard tapNeedsReenable, let eventTap else { return }
 
         if IsSecureEventInputEnabled() {
@@ -296,27 +328,29 @@ final class HotkeyManager {
 
     private func handleFlagsChanged(event: CGEvent) {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+
+        // Right Command pressed *during* a hold switches this dictation to
+        // Work. Checked before the hotkey guard below, because this is a
+        // different key and would otherwise be filtered out.
+        if keyCode == Self.workModeKeyCode, isHotkeyActive,
+           event.flags.contains(.maskCommand), !workModeAlreadyRequestedThisHold {
+            workModeAlreadyRequestedThisHold = true
+            SaylineLog.log("work mode requested")
+            onWorkModeHold?()
+            return
+        }
+
         guard keyCode == hotkeyOption.rawValue else { return }
 
         let isPressed = event.flags.contains(hotkeyOption.flagMask)
         if isPressed && !isHotkeyActive {
             isHotkeyActive = true
             agentModeAlreadyRequestedThisHold = false
-            holdStarted = Date()
-
-            // Decided before recording starts, and announced after, so the
-            // pill can show the mode while the user is still speaking.
-            let isWorkHold = previousHoldWasBrief
-                && previousHoldEnded.map { Date().timeIntervalSince($0) < doubleTapWindow } == true
-
-            SaylineLog.log(isWorkHold ? "hotkey DOWN (double-tap — work mode)" : "hotkey DOWN")
+            workModeAlreadyRequestedThisHold = false
+            SaylineLog.log("hotkey DOWN")
             onHotkeyDown?()
-            if isWorkHold { onWorkModeHold?() }
         } else if !isPressed && isHotkeyActive {
             isHotkeyActive = false
-            let held = holdStarted.map { Date().timeIntervalSince($0) } ?? .greatestFiniteMagnitude
-            previousHoldWasBrief = held < doubleTapWindow
-            previousHoldEnded = Date()
             SaylineLog.log("hotkey UP")
             onHotkeyUp?()
         }

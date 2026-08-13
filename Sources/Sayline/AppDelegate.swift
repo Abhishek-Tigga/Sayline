@@ -192,12 +192,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         hotkeyManager.onWorkModeHold = { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
-                // Recording is already running by now — the first press
-                // started it. This only marks the mode and shows it, so
-                // the pill can say "Work" while the user is still talking.
+                // Recording is already running by now — the hold started
+                // it. This only marks the mode and shows it, so the pill
+                // can say "Work" while the user is still talking.
                 // With the default flipped, a double-tap means Clean —
                 // the second gesture is always "the other one", not always
                 // Work.
+                // Right Command while a question is on screen is still an
+                // answer, not a work dictation. The answer path ignores
+                // the flag anyway, but the pill would briefly claim a mode
+                // that cannot apply.
+                guard !self.indicatorWindow.isAwaitingSpokenAnswer else { return }
                 let isWork = !self.defaultModeIsWork
                 self.isWorkModeThisRecording = isWork
                 self.indicatorWindow.updateWorkMode(isWork)
@@ -371,6 +376,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         audioRecorder.start(preferredDeviceUID: preferredInputDeviceUID) { started in
             if !started { SaylineLog.log("audio engine did not start for this hold") }
         }
+        // Open the TLS connection while the user is still speaking.
+        //
+        // The first rewrite of a session measured 5913 ms against 191-607
+        // warm — connection setup, not the model. A hold lasts seconds;
+        // the handshake costs nothing if they turn out not to want a
+        // rewrite, and there is no keep-alive machinery to maintain.
+        ConnectionWarmer.warm()
         indicatorWindow.show(state: .recording)
         // Answering a question is still part of the agent exchange, so the
         // pill keeps its agent styling. Resetting it here made the pill
@@ -520,25 +532,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 var finalText = rawText
                 var producedBy = "clean"
                 do {
-                    finalText = try await cleaner.clean(rawText, context: context)
-                    SaylineLog.log("cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
-
-                    // Work mode runs AFTER Clean, not instead of it.
+                    // Clean and Work run CONCURRENTLY for a work hold.
                     //
-                    // Clean's output is the fallback the guard falls back
-                    // *to*, so it has to exist before the rewrite is
-                    // attempted. It also means a work dictation that fails
-                    // every check still lands as good text rather than raw
-                    // speech.
+                    // The first version awaited Clean and then started
+                    // Work, justified as "Clean's output is the fallback,
+                    // so it must exist first". That does not hold: it must
+                    // exist before the fallback is *needed*, which is the
+                    // rare path. Work needs only the raw transcript. Every
+                    // successful work dictation was paying Clean's full
+                    // duration for nothing — several hundred ms against a
+                    // budget of about a second.
+                    let cleanTask = Task { try await self.cleaner.clean(rawText, context: context) }
                     if workMode {
-                        switch try await workCleaner.rewrite(rawText, context: context) {
+                        let outcome = try await workCleaner.rewrite(rawText, context: context)
+                        switch outcome {
                         case .rewritten(let text):
+                            cleanTask.cancel()
                             finalText = text
                             producedBy = "work"
                         case .rescued(let text, let broke):
+                            cleanTask.cancel()
                             finalText = text
                             producedBy = "work (retry rescued \(broke.map(\.kind).joined(separator: "+")))"
                         case .fellBack(let reason):
+                            // The one path that needs Clean, and it is
+                            // already in flight rather than starting now.
+                            finalText = try await cleanTask.value
                             producedBy = "work → fell back to clean"
                             await MainActor.run {
                                 self.indicatorWindow.flashMessage(
@@ -546,7 +565,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             }
                         }
                         SaylineLog.log("[work] \(producedBy) -> \(finalText)")
+                    } else {
+                        finalText = try await cleanTask.value
+                        SaylineLog.log("cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
                     }
+
                 } catch {
                     SaylineLog.log("cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }

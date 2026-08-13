@@ -3259,3 +3259,172 @@ button.
 
 **Still open for Fable, unfixed by instruction:** the
 rhetorical-question invention, recorded above with reproduction.
+
+---
+
+## WORK MODE · Stage-6 review (Fable, 2026-08-13)
+
+Answering `review/FABLE-PROMPT-workmode-complete.md`. Read all six
+stages; ran one live probe against the guard (below). Everything else
+analysis; claimed, not verified.
+
+### 1 · The rhetorical-question fix: a `questionLost` fact class, not the
+### novelty gate
+Both observed inventions share one mechanical property: **the speaker
+asked a question and the rewrite contains none.** That is checkable by
+dumb code. New fact class: the raw transcript's question count, where a
+question is a sentence ending in "?" that is not a bare tic ("right?",
+"you know?", "okay?" — tiny lexicon, additions with transcripts as
+ever). Verification is all-or-nothing, the negation lesson applied: raw
+has ≥1 real question → rewrite must have ≥1 "?" — merging two questions
+into one is faithful, answering them is not. Both observed failures are
+caught; the retry line is "the speaker asked a question — keep it as a
+question". Ship Opus's prompt clause too (option 1): the prompt reduces
+occurrence, the guard catches leakage — same layering as everything
+else in decision 2.
+**The novelty gate stays unwired.** The two new positive controls are
+both *questions* — so the mechanism-targeted rule above covers them
+exactly, and the gate's problem is unchanged: two controls cannot set a
+threshold, and its one measured false positive was a faithful rewrite
+it wanted to discard. Store both sentences in the suite as calibration
+cases for the day a NON-question qualitative invention appears; that is
+the evidence that would genuinely reopen the verdict.
+
+### 2 · New guard bug, confirmed live: unit symbols false-positive
+Ran the guard directly: raw "60 percent … 45,000 rupees", rewrite
+"60% … ₹45,000" → **two unitLost violations on a faithful rewrite.**
+`tokenize` drops "%" and "₹" as separators, so symbol forms of pinned
+units read as lost. Models overwhelmingly write symbols for money and
+percentages — this fires on exactly the sentences the guard most
+protects, costing a retry (which will use symbols again) and then a
+fallback. Fix: a symbol↔word equivalence map applied on both sides
+(% ↔ percent, ₹ ↔ rupee/rupees, $ ↔ dollar/dollars, £ € optional).
+The mapping must preserve the currency-*swap* catch: raw "rupees",
+rewrite "$45,000" must still raise `inventedUnit(dollars)` — the
+equivalence is within a currency, never across. Suite cases in both
+directions plus the swap.
+
+### 3 · Serial Clean-then-Work: change to parallel — the stated
+### justification doesn't hold
+"Clean's output is the fallback, so it has to exist before the rewrite
+is attempted" — no: it has to exist before the fallback is *needed*,
+which is the rare path. Work needs only the raw transcript. Fire both
+concurrently; await Work; await Clean only on the final-failure path
+(or cancel it on success — an 8B call is cheap either way). This
+removes Clean's full duration from every successful work dictation —
+several hundred ms back against decision 7's budget, which also widens
+the headroom for the gpt-4o-mini availability fallback the cleaner's
+own comment names for when Groq's daily cap bites.
+
+### 4 · The 5,913 ms cold start: pre-warm at hotkey-down
+First rewrite of a session pays connection setup. Warm the HTTP
+connection the moment recording *starts* — a tiny request to the
+endpoint host fired at hotkey-down completes its TLS handshake while
+the user is still speaking, costs nothing when they weren't going to
+rewrite, and needs no keep-alive machinery. The same trick applies to
+the router endpoint and likely explains a slice of the standing ~2s
+agent latency. Measure: log time-to-first-byte on the first call of a
+session, before and after.
+
+### 5 · Double-tap state machine: sound, one cosmetic nit
+Attacked the shape rather than re-reading the claim: capture-to-local
+before async is right; branch order (follow-up → agent → dictation)
+honors decision 8; the settings flip as "the second gesture is always
+the other one" is the correct generalization. The nit: `onWorkModeHold`
+does not check `isAnsweringFollowUpThisRecording`, so a double-tap
+while a question is on screen labels the *answer* hold "Work" on the
+pill — cosmetic, the answer path ignores the flag, but the pill briefly
+claims a mode that cannot apply. One guard line.
+
+### 6 · The smoke-test outlier call: right decision, better framing
+### available
+Recording 1696 ms as an outlier was honest. The improvement: first-of-
+session is not an outlier population, it is a *different* population —
+cold paths (audio engine, TLS, model load) systematically differ from
+warm ones, which is exactly what item 4 shows on the network side. Give
+the smoke test two thresholds: first-hold-of-session and warm holds.
+Outliers stop needing judgment calls because the bin exists.
+
+### 7 · What the 73 cases still cannot catch, stated for the record
+Assignment swaps between people ("Ankit takes payments, Sneha
+dashboards" reversed) — pairing is semantics; documented hole, unchanged
+by anything above. Modality strength ("maybe we should" → "we must") —
+partially inherent: hedge-deletion is the mode's feature, so pinning
+hedges would fight it; accepted. AM/PM flips are covered indirectly
+where a part-of-day word was spoken (relativeTimes pins it). The
+question class closes with item 1. Nothing else new found this pass.
+
+### Still owed live — now the full work-mode list
+The double-tap feel and the 350 ms window; the pill chip; the settings
+flip; the code-window double-tap; a real fallback flash; the first-day
+guard-log read to see what actually fires. Plus the pre-existing list.
+Accessibility will be stale after the next rebuild; the tccutil
+sequence is in the ledger.
+
+---
+
+## 2026-08-13 — Fable's stage-6 items built; the freeze was ours (Opus)
+
+`claimed-fixed`. All seven review items, plus a keyboard freeze the user
+hit while testing.
+
+**The freeze, diagnosed and fixed.** The circuit breaker built to prevent
+a frozen keyboard **caused one**: `noteDisable()` disabled the tap from
+inside the tap callback, which delivers another `tapDisabled` event and
+re-entered the same function, and nothing checked whether it had already
+given up. 24,884 "giving up" lines and 24,872 pill redraws in one
+session, a 10 MB log, and the machine unusable. `main ok 0.8s`
+throughout — **not** the CoreAudio deadlock. Full entry in
+`DICTATION-HISTORY.md`. Fixed: the breaker is idempotent, and every
+`tapEnable` call now belongs to the tap thread alone.
+
+**Item 1 · `questionLost`.** Fable's mechanism-targeted rule rather than
+the novelty gate, and it is better: both observed inventions share the
+property that the speaker asked something and the rewrite contains no
+question mark. All-or-nothing, so merging two questions is faithful.
+Conversational tics excluded. Verified live — the real-1 case now logs
+`retry rescued question-lost` and comes back *"We can move it to Friday
+morning around 11, doesn't that work for you or is Friday bad?"* Two of
+my own cases caught two bugs in it first: every statement counted as a
+question, and "we should ship, right?" counted because a modal appeared
+anywhere rather than at the start.
+
+**Item 2 · symbol units.** Confirmed as Fable described before fixing:
+`60 percent` → `60%` and `45,000 rupees` → `₹45,000` both raised
+`unitLost` on faithful rewrites. Symbol↔word equivalence within a
+currency; a rupees→dollars swap still raises both `unitLost(rupees)` and
+`inventedUnit(dollars)`.
+
+**Item 3 · parallel Clean/Work.** Fable was right that my justification
+did not hold — Clean must exist before the fallback is *needed*, not
+before Work starts. Both now run concurrently; Clean is cancelled on
+success and awaited only on the fallback path.
+
+**Item 4 · `ConnectionWarmer`**, fired at hotkey-down. Untested against
+the 5913 ms cold start, because the measurement needs a cold session.
+
+**Item 5 · the follow-up nit.** A work chord during a pending question no
+longer labels the answer hold "Work".
+
+**Item 6 · two populations** in the smoke test — first-of-session under
+900 ms, warm under 150 ms — so an outlier no longer needs a judgement
+call.
+
+**Item 7** documented unchanged: assignment swaps and modality strength
+remain uncatchable.
+
+### The double-tap is gone, by the user's call
+
+*"The double tap option is not feeling nice."* Work mode is now **hold +
+Right Command**, mirroring agent mode's hold + Space. A chord has no
+timing window to tune, no fumble case, and no interaction with the
+mis-tap rule; two gestures built the same way are one thing to learn.
+The 350 ms machinery is deleted, not parked. `DESIGN-work-mode.md`
+amended in place with the reason.
+
+Suite 85 cases green. Smoke test 304/87/115/117/93 ms, PASS.
+
+**Not verified by its author:** nobody has pressed Right Command during a
+hold. The freeze fix cannot be proven without reproducing a condition
+whose trigger is still unknown — what is proven is that the response
+cannot loop.

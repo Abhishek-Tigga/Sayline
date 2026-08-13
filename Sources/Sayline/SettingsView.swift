@@ -51,8 +51,8 @@ struct SettingsView: View {
                 Toggle("Default to Work mode", isOn: $appDelegate.defaultModeIsWork)
                     .disabled(appDelegate.alwaysVerbatim)
                 Text(appDelegate.defaultModeIsWork
-                     ? "Single press rewrites for clarity. Double-tap keeps your own sentences."
-                     : "Single press tidies what you said. Double-tap rewrites for clarity.")
+                     ? "Holding rewrites for clarity. Add \(appDelegate.hotkeyOption.shortSymbol)+⌘ to keep your own sentences."
+                     : "Holding tidies what you said. Add \(appDelegate.hotkeyOption.shortSymbol)+⌘ to rewrite for clarity.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

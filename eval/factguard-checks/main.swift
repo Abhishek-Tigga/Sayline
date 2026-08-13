@@ -311,6 +311,58 @@ check("one bug -> two bugs is caught by the subset rule",
       violations("there is one bug in checkout", "There are two bugs in checkout.")
         .contains(.inventedNumber(2)))
 
+print("\nFable stage-6 review — symbol units, confirmed live as a false positive")
+
+// Models overwhelmingly write symbols for money and percentages, so this
+// fired on exactly the sentences the guard most exists to protect: a
+// retry (which uses symbols again) and then a fallback, on a faithful
+// rewrite.
+check("percent symbol is the same unit as the word",
+      violations("the backend work is maybe 60 percent done", "The backend is 60% done.").isEmpty)
+check("rupee symbol is the same unit as the word",
+      violations("the invoice is for 45,000 rupees", "The invoice is for ₹45,000.").isEmpty)
+check("dollar symbol is the same unit as the word",
+      violations("it cost 200 dollars", "It cost $200.").isEmpty)
+// The equivalence is WITHIN a currency, never across it.
+check("a currency swap is still caught",
+      violations("the invoice is for 45,000 rupees", "The invoice is for $45,000.")
+        .contains(where: { if case .unitLost = $0 { return true }; return false }))
+check("and the swapped-in currency is flagged as invented",
+      violations("the invoice is for 45,000 rupees", "The invoice is for $45,000.")
+        .contains(.inventedUnit("dollars")))
+
+print("\nFable stage-6 review — a question answered is a question lost")
+
+// Both observed qualitative inventions share one mechanical property:
+// the speaker asked something and the rewrite contains no question. That
+// is checkable without semantics.
+check("the real-1 rhetorical question invention is caught",
+      violations("So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?",
+                 "Let's move the design review to Friday morning around 11. Friday morning at 11 won't work if you have a conflict, but it's an option.")
+        .contains(where: { if case .questionLost = $0 { return true }; return false }))
+check("the email-register version is caught too",
+      violations("Doesn't that work for you or is Friday bad?",
+                 "Friday is not confirmed as a suitable alternative, as it is not known if it works or if Friday is bad.")
+        .contains(where: { if case .questionLost = $0 { return true }; return false }))
+check("keeping the question passes",
+      !violations("Doesn't that work for you or is Friday bad?",
+                  "Does Friday morning work for you?")
+        .contains(where: { if case .questionLost = $0 { return true }; return false }))
+// Merging two questions into one is faithful; the rule is all-or-nothing,
+// the same lesson the negation count had to learn.
+check("merging two questions into one is allowed",
+      !violations("Can we do Friday? Or is that bad for you?", "Does Friday work for you?")
+        .contains(where: { if case .questionLost = $0 { return true }; return false }))
+// Conversational tics are not questions worth protecting.
+check("a trailing tic is not a question",
+      !violations("we should ship on Friday, right?", "We should ship on Friday.")
+        .contains(where: { if case .questionLost = $0 { return true }; return false }))
+check("you know? is not a question either",
+      !violations("it just sits there forever, you know?", "It sits there forever.")
+        .contains(where: { if case .questionLost = $0 { return true }; return false }))
+check("a statement rewritten as a statement is untouched",
+      violations("we should ship on Friday", "We should ship on Friday.").isEmpty)
+
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))
 check("pinned block names the number", pinned.contains("15"))

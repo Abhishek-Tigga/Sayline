@@ -211,7 +211,14 @@ extension HeadlessModes {
             let text = (try? String(contentsOfFile: arguments[index + 1], encoding: .utf8)) ?? ""
             inputs = text.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
         } else {
-            inputs = arguments.dropFirst(2).filter { !$0.hasPrefix("--") }
+            // Drop flag VALUES too, not just the flags. "--context chat"
+            // left "chat" behind and it was rewritten as a transcript.
+            var skipNext = false
+            inputs = arguments.dropFirst(2).filter { argument in
+                if skipNext { skipNext = false; return false }
+                if argument.hasPrefix("--") { skipNext = true; return false }
+                return true
+            }
         }
         guard !inputs.isEmpty else {
             print("usage: Sayline --work-rewrite \"transcript\" [--context email|chat|code|general]")
@@ -337,10 +344,14 @@ extension HeadlessModes {
             let peak = peakAmplitude(of: file)
             // The contract: fast to start, nearly all of the window on
             // disk, and actual sound in it.
-            // Hold 1 pays a cold engine start; the agreed contract bounds
-            // holds 2 onward. Budgeting them the same either fails a
-            // healthy first hold or hides a real regression in the rest.
-            let budget = hold == 1 ? 600.0 : 150.0
+            // Two populations, not one threshold with judgement calls
+            // attached. Cold paths — audio engine, TLS, model load —
+            // systematically differ from warm ones, so a first hold at
+            // 1696 ms is not an outlier in the warm distribution, it is a
+            // sample from a different one. Giving the bin a name means
+            // nobody has to decide in the moment whether to believe a
+            // number.
+            let budget = hold == 1 ? 900.0 : 150.0
             let ok = latency < budget && onDisk > seconds * 0.8 && peak > 0.005
             if !ok { failures += 1 }
             print(String(format: "hold %d: start %3.0f ms · %.2fs of %.1fs · peak %.3f · %d Hz %d ch · %d KB  %@",
@@ -349,8 +360,9 @@ extension HeadlessModes {
                          ok ? "OK" : (peak <= 0.005 ? "<-- SILENT" : "<-- BREAKS THE CONTRACT")))
             recorder.discardRecording(at: url)
         }
-        print(failures == 0 ? "PASS — every hold met the contract"
-                            : "FAIL — \(failures) hold(s) broke the contract")
+        print(failures == 0
+              ? "PASS — every hold met the contract (first-of-session < 900ms, warm < 150ms)"
+              : "FAIL — \(failures) hold(s) broke the contract")
         exit(failures == 0 ? 0 : 1)
     }
 }

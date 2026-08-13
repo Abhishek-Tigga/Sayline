@@ -158,13 +158,17 @@ decides must compile without frameworks so a check suite can hold it.**
   the temperature-0 call to the measured model, the single retry with
   the violation named, and the fallback decision. Never touches the
   router; work mode is entirely on the dictation path.
-- **`HotkeyManager`** gains double-tap detection: a hold that begins
-  within ~350 ms of a previous hold ending, where that previous hold
-  itself lasted under ~350 ms, is a Work hold. The first tap's fragment
-  is already discarded by the existing 0.4 s mis-tap rule, so normal
-  dictation start stays instant — nothing waits to see whether a second
-  tap is coming. The window value is a starting point, tuned by hand
-  once it is feelable.
+- **`HotkeyManager`**: Work is **hold + Right Command**, mirroring agent
+  mode's hold + Space.
+
+  **Amended 2026-08-13, after use.** The design specified a double-tap and
+  the builder shipped it; the user rejected it on feel — *"the double tap
+  option is not feeling nice"* — and asked for a chord instead. Two
+  gestures built the same way are one thing to learn rather than two, and
+  a chord has no timing window to tune, no fumble case, and no
+  interaction with the mis-tap rule. The double-tap machinery and its
+  350 ms window are deleted, not parked: nothing about them is worth
+  reviving.
 - **`AppDelegate` / pipeline**: `isWorkModeThisRecording`, set per-hold
   like agent mode; routed only on the plain-dictation branch (decision
   8). Clean path unchanged. `TranscriptCleanupValidator` continues to
