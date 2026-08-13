@@ -24,19 +24,36 @@ final class SoundEffectPlayer {
 
         engine.attach(playerNode)
         engine.connect(playerNode, to: engine.mainMixerNode, format: format)
-        do {
-            try engine.start()
-        } catch {
-            SaylineLog.log("sound engine failed to start -> \(error.localizedDescription)")
-        }
+        // Deliberately NOT started here.
+        //
+        // This engine used to run from launch to quit, holding an output
+        // stream open for the whole session so the process never went
+        // audio-quiet. macOS restores other apps' volume when the ducking
+        // process falls silent, and this one never did — so a duck that
+        // should have lifted in a second lasted as long as the app.
+        //
+        // Nothing is held while idle: started for a chime, stopped after.
     }
 
     func playHotkeyDown() { play(startBuffer) }
     func playHotkeyUp() { play(stopBuffer) }
 
     private func play(_ buffer: AVAudioPCMBuffer) {
-        guard engine.isRunning else { return }
-        playerNode.scheduleBuffer(buffer, at: nil)
+        do {
+            if !engine.isRunning { try engine.start() }
+        } catch {
+            SaylineLog.log("sound engine failed to start -> \(error.localizedDescription)")
+            return
+        }
+        playerNode.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
+            // Off the render thread, and after a beat so a second chime
+            // arriving immediately (hold-down then hold-up) does not have
+            // the engine pulled out from under it.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                guard let self, !self.playerNode.isPlaying else { return }
+                self.engine.stop()
+            }
+        }
         if !playerNode.isPlaying { playerNode.play() }
     }
 

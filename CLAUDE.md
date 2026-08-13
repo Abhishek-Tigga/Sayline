@@ -143,6 +143,16 @@ table, `LocalTimestamp`. When we know the answer, don't ask the model.
 broke. A case added after the fix tends to describe the fix rather than the
 bug.
 
+**While idle, Sayline holds nothing.** No input stream, no output stream,
+no device claim, and no OS-level state — ducking, secure-input
+workarounds — that outlives the gesture which justified it. Idle means no
+hold in progress and no chime sounding; anything acquired for a gesture is
+released within a second of its end. On 2026-08-13 the app quietened every
+other app on the Mac by ~43x for as long as it ran, and the person it
+happened to had no way to attribute it to us. Any effect on the system
+must be scoped to a gesture, and the *absence* of leftovers has to be
+asserted by a test, because a leftover is invisible to whoever caused it.
+
 **Verify the contract, not the delta.** Check the invariant the feature
 must always satisfy, not just the symptom you removed. Every dictation
 regression on 2026-08-13 was visible in the log that shipped with its own

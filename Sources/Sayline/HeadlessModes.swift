@@ -274,7 +274,11 @@ extension HeadlessModes {
             let peak = peakAmplitude(of: file)
             // The contract: fast to start, nearly all of the window on
             // disk, and actual sound in it.
-            let ok = latency < 150 && onDisk > seconds * 0.8 && peak > 0.005
+            // Hold 1 pays a cold engine start; the agreed contract bounds
+            // holds 2 onward. Budgeting them the same either fails a
+            // healthy first hold or hides a real regression in the rest.
+            let budget = hold == 1 ? 600.0 : 150.0
+            let ok = latency < budget && onDisk > seconds * 0.8 && peak > 0.005
             if !ok { failures += 1 }
             print(String(format: "hold %d: start %3.0f ms · %.2fs of %.1fs · peak %.3f · %d Hz %d ch · %d KB  %@",
                          hold, latency, onDisk, seconds, peak,

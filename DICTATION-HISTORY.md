@@ -94,6 +94,54 @@ frozen the whole app, and probably the keyboard with it.
 
 ## Entries, newest first
 
+### 2026-08-13 · Sayline quietened the entire Mac
+
+**Seen:** all system audio playing at minimum however high the volume was
+set. Resolved on killing Sayline. The user asked whether we turn their
+volume down, and said the thing worth keeping: *"We should not modify the
+user's system in order to fit our purpose."*
+
+**Not the volume setting** — that read 100 throughout, and `setVolume` runs
+only from an explicit command.
+
+**Cause:** voice processing does two things, and we only ever wanted one.
+It subtracts the speaker signal from the microphone (the 97% bleed fix),
+**and** it turns every other app down, because macOS assumes a
+voice-processing unit means a call. Enabled at launch, it ducked the
+system for the app's whole life.
+
+**Measured**, fixed tone through the speakers, three repetitions per state:
+
+```
+Sayline not running        1.59  1.45  1.59
+running, never held        0.035 0.035 0.035   <- 43x quieter
+after one hold             0.072 0.072 0.035
+killed again               1.48  1.65  1.60
+```
+
+**Two attempted fixes, both measured, both insufficient:**
+`voiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking:
+false, duckingLevel: .min)` — `.min` is the smallest duck, not "none".
+Re-applying it on every start — no better. The only way not to duck while
+idle is not to have voice processing enabled while idle, and enabling it
+per hold costs ~700ms of the user's first words.
+
+**Resolution: voice processing parked** behind
+`AudioRecorder.voiceProcessingWanted`, off. The exit criterion had been
+written in advance by Fable — *if ducking survives both fixes, VP is
+removed* — so this was a rule applied, not a judgement made under
+pressure. Verified after: A ≈ B ≈ C (1.5 / 1.5 / 2.0), and five holds
+capture cleanly.
+
+**Also fixed regardless:** `SoundEffectPlayer` started an `AVAudioEngine`
+in `init()` and never stopped it, so the process never went audio-quiet.
+It now starts for a chime and stops after.
+
+**Cost accepted:** speaker audio can again bleed into a transcript when
+dictating with music playing on the built-in speakers.
+
+**Working until:** voice processing was introduced the previous day.
+
 ### 2026-08-13 · Recordings full of silence, and no password prompt
 
 **Seen:** dictation produced nothing. The user's key observation was the

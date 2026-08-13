@@ -21,6 +21,36 @@ final class AudioRecorder {
     /// Continuity microphone and a virtual driver installed. We cannot
     /// stop macOS churning its device list; we can refuse to block the
     /// main thread on it.
+    /// **Voice processing is off, and this is the switch that turns it
+    /// back on.** Parked rather than deleted, like `SurfaceStyle.parkedGlass`.
+    ///
+    /// It solved a real problem — speaker audio bleeding into dictation,
+    /// cut 97% (peak 0.8085 -> 0.0230). It also, unavoidably, turns every
+    /// other app's volume down, because macOS assumes a voice-processing
+    /// unit means you are on a call. Measured with a fixed tone, three
+    /// repetitions per state, 2026-08-13:
+    ///
+    /// ```
+    /// Sayline not running        1.59  1.45  1.59
+    /// running, never held        0.035 0.035 0.035   <- 43x quieter
+    /// after one hold             0.072 0.072 0.035
+    /// killed again               1.48  1.65  1.60
+    /// ```
+    ///
+    /// `voiceProcessingOtherAudioDuckingConfiguration` with
+    /// `enableAdvancedDucking: false, duckingLevel: .min` does not stop it;
+    /// `.min` is the smallest duck available, not "none". The only way not
+    /// to duck while idle is not to have it enabled while idle — and
+    /// enabling it per hold costs ~700ms of the user's first words.
+    ///
+    /// So it goes. The bug it fixed is a lyric occasionally landing in a
+    /// transcript; the cost was reaching outside our own app to quieten
+    /// the user's machine. The exit criterion for this was written down in
+    /// advance (Fable, `review/LEDGER.md`) and the measurement met it.
+    ///
+    /// Turn this on only alongside a plan for the ducking.
+    private let voiceProcessingWanted = false
+
     private let audioQueue = DispatchQueue(label: "com.abhishektigga.sayline.audio")
     private let engine = AVAudioEngine()
     private var audioFile: AVAudioFile?
@@ -190,11 +220,33 @@ final class AudioRecorder {
     /// one step later, because it couples the input to the output and some
     /// output devices present a layout it cannot initialise. `startOnAudioQueue`
     /// therefore treats it as an attempt, not a setting.
+    /// Keeps the echo cancellation, declines the ducking.
+    ///
+    /// Voice processing does two separate things: it subtracts the speaker
+    /// signal from the microphone (which is the 97% bleed fix we wanted),
+    /// and it turns *every other app's* volume down, because it assumes you
+    /// are on a call. We only ever asked for the first.
+    ///
+    /// Measured on 2026-08-13 with a fixed tone through the speakers: peak
+    /// **1.4855 with Sayline closed, 0.0081 with it merely running** — the
+    /// user's whole system roughly 180x quieter for as long as the app was
+    /// open, at full volume. That is the app reaching outside itself to
+    /// change the machine, which it must never do.
+    private func declineToDuckOtherAudio(on input: AVAudioInputNode) {
+        guard #available(macOS 14.0, *) else { return }
+        input.voiceProcessingOtherAudioDuckingConfiguration =
+            AVAudioVoiceProcessingOtherAudioDuckingConfiguration(
+                enableAdvancedDucking: false,
+                duckingLevel: .min)
+        SaylineLog.log("[mic] ducking of other apps disabled — cancellation kept")
+    }
+
     private func setVoiceProcessing(_ enabled: Bool, on input: AVAudioInputNode) {
         guard voiceProcessingEnabled != enabled else { return }
         do {
             try input.setVoiceProcessingEnabled(enabled)
             voiceProcessingEnabled = enabled
+            if enabled { declineToDuckOtherAudio(on: input) }
             SaylineLog.log(enabled
                 ? "voice processing enabled — speaker audio cancelled from the mic"
                 : "voice processing turned off")
@@ -216,7 +268,7 @@ final class AudioRecorder {
     /// holds two through five cost nothing.
     func warmUp() {
         audioQueue.async { [weak self] in
-            guard let self, !self.voiceProcessingBroke else { return }
+            guard let self, self.voiceProcessingWanted, !self.voiceProcessingBroke else { return }
             let started = Date()
             self.setVoiceProcessing(true, on: self.engine.inputNode)
             SaylineLog.log(String(format: "[mic] warm-up took %.0f ms — later holds pay none of it",
@@ -225,11 +277,11 @@ final class AudioRecorder {
     }
 
     private func startOnAudioQueue(preferredDeviceUID: String?) -> Bool {
-        if !voiceProcessingBroke,
+        if voiceProcessingWanted, !voiceProcessingBroke,
            attemptStart(preferredDeviceUID: preferredDeviceUID, withVoiceProcessing: true) {
             return true
         }
-        guard !voiceProcessingBroke else {
+        guard voiceProcessingWanted, !voiceProcessingBroke else {
             // Already known bad this session — go straight to the path that
             // works instead of failing once more to learn the same thing.
             return attemptStart(preferredDeviceUID: preferredDeviceUID, withVoiceProcessing: false)
@@ -284,6 +336,14 @@ final class AudioRecorder {
             applyPreferredDevice(preferredDeviceUID, on: input)
         }
         setVoiceProcessing(withVoiceProcessing, on: input)
+        // Re-applied on every start, not only when the toggle changes.
+        //
+        // `setVoiceProcessing` returns early when the state already
+        // matches, so after warm-up this was set once at launch and never
+        // again — and the audio unit loses it across `reset()`/`start()`.
+        // Measured: launching stopped ducking, and the first *hold* ducked
+        // the system anyway and never released it.
+        if withVoiceProcessing { declineToDuckOtherAudio(on: input) }
 
         // Read AFTER voice processing is enabled. Turning it on replaces the
         // input format — 16 kHz became 48 kHz in testing — so a format read

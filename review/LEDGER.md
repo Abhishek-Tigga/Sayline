@@ -2217,3 +2217,139 @@ open.
 **Also open, untouched:** "next song" does nothing while play/pause works.
 The browser path posts `NX_KEYTYPE_NEXT` and was never verified against a
 browser tab. Not investigated, deliberately.
+
+---
+
+## SYSTEM-AUDIO · Ducking diagnosis (Fable, 2026-08-13)
+
+Answering `review/FABLE-PROMPT-system-audio.md`. Analysis + measurement
+design; nothing run against the live system (a real repro needs speakers,
+a mic, and a session where the symptom is present).
+
+### 1 · The mechanism, named
+The voice-processing IO unit **ducks other applications' audio by
+design** — it believes it is a call app, and macOS treats a running VPIO
+like an active FaceTime call. This is not a leak or a side effect; it is
+the documented behaviour, and it is configurable:
+`AVAudioInputNode.voiceProcessingOtherAudioDuckingConfiguration`
+(macOS 14+), which Sayline never sets (verified: no reference in the
+codebase). Ducking legitimately engages during every hold.
+Why it *persists* while idle — the part Opus's probes could not explain —
+fits a stuck-duck: coreaudiod restores other apps' volume when the
+ducking process goes audio-quiet, and Sayline **never goes audio-quiet**,
+because `SoundEffectPlayer` starts an output engine in `init()` and never
+stops it (verified: `engine.start()` at line 28, no stop in the file).
+Duck engages on the first hold; the always-open output stream keeps the
+process looking active; the restore never fires; killing the app releases
+everything at once — which is exactly the reported shape. This also
+explains why VP-in-isolation probes showed nothing: the isolation probe
+lacked the second, permanent stream.
+
+### 2 · Measuring it without ears
+Loopback through the mic, three states, one number each. From a second
+process: `afplay` a fixed tone at fixed system volume; from a third,
+`scratchpad/mictest.swift` records and prints peak.
+(A) Sayline dead → baseline peak. (B) Sayline running, never yet held →
+peak. (C) after one dictation hold, idle again → peak.
+A ≈ B ≫ C confirms engages-on-first-hold-and-sticks. A ≈ B ≈ C with the
+fixes applied is the pass criterion. Perceptual claim becomes a number;
+the selftest lesson (assert the signal, not the artifact) applied.
+
+### 3 · The fix, ranked — both halves, in one build
+1. **Tell VP not to duck**: set
+   `voiceProcessingOtherAudioDuckingConfiguration = .init(
+   enableAdvancedDucking: false, duckingLevel: .min)` where VP is
+   enabled. One line. Echo *cancellation* (the 97% bleed fix) is
+   unaffected — cancellation subtracts the speaker signal from the mic;
+   ducking lowers other apps' volume. We keep the half we wanted and
+   decline the half we never asked for. Verify the exact initializer
+   against the SDK; the API is macOS 14+.
+2. **SoundEffectPlayer stops holding the system**: start before a chime,
+   stop after (or replace with NSSound). Right regardless of whether it
+   is implicated: it removes the stuck-duck ingredient, and it fixes the
+   known self-noise in the NowPlaying detector, which currently lists
+   Sayline as "outputting" in silence.
+Both are independently correct, so shipping them together is not
+hypothesis-bundling — but run measurement (2) before and after so the
+mechanism is proven, not believed. If C still sags after both, THEN the
+combination theory is wrong and VP itself goes on trial.
+
+### 4 · Should voice processing go?
+Not yet — this failure is its *designed* behaviour left unconfigured,
+not a sixth defect. But set the exit criterion now, in writing: **if the
+loopback measurement still shows ducking after fix 1+2, or if any
+further VP failure class appears that cannot be configured away, VP is
+removed** — and the fallback is not "accept bleed" but scoping: enable
+VP for a hold only when the NowPlaying detector says something is
+audibly playing, since bleed only exists when media plays. Smaller
+surface, same protection, at the cost of a per-hold decision that is
+already computed.
+
+### 5 · The rule for CLAUDE.md
+"While idle, Sayline holds nothing: no input stream, no output stream,
+no device claim, no OS-level state (ducking, secure-input workarounds)
+that outlives the user gesture that justified it. Idle means no hold in
+progress and no chime currently sounding; everything acquired for a
+gesture is released within a second of its end. Detection: the selftest
+asserts, after launch + one hold + five seconds idle, that the
+per-process audio probe lists no Sayline stream and that a mic-loopback
+tone matches the app-dead baseline." The generalized form of the user's
+own sentence, and of this bug: any effect on the system must be scoped
+to a gesture, and the absence of leftovers must be asserted by a test,
+because a leftover is invisible to the person who caused it.
+
+### Also: "next song" not working is probably not a bug
+`NX_KEYTYPE_NEXT` reaches the now-playing owner, but a single YouTube
+video registers no next-track handler — there is no next. In a playlist
+or on YouTube Music, there is. Verify against a playlist before touching
+any code; play/pause working while next does not is consistent with
+correct behaviour on a lone video.
+
+---
+
+## 2026-08-13 — system ducking resolved; voice processing parked (Opus)
+
+`claimed-fixed`. Fable's plan followed, including its written exit
+criterion, which is what decided this rather than my judgement.
+
+**Measured before touching anything** (fixed tone, 3 reps per state):
+not-running 1.59/1.45/1.59 · running-never-held 0.035×3 · after-a-hold
+0.072/0.072/0.035 · killed 1.48/1.65/1.60. The duck engaged **at launch**,
+not on first hold as modelled — because Build 1 warms VP up at startup.
+
+**Fix 1 (Fable's, applied):** `voiceProcessingOtherAudioDuckingConfiguration
+(enableAdvancedDucking: false, duckingLevel: .min)`. Measured: B recovered
+to 1.62 but C stayed ducked. Re-applied it on every start, since
+`setVoiceProcessing` returns early once the state matches and the unit
+loses the config across reset/start — and B then measured 0.0327. Three
+repetitions confirmed the duck at every stage. `.min` is the smallest
+duck, not "none".
+
+**Fix 2 (Fable's, applied and kept):** `SoundEffectPlayer` no longer holds
+an output engine for the process lifetime. Correct independent of this
+bug, and it also removes the self-noise that made Sayline list itself as
+"outputting" in the NowPlaying detector.
+
+**Exit criterion met → voice processing parked.** Fable wrote: *if the
+loopback measurement still shows ducking after fix 1+2, VP is removed.* It
+did. `AudioRecorder.voiceProcessingWanted = false`, the machinery kept and
+documented in the manner of `SurfaceStyle.parkedGlass`.
+
+**Verified after:** A 1.98/1.43/1.52 · B 1.51/1.70/1.48 · C 2.33/2.22/1.80
+— A ≈ B ≈ C, the stated pass criterion. `--selftest-capture 3 5` passes
+all five holds: start 214 ms cold then 91–115 ms, 2.99s of a 3.0s window,
+peak 1.000, 97 KB.
+
+**Harness correction:** the self-test bounded hold 1 at 150 ms, but the
+agreed contract bounds *holds 2–5*; hold 1 pays a cold engine start. Hold
+1 now gets 600 ms. Loosening a threshold to make a test pass deserves
+suspicion — recorded here so it can be challenged.
+
+**Cost accepted, stated plainly:** speaker bleed can again reach a
+transcript when dictating with music on the built-in speakers. That is a
+lyric in a transcript, against quietening the user's whole machine.
+
+**Fable's note on "next song" not yet checked:** a lone YouTube video
+registers no next-track handler, so play/pause working while next does
+nothing may be correct behaviour. To be verified against a playlist before
+any code is touched.
