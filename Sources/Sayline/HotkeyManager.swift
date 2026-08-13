@@ -48,6 +48,33 @@ final class HotkeyManager {
 
     var onHotkeyDown: (() -> Void)?
     var onHotkeyUp: (() -> Void)?
+
+    /// Called on hotkey-down when this hold is a Work hold — a second
+    /// press that arrived quickly after a brief first one.
+    ///
+    /// Deliberately a *separate* callback fired alongside `onHotkeyDown`
+    /// rather than a parameter on it. The first press has already started
+    /// recording by then, exactly as it always has; nothing waits to
+    /// discover whether a second tap is coming, so ordinary dictation
+    /// keeps its instant start. This only tells the app that the hold now
+    /// in progress means Work.
+    var onWorkModeHold: (() -> Void)?
+
+    /// When the previous hold ended, and how long it lasted.
+    ///
+    /// A hold that begins within `doubleTapWindow` of a previous hold that
+    /// was itself shorter than `doubleTapWindow` is a double-tap. The
+    /// first tap's audio is already thrown away by the existing 0.4s
+    /// mis-tap rule, so the gesture costs nothing that was not already
+    /// being discarded.
+    private var holdStarted: Date?
+    private var previousHoldEnded: Date?
+    private var previousHoldWasBrief = false
+
+    /// 350 ms, the design's starting value, flagged there as tune-by-feel.
+    /// Long enough for a deliberate double-tap, short enough that two
+    /// separate dictations a second apart are not fused into one.
+    private let doubleTapWindow: TimeInterval = 0.35
     /// Fired when Space is pressed while the hotkey is held — flags the
     /// *current* recording as an agent request rather than dictation.
     /// Per-hold, not a persistent toggle: each new hold defaults back to
@@ -275,10 +302,21 @@ final class HotkeyManager {
         if isPressed && !isHotkeyActive {
             isHotkeyActive = true
             agentModeAlreadyRequestedThisHold = false
-            SaylineLog.log("hotkey DOWN")
+            holdStarted = Date()
+
+            // Decided before recording starts, and announced after, so the
+            // pill can show the mode while the user is still speaking.
+            let isWorkHold = previousHoldWasBrief
+                && previousHoldEnded.map { Date().timeIntervalSince($0) < doubleTapWindow } == true
+
+            SaylineLog.log(isWorkHold ? "hotkey DOWN (double-tap — work mode)" : "hotkey DOWN")
             onHotkeyDown?()
+            if isWorkHold { onWorkModeHold?() }
         } else if !isPressed && isHotkeyActive {
             isHotkeyActive = false
+            let held = holdStarted.map { Date().timeIntervalSince($0) } ?? .greatestFiniteMagnitude
+            previousHoldWasBrief = held < doubleTapWindow
+            previousHoldEnded = Date()
             SaylineLog.log("hotkey UP")
             onHotkeyUp?()
         }

@@ -3198,3 +3198,64 @@ rejecting was missing evidence and the evidence now exists.
 ```bash
 Sayline --work-rewrite "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?" --context chat
 ```
+
+---
+
+## 2026-08-13 — work mode stages 4, 5, 6 (Opus)
+
+`claimed-fixed`. All six stages built. Nothing here has been used by a
+human; every live item is owed.
+
+**Stage 4 · double-tap.** `HotkeyManager` records when the previous hold
+ended and whether it was brief; a hold beginning within 350 ms of a hold
+shorter than 350 ms is a Work hold. `onWorkModeHold` is a **separate
+callback fired after `onHotkeyDown`**, deliberately: the first press has
+already started recording, so nothing waits to discover whether a second
+tap is coming and ordinary dictation keeps its instant start. The first
+tap's audio is discarded by the existing 0.4 s mis-tap rule, so the
+gesture costs nothing that was not already thrown away.
+
+`isWorkModeThisRecording` mirrors the agent-mode flag and is captured
+into a local before the async work, so a later hold cannot change what
+this one does. Routed only on the plain-dictation branch — agent commands
+and spoken follow-ups ignore the double-tap silently, per decision 8.
+
+Work runs **after** Clean, not instead of it: Clean's output is what the
+guard falls back *to*, so it must exist before the rewrite is attempted.
+
+**Stage 5.** Mode chip on the pill the instant the hold registers ("Work
+Listening", ocean accent), same lesson as the agent styling fix. Settings
+gained "Always insert my exact words" (skips both modes, no round trip)
+and "Default to Work mode" (flips which gesture means which; the
+double-tap is always *the other one*, never always Work). `HistoryEntry`
+gained an **optional** `mode` — verified that an entry written before
+work mode still decodes, because a non-optional field would have made
+every stored history unreadable on upgrade.
+
+**Decision 4's picker retirement was already done.** There is no
+`DictationStyle` in the codebase; `abc2bd9` removed the style system long
+before this feature, and no stored preference exists to migrate. Checked
+with `git log -S` rather than writing migration code for a key that was
+never there.
+
+**Stage 6 · the smoke test earned its keep.** First run:
+`hold 1: start 1696 ms <-- BREAKS THE CONTRACT`, against a 214 ms
+baseline. Re-measured three times: 255, 255, 238 ms. **An outlier, not a
+regression** — recorded because the honest options were to re-measure or
+to explain it away, and this project has paid for the second. Final run
+after stage 5: five holds, 238/89/95/91/118 ms, full window, real audio,
+PASS. All eight check suites green. `git diff` over Clean's two files
+still empty.
+
+**Owed live, none of it automatable:** the double-tap feel and its
+350 ms window; the fumble case (a mis-tap showing "Work" mid-hold); the
+Settings flip actually reversing the gestures; a work rewrite landing in
+a code window via double-tap; and the guard's fallback flash in real use.
+Plus the five older items still outstanding from the meetings work.
+
+**Accessibility will be stale after this build** —
+`tccutil reset Accessibility com.abhishektigga.sayline`, then the grant
+button.
+
+**Still open for Fable, unfixed by instruction:** the
+rhetorical-question invention, recorded above with reproduction.

@@ -15,6 +15,9 @@ enum RecordingIndicatorState: Equatable {
 final class IndicatorViewModel: ObservableObject {
     @Published var state: RecordingIndicatorState = .recording
     @Published var isAgentMode: Bool = false
+    /// Work mode gets its own label and accent, set the instant the
+    /// double-tap registers rather than when the text arrives.
+    @Published var isWorkMode: Bool = false
     /// What the user said, shown in the speech-back box above the pill.
     /// Only set in agent mode, and only once transcription returns — we
     /// have no words before then (Groq Whisper is batch, not streaming).
@@ -691,7 +694,8 @@ private struct PillView: View {
             // read badly) at .mono/40%, so the two states stay distinct.
             .borderBeam(
                 viewModel.isAgentMode ? .sm : .pulseInner,
-                colorVariant: viewModel.isAgentMode ? .ocean : .mono,
+                colorVariant: viewModel.isAgentMode ? .ocean
+                    : viewModel.isWorkMode ? .ocean : .mono,
                 active: true,
                 borderRadius: Double(PillStyle.cornerRadius),
                 strength: viewModel.isAgentMode ? 1.0 : 0.4
@@ -710,7 +714,8 @@ private struct PillView: View {
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let phase = (sin(t * 2 * .pi / Self.breatheCycleSeconds) + 1) / 2
                 let opacity = 1.0 - phase * (1.0 - Self.breatheFloor)
-                Text(viewModel.isAgentMode ? "Agent Listening" : "Listening")
+                Text(viewModel.isAgentMode ? "Agent Listening"
+                     : viewModel.isWorkMode ? "Work Listening" : "Listening")
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(PillStyle.foreground)
                     .opacity(opacity)

@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let maxHistoryEntries = 20
     private static let preferredInputDeviceDefaultsKey = "com.abhishektigga.sayline.preferredInputDeviceUID"
     private static let hotkeyOptionDefaultsKey = "com.abhishektigga.sayline.hotkeyOption"
+    private static let defaultModeIsWorkKey = "com.abhishektigga.sayline.defaultModeIsWork"
+    private static let alwaysVerbatimKey = "com.abhishektigga.sayline.alwaysVerbatim"
 
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
@@ -38,6 +40,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             indicatorWindow.updateHotkeySymbol(hotkeyOption.shortSymbol)
         }
     }
+    /// Flips the gestures for whoever spends their whole day in email:
+    /// single press becomes Work, double-tap becomes Clean.
+    ///
+    /// Decision 6. The gesture always chooses the depth — this only
+    /// changes which gesture means which, and the pill still says which
+    /// mode is running before the user stops speaking.
+    @Published var defaultModeIsWork: Bool =
+        UserDefaults.standard.bool(forKey: AppDelegate.defaultModeIsWorkKey) {
+        didSet { UserDefaults.standard.set(defaultModeIsWork, forKey: Self.defaultModeIsWorkKey) }
+    }
+
+    /// "Always insert my exact words" — the one surviving home of
+    /// Verbatim, per decision 4.
+    ///
+    /// Skips both Clean and Work entirely. The dictation-style picker it
+    /// replaces was removed in `abc2bd9` long before work mode, so there
+    /// is no stored preference to migrate — checked rather than assumed.
+    @Published var alwaysVerbatim: Bool =
+        UserDefaults.standard.bool(forKey: AppDelegate.alwaysVerbatimKey) {
+        didSet { UserDefaults.standard.set(alwaysVerbatim, forKey: Self.alwaysVerbatimKey) }
+    }
+
     @Published var useLocalTranscription: Bool = {
         UserDefaults.standard.bool(forKey: AppDelegate.useLocalTranscriptionDefaultsKey)
     }() {
@@ -66,6 +90,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var accessibilityWatchdog: Timer?
     private var isAnsweringFollowUpThisRecording = false
     private var isAgentModeThisRecording = false
+    /// Set per-hold by the double-tap, mirroring agent mode exactly.
+    /// Routed only on the plain-dictation branch — decision 8: agent
+    /// commands and spoken follow-up answers treat a double-tap as a
+    /// single press, silently. There is no text to professionalize in
+    /// "remind me to call the bank at 4", and touching it could only hurt.
+    private var isWorkModeThisRecording = false
 
     private let hotkeyManager = HotkeyManager()
     @MainActor
@@ -85,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let cloudTranscriber = GroqTranscriber()
     private let localTranscriber = WhisperKitTranscriber()
     private let cleaner = TranscriptCleaner()
+    private let workCleaner = WorkModeCleaner()
     private let agentRouter = AgentRouter()
     private let indicatorWindow = FloatingIndicatorWindow()
     private lazy var settingsWindowController = SettingsWindowController(appDelegate: self)
@@ -158,6 +189,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         hotkeyManager.onHotkeyUp = { [weak self] in
             DispatchQueue.main.async { self?.handleHotkeyUp() }
         }
+        hotkeyManager.onWorkModeHold = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                // Recording is already running by now — the first press
+                // started it. This only marks the mode and shows it, so
+                // the pill can say "Work" while the user is still talking.
+                // With the default flipped, a double-tap means Clean —
+                // the second gesture is always "the other one", not always
+                // Work.
+                let isWork = !self.defaultModeIsWork
+                self.isWorkModeThisRecording = isWork
+                self.indicatorWindow.updateWorkMode(isWork)
+            }
+        }
         // Escape dismisses a pending question. Observed on the tap rather
         // than handled by the panel, which never becomes key window — and
         // deliberately not consumed, so the key still reaches whatever the
@@ -215,8 +260,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         UserDefaults.standard.set(data, forKey: Self.historyDefaultsKey)
     }
 
-    private func addHistoryEntry(text: String, usedLocal: Bool) {
-        let entry = HistoryEntry(id: UUID(), timestamp: Date(), text: text, usedLocal: usedLocal)
+    private func addHistoryEntry(text: String, usedLocal: Bool, mode: String) {
+        let entry = HistoryEntry(id: UUID(), timestamp: Date(), text: text,
+                                 usedLocal: usedLocal, mode: mode)
         historyEntries.insert(entry, at: 0)
         if historyEntries.count > Self.maxHistoryEntries {
             historyEntries.removeLast(historyEntries.count - Self.maxHistoryEntries)
@@ -307,6 +353,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         isRecording = true
         transcriptionError = nil
         isAgentModeThisRecording = false
+        // A single press means Work when the default is flipped; the
+        // double-tap callback overrides this if one arrives.
+        isWorkModeThisRecording = defaultModeIsWork
+        indicatorWindow.updateWorkMode(defaultModeIsWork)
         isAnsweringFollowUpThisRecording = indicatorWindow.isAwaitingSpokenAnswer
         // A hold is the opposite of an absent user, and the timeout exists
         // for absence. Stop the clock until they let go.
@@ -413,6 +463,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         let context = capturedFocusedAppInfo?.context ?? .general
         let usingLocal = useLocalTranscription && localTranscriber.isReady
+        // Captured here, not read inside the Task: the flag is per-hold and
+        // a later hold would otherwise change what this one does.
+        let workMode = isWorkModeThisRecording
 
         isTranscribing = true
         transcriptionError = nil
@@ -445,6 +498,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     return
                 }
 
+                // "Always insert my exact words" skips both modes. Nothing
+                // is cleaned, nothing is rewritten, and no round trip is
+                // paid for either.
+                if await MainActor.run(body: { self.alwaysVerbatim }) {
+                    SaylineLog.log("verbatim setting on — inserting the raw transcript")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.finishDictation(with: rawText, producedBy: "verbatim", url: url,
+                                             usedLocal: usingLocal)
+                    }
+                    return
+                }
+
                 await MainActor.run {
                     self.isTranscribing = false
                     self.isCleaningUp = true
@@ -452,19 +518,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 }
 
                 var finalText = rawText
+                var producedBy = "clean"
                 do {
                     finalText = try await cleaner.clean(rawText, context: context)
                     SaylineLog.log("cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
+
+                    // Work mode runs AFTER Clean, not instead of it.
+                    //
+                    // Clean's output is the fallback the guard falls back
+                    // *to*, so it has to exist before the rewrite is
+                    // attempted. It also means a work dictation that fails
+                    // every check still lands as good text rather than raw
+                    // speech.
+                    if workMode {
+                        switch try await workCleaner.rewrite(rawText, context: context) {
+                        case .rewritten(let text):
+                            finalText = text
+                            producedBy = "work"
+                        case .rescued(let text, let broke):
+                            finalText = text
+                            producedBy = "work (retry rescued \(broke.map(\.kind).joined(separator: "+")))"
+                        case .fellBack(let reason):
+                            producedBy = "work → fell back to clean"
+                            await MainActor.run {
+                                self.indicatorWindow.flashMessage(
+                                    WorkModeCleaner.fallbackMessage(for: reason), duration: 3.4)
+                            }
+                        }
+                        SaylineLog.log("[work] \(producedBy) -> \(finalText)")
+                    }
                 } catch {
                     SaylineLog.log("cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }
 
+                let produced = producedBy
                 await MainActor.run {
                     self.isCleaningUp = false
-                    self.lastTranscript = finalText
-                    self.indicatorWindow.hide()
-                    self.addHistoryEntry(text: finalText, usedLocal: usingLocal)
-                    TextInjector.insert(finalText)
+                    self.finishDictation(with: finalText, producedBy: produced, url: url,
+                                         usedLocal: usingLocal)
                 }
             } catch {
                 await MainActor.run {
@@ -565,6 +656,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 }
             }
         }
+    }
+
+    /// The one place a finished dictation lands, whichever mode produced
+    /// it.
+    ///
+    /// `producedBy` reaches the history so "does anyone use work mode"
+    /// becomes a question the data answers — decision 6's telemetry note,
+    /// and one field rather than a subsystem.
+    @MainActor
+    private func finishDictation(with text: String, producedBy: String,
+                                 url: URL, usedLocal: Bool) {
+        lastTranscript = text
+        indicatorWindow.hide()
+        addHistoryEntry(text: text, usedLocal: usedLocal, mode: producedBy)
+        TextInjector.insert(text)
     }
 
     private func runCommand(_ command: VoiceCommand) {

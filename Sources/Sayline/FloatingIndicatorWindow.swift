@@ -137,6 +137,21 @@ final class FloatingIndicatorWindow {
         }
     }
 
+    /// Marks this hold as Work, so the pill says so while the user is
+    /// still speaking.
+    ///
+    /// The same lesson as the agent-mode styling fix: a mode the user
+    /// cannot see until the text lands is a mode they cannot trust or
+    /// correct. A fumbled double-tap should be obvious mid-hold, which is
+    /// what bounds the risk of decision 5 (double-tap wins even in code
+    /// windows).
+    func updateWorkMode(_ isWorkMode: Bool) {
+        viewModel.isWorkMode = isWorkMode
+        if isWorkMode {
+            SaylineLog.log("work mode flagged for this recording")
+        }
+    }
+
     /// Shows the one-time calendar setup card under whatever is on screen.
     ///
     /// Persistent by design: no timeout, and `hide()` will not take it

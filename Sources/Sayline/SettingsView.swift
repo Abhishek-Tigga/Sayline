@@ -43,6 +43,21 @@ struct SettingsView: View {
             }
 
             Section("Hotkey") {
+                Toggle("Always insert my exact words", isOn: $appDelegate.alwaysVerbatim)
+                Text("Skips both Clean and Work. Nothing is rewritten or tidied.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Default to Work mode", isOn: $appDelegate.defaultModeIsWork)
+                    .disabled(appDelegate.alwaysVerbatim)
+                Text(appDelegate.defaultModeIsWork
+                     ? "Single press rewrites for clarity. Double-tap keeps your own sentences."
+                     : "Single press tidies what you said. Double-tap rewrites for clarity.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Divider()
+
                 Picker("Hold to Talk", selection: $appDelegate.hotkeyOption) {
                     ForEach(HotkeyOption.allCases, id: \.self) { option in
                         Text(option.displayName).tag(option)
