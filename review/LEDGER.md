@@ -2725,3 +2725,84 @@ with `eval/work-mode/run.py --model llama-3.3-70b-versatile`.
 
 **Nothing built on this.** Stage 3 not started, no production prompt
 written, no model wired in.
+
+---
+
+## FACTGUARD · Invention findings — answers (Fable, 2026-08-13)
+
+Answering `review/FABLE-PROMPT-workmode-findings.md`. Analysis over the
+bake-off outputs and guard source; nothing run; all claimed, not
+verified. Stopping stage 3 on finding 1 was correct.
+
+### 1 · Catching invention: build the subset rule now, and say the
+### general case out loud
+**Build Opus's candidate** — the closed-world rule for quantifiables: no
+number, day, month, date or unit may appear in the rewrite that was not
+in the raw. Symmetric with the survival check, deterministic, and it
+catches both observed inventions. It needs the same normalization
+maturity as the forward direction or it will storm:
+- quantity words map to values on the *raw* side ("both"→2, "a
+  couple"→2, "half"→a marker, "dozen"→12), so a rewrite writing "2
+  options" for "both options" passes;
+- time formats fuse ("11:00" must not read as an invented 0/00; treat
+  HH:MM as one token);
+- bare 0 is never an invention.
+**The general case — "The api is affected by these issues" — is not
+deterministically solvable, and the design doc should say so.** Deciding
+"substantive claim" vs "connective tissue" is semantics; word lists
+cannot do it, and decision 2's "nothing substantive may appear" is
+currently a promise the implementation cannot keep in full. Amend the
+decision to what is enforceable, flagged for the user: *quantifiable
+inventions are caught mechanically; qualitative inventions are bounded,
+not eliminated.* The bound worth building, behind measurement: a
+**sentence-novelty gate** — for each rewrite sentence, the fraction of
+its content words present anywhere in the raw; a sentence below
+threshold is an invented-sentence candidate → violation. Both observed
+inventions are near-total-novelty sentences and would be caught. Known
+false-positive risk: synonym-heavy faithful compression ("60% done" →
+"more than half complete"). So: score the gate offline against the ~100
+bake-off rewrites already on disk, count false fires, pick the
+threshold from data or reject the gate with numbers. Do not ship it
+unmeasured. Third layer, free: the production prompt gains "never add
+information; connect ideas using only the speaker's own words."
+
+### 2 · negationAdded: keep, with a conditional-context exclusion
+Finding 4's false fire is a *conditional restructuring* — "or it slips"
+→ "if it is not cleared, it will slip" — and that shape is
+distinguishable by dumb code: exclude a negation token whose preceding
+three tokens contain if / unless / whether / until / otherwise. The
+catastrophic case this rule exists for (a bare assertion reversed) is
+almost never conditional-phrased, so the exclusion gives up little.
+Keep the rule, add the exclusion, and let the rerun measure it: it
+fired once falsely and never truly in this bake-off, so if it false-
+fires again after the exclusion, demote it with numbers in hand — not
+before.
+
+### 3 · Pronoun "one": count it only when a unit follows
+"one" becomes a pinned number only when the next token is in the unit
+lexicon ("one week", "one hour", "one percent"); in every other
+position ("quick one", "the last one", "no one", "one more thing") it
+is prose. The apparent hole — "one bug" → "two bugs" — is closed from
+the other side by the answer-1 subset rule, which flags the invented 2.
+Compound spoken numbers ("twenty one") are unaffected; they resolve in
+the tens+units path before this rule is consulted.
+
+### 4 · Rerun: yes, and two things to carry into it
+The ranking measured a broken instrument; it does not survive on
+authority. Carry in: (a) weight the ten real transcripts above the
+invented fifteen — every discriminating bug so far came from the real
+half; (b) an axis the table omits entirely: **provider rate limits.**
+The standing lesson in PRODUCT.md ("rate limits are the real
+constraint, not price") applies — llama-3.3-70b on Groq's free tier
+hit its daily cap twice during eval work alone; a production feature
+routed there inherits that ceiling until the backend exists. If the
+rerun is close between 70B and gpt-4o-mini, the tiebreak is
+operational, not milliseconds. Also rerun the sentence-novelty scoring
+(answer 1) on the same outputs — one pass, two instruments calibrated.
+
+### Finding 2 (pin-block leak): fix the shape, not the flattening
+The production prompt must not append the pin block to user content at
+all: constraints and pinned facts belong in the system message; the
+user message carries the transcript and nothing else. A model echoing
+a delimiter is a symptom; content-role confusion is the disease. This
+also makes the "do not echo" instruction unnecessary.

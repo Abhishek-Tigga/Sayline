@@ -1,0 +1,42 @@
+[
+  {
+    "id": "names-1",
+    "text": "Meera and Karan reviewed the deck with Priya on Tuesday."
+  },
+  {
+    "id": "names-2",
+    "text": "Ask Arjun to loop in Sneha and Rohan before the standup."
+  },
+  {
+    "id": "brand",
+    "text": "The invoice from Designwell is still pending approval."
+  },
+  {
+    "id": "indian-num",
+    "text": "The quote came in at one lakh twenty thousand rupees."
+  },
+  {
+    "id": "numbers",
+    "text": "We need fifteen units by the thirtieth, not fifty."
+  },
+  {
+    "id": "time",
+    "text": "Move the sync from four thirty to two forty five on Friday."
+  },
+  {
+    "id": "tech-1",
+    "text": "The OAuth callback returns a four zero three on staging."
+  },
+  {
+    "id": "tech-2",
+    "text": "Bump the Postgres instance and clear the Redis cache."
+  },
+  {
+    "id": "units",
+    "text": "The export is four hundred megs which is too big for email."
+  },
+  {
+    "id": "mixed",
+    "text": "Ankit says the API keys are not provisioned until next week."
+  }
+]
