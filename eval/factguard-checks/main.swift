@@ -363,6 +363,30 @@ check("you know? is not a question either",
 check("a statement rewritten as a statement is untouched",
       violations("we should ship on Friday", "We should ship on Friday.").isEmpty)
 
+print("\nfound live 2026-08-13 — enumeration markers are structure, not facts")
+
+// The user asked for dictated lists to become bullets. Doing that drops
+// "first/second/third", which were pinned as 1/2/3 — so the guard fell
+// back on the exact output the user wanted. The prompt was fighting the
+// guard.
+//
+// Same shape as the "one" rule: a bare small ordinal in speech is almost
+// always an enumeration marker. Digit ordinals ("30th") and compounds
+// ("twenty first") stay facts, because that is how a real date is said.
+check("bare first/second/third are not numbers",
+      FactGuard.extract(from: "three reasons: first the cost, second the timeline, third nobody asked")
+        .numbers.isEmpty == false)  // "three" is still a number
+check("but the ordinals themselves are not pinned",
+      !FactGuard.extract(from: "first the cost, second the timeline").numbers.contains(1))
+check("so a dictated list can become bullets without falling back",
+      violations("there are three reasons we shouldn't do it first the cost second the timeline and third nobody asked",
+                 "We shouldn't do it, for three reasons:\n- the cost\n- the timeline\n- nobody asked")
+        .isEmpty)
+check("digit ordinals are still facts",
+      FactGuard.extract(from: "cleared before the 30th").numbers.contains(30))
+check("compound spoken ordinals are still facts",
+      FactGuard.extract(from: "due on the twenty first").numbers.contains(21))
+
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))
 check("pinned block names the number", pinned.contains("15"))

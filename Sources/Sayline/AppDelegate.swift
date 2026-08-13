@@ -206,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 let isWork = !self.defaultModeIsWork
                 self.isWorkModeThisRecording = isWork
                 self.indicatorWindow.updateWorkMode(isWork)
+                SaylineLog.log("chord pressed — this hold is \(isWork ? "Work" : "Clean")")
             }
         }
         // Escape dismisses a pending question. Observed on the tap rather
@@ -358,10 +359,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         isRecording = true
         transcriptionError = nil
         isAgentModeThisRecording = false
-        // A single press means Work when the default is flipped; the
-        // double-tap callback overrides this if one arrives.
+        // A plain hold means Work when the default is flipped; the chord
+        // callback overrides this if one arrives.
+        //
+        // Logged unconditionally. The first live session reported "after
+        // reversing, holding Option enables work mode but the dictation is
+        // still clean", and the log could not settle it: `updateWorkMode`
+        // only logs when the flag is *true*, so a hold that should have
+        // been Work and was not left no trace at all. An absent log line
+        // is not evidence.
         isWorkModeThisRecording = defaultModeIsWork
         indicatorWindow.updateWorkMode(defaultModeIsWork)
+        SaylineLog.log("hold begins — default is \(defaultModeIsWork ? "Work" : "Clean"), "
+            + "verbatim \(alwaysVerbatim ? "on" : "off")")
         isAnsweringFollowUpThisRecording = indicatorWindow.isAwaitingSpokenAnswer
         // A hold is the opposite of an absent user, and the timeout exists
         // for absence. Stop the clock until they let go.

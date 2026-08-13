@@ -383,7 +383,24 @@ enum FactGuard {
     /// rewritten as "$" must still raise both a lost rupee and an
     /// invented dollar.
     private static func units(in text: String, words: [String]) -> Set<String> {
-        var found = Set(words.filter(unitWords.contains))
+        // A unit counts only when it sits beside a number.
+        //
+        // Fable's rule was "pin the unit token adjacent to each number";
+        // this was implemented as bare set membership, which pinned
+        // "second" in "second the timeline" as the time unit *seconds* —
+        // so turning a dictated list into bullets dropped it and the guard
+        // fell back on exactly the output the user had asked for. A unit
+        // with no quantity beside it is an ordinary word.
+        var found: Set<String> = []
+        for (index, word) in words.enumerated() where unitWords.contains(word) {
+            let before = index > 0 ? words[index - 1] : ""
+            let after = index + 1 < words.count ? words[index + 1] : ""
+            let isQuantified = [before, after].contains { token in
+                Int(token) != nil || spokenUnits[token] != nil
+                    || spokenTens[token] != nil || quantityWords[token] != nil
+            }
+            if isQuantified { found.insert(word) }
+        }
         for (symbol, canonical) in unitSymbols where text.contains(symbol) {
             found.insert(canonical)
         }
@@ -766,6 +783,12 @@ enum FactGuard {
         "half": 1, "single": 1, "once": 1, "thrice": 3,
     ]
 
+    /// Ordinals small enough to be list markers in ordinary speech.
+    private static let enumerationMarkers: Set<String> = [
+        "first", "second", "third", "fourth", "fifth", "sixth",
+        "seventh", "eighth", "ninth", "tenth",
+    ]
+
     private static let spokenOrdinals: [String: Int] = [
         "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
         "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
@@ -823,6 +846,21 @@ enum FactGuard {
             }
             if let quantity = quantityWords[word] {
                 found.insert(quantity)
+                index += 1
+                continue
+            }
+            // A bare small ordinal is an enumeration marker, not a fact.
+            //
+            // "three reasons: first the cost, second the timeline" pinned
+            // 1 and 2, so turning that into the bullet list the user asked
+            // for dropped them and the guard fell back — on exactly the
+            // output that was wanted. The prompt was fighting the guard.
+            //
+            // Digit ordinals ("the 30th") and compounds ("twenty first")
+            // stay facts, because that is how a real date is spoken. The
+            // cost is "the first of March" losing its 1; March is still
+            // pinned, so the date is not wholly unprotected.
+            if enumerationMarkers.contains(word) {
                 index += 1
                 continue
             }

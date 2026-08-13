@@ -3547,3 +3547,131 @@ not causing.
 a human — the menu-bar click needs Automation permission this process
 does not have. The app relaunches clean and no new crash report has
 appeared, but the actual test is the user clicking Settings.
+
+---
+
+## WORK MODE · First live session — user-verified results (Fable recording, 2026-08-13)
+
+The first human use of work mode. Gesture note: the double-tap was
+replaced before this session by a chord — hold Option, press Command
+during the hold — mirroring the agent chord, after the double-tap proved
+unreliable in practice. Decisions 5 and 6 in `DESIGN-work-mode.md` still
+say "double-tap" and need amending; the settings-flip wording becomes
+"the chord always means the other mode".
+
+**user-verified PASS (19):**
+- A1–A5 — the chord state machine end to end: plain hold Clean; chip
+  appears the instant Command goes down; releasing Command keeps Work
+  flagged for the hold; reverse order (Command before Option) stays
+  Clean; the chord leaks nothing into the app underneath.
+- B1 — conclusion-first restructure on a real ramble. B3 — no invented
+  scaffolding or self-assigned commitments.
+- C2, C3 — email register composed, unknown-context register neutral.
+- E1–E5 — **the whole guard trap set passed live**: facts survive;
+  symbol forms (₹, %) no longer false-alarm; a trailing question stays a
+  question; negation never reversed; the self-correction case resolved
+  correctly rather than falling back.
+- F1, F2 — agent chord wins when both are pressed; follow-up answers
+  unaffected. G3 — Clean speed unchanged.
+
+**FAIL (3):**
+- **A6 · Settings flip does not flip the pipeline.** User note verbatim:
+  "after reversing, holding the Option key enables work mode but the
+  dictation is still clean. It does not signify the work mode." With
+  default = Work, a plain hold does not produce a Work rewrite (and/or
+  the pill does not show it) — flag and pipeline disagree somewhere
+  between the Settings read and the captured per-hold local.
+- **B2 · Dictated list did not become bullets.** Output was: "There are
+  three reasons: the quote, the timeline, and that nobody asked for it.
+  These are the first, second, and third reasons, respectively." Two
+  defects in one: no bullets, and an invented meta-sentence ("These are
+  the first, second, and third reasons, respectively") that is exactly
+  the scaffolding decision 1 forbids. Also note the transcriber heard
+  "the quote" for "the cost" — the custom-vocabulary case again.
+- **H1 · History shows no mode indicator.** The `mode` field decodes but
+  the UI never displays it.
+
+**Skipped (7):** C1, D1, D2, E6, F3, G1, G2 — still owed a live pass,
+carried on the checklist.
+
+**Also raised by the user, opening a new design round:** work mode
+over-writes — output can be longer and more "professional" than the
+thought it rewrites. The user's principle, verbatim in spirit: simply
+understood, simple, not too long; never add words just to sound
+professional. A voice/register brainstorm follows in-session; its
+outcome will amend the work-mode prompt and possibly decision 3's
+register seasoning.
+
+---
+
+## 2026-08-13 — first-session fails: B2 and H1 fixed, A6 instrumented (Opus)
+
+`claimed-fixed` for two of three. 19 of 22 live checks passed, including
+the whole guard trap set; these are the three that did not.
+
+**B2 · dictated list → bullets. Fixed, and the fix exposed two guard bugs
+of mine.**
+
+The prompt now says to bullet an enumeration and never to comment on its
+own output. That alone made it worse: the rewrite came back correct **and
+the guard rejected it**, because turning "first the cost, second the
+timeline" into bullets drops those words.
+
+1. `first`/`second`/`third` were pinned as the numbers 1/2/3. They are
+   enumeration markers, not facts — the same shape as the "one" rule.
+   Digit ordinals (`the 30th`) and compounds (`twenty first`) stay facts,
+   since that is how a date is actually spoken.
+2. **"second" is also a time unit**, so "second the timeline" pinned the
+   unit *seconds*. Fable's rule was "pin the unit token **adjacent to
+   each number**" and I had implemented bare set membership, losing the
+   adjacency. A unit with no quantity beside it is an ordinary word.
+
+Both mean my prompt was fighting my own guard, and the visible symptom
+was a fallback on exactly the output the user asked for. Live now:
+
+```
+said : "there are three reasons we shouldn't do it first the cost
+        second the timeline and third nobody actually asked for it"
+work : "We shouldn't do it for 3 reasons:
+        - the cost
+        - the timeline
+        - nobody actually asked for it"          [guard clean]
+```
+
+The invented meta-sentence is gone, and prose with several ideas still
+does not become bullets (checked).
+
+**H1 · history mode indicator. Fixed.** Each row shows `work`,
+`work · retried`, `fell back`, `verbatim`, or `clean`. A fallback is
+labelled as a fallback rather than as Clean — the user asked for a
+rewrite and did not get one, which is worth seeing in the list. Entries
+written before work mode decode with `mode` nil and show nothing rather
+than a wrong label.
+
+**A6 · settings flip. NOT fixed — instrumented instead, because the
+evidence could not settle it.**
+
+The log shows plain holds after the flip producing `cleaned transcript`
+with **no "work mode flagged" line at all**, so the flag was false at
+hold time. `defaults read` shows the key present with value `0`. The code
+path reads correctly on inspection: `isWorkModeThisRecording =
+defaultModeIsWork` at hold start, captured to a local before the async
+work.
+
+What I could not determine is whether the toggle failed to write, or was
+already back off by the time those holds happened. **`updateWorkMode`
+only logged when the flag was true**, so a hold that should have been
+Work and was not left no trace — an absent log line is not evidence.
+Every hold now logs the default and the verbatim setting unconditionally,
+and the chord logs which mode it selected. One more test settles it.
+
+Guessing at a fix for a bug I cannot see would be the third time this
+week that produced a new bug.
+
+**Raised by the user, not yet designed:** work mode over-writes — output
+longer and more "professional" than the thought deserved. Their
+principle: simply understood, simple, not too long, never words added to
+sound professional. That is a voice/register change to the prompt and
+possibly to decision 3, and it wants its own round rather than a tweak.
+
+Suite 90 cases. Smoke test PASS.

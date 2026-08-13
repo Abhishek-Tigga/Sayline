@@ -72,8 +72,14 @@ final class WorkModeCleaner {
     speaker did not say it, it does not appear.
     - Never reverse a statement. "I don't think we should" must not become \
     "we should".
-    - Bullets ONLY if the speaker dictated an actual list. Never invent \
-    headers, greetings, or sign-offs.
+    - If the speaker enumerated items — "three reasons: first… second…", \
+    "two things: X and Y" — write them as a bulleted list, one item per \
+    line starting with "- ". Do not do this for prose that merely \
+    contains several ideas.
+    - Never invent headers, greetings, or sign-offs.
+    - Never comment on your own output. No "these are the reasons", no \
+    "in summary", no restating what you just wrote. Say the thing once \
+    and stop.
     - Never add information. Connect ideas using only the speaker's own words.
     - Output only the rewritten text. No preamble, no explanation, no quotes.
     """
