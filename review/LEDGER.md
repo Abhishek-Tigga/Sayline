@@ -2584,3 +2584,56 @@ not here.
 
 **Nothing verified by its author.** The suite is mine and passes; no model
 output has been checked against it, and no model has been called.
+
+---
+
+## 2026-08-13 — work mode stage 2: the model bake-off (Opus)
+
+`claimed-fixed`. 25 transcripts (10 dictated by the user, 15 authored to
+cover the classes the real ten left thin), temperature 0, scored by
+`FactGuard` itself through a compiled verifier — never a Python copy of
+the rules, so the scorer cannot drift from production.
+
+| model | broke a fact | retry rescued | ends in fallback | median |
+|---|---|---|---|---|
+| `llama-3.1-8b-instant` (baseline) | 39% | 0% | **39%** | 188 ms |
+| `llama-3.3-70b-versatile` | 20% | 80% | 4% | **380 ms** |
+| `gpt-4o-mini` | 20% | **100%** | **0%** | 1167 ms |
+| `gpt-4.1-mini` | 24% | 83% | 4% | 1030 ms |
+
+**The baseline lost as predicted, and worse than expected:** the current
+8B broke a fact in 39% of transcripts and the corrective retry rescued
+**none** of them. It is fast and it cannot do this job.
+
+**Recommendation: `llama-3.3-70b-versatile`.** Same first-pass accuracy as
+`gpt-4o-mini` (20%), 4% fallback against 0%, and **380 ms against
+1167 ms**. Decision 7 budgets work mode at Clean + ~1 s; at 380 ms it
+spends a third of that, leaving room for the retry to stay inside budget
+too. `gpt-4o-mini`'s perfect rescue rate is attractive, but a retry at
+1167 ms lands near 2.4 s, which decision 7 explicitly calls "reads as
+broken".
+
+**A guard bug the bake-off found, and the first numbers were wrong.**
+The initial run scored negation as 8 of 13 violations across every model.
+Inspecting one: gpt-4.1-mini rewrote *"Rohan said he can't make Wednesday
+… Doesn't that work for you?"* as *"Rohan can't make Wednesday anymore.
+We should move it to Friday."* — a **correct** rewrite that dropped a
+rhetorical question and its negation with it. Decision 1 says deleting
+thinking-out-loud is expected, so the strict count was the guard fighting
+the mode it protects.
+
+Narrowed: losing *some* negation is allowed, losing *all* of it is not.
+Suite 52 → 55, the real case added per the growth rule. Every model was
+re-measured afterwards; the table above is the corrected run and the
+inflated one was deleted from `results.md` rather than left to be quoted.
+
+**A harness bug worth recording.** The first execution failed every
+request (a return-signature mismatch) and printed **0% broke a fact for
+all four models** — a clean sweep built on zero data. It now refuses to
+score a model that completed under 80% of its calls. Third harness in this
+project to lie before it worked.
+
+**Not verified by its author.** No human has read the rewrites for
+quality. The guard measures fact survival, not whether the output is good
+writing — a model could score perfectly by returning the input unchanged.
+Spot-reading a sample is a live-owed item.

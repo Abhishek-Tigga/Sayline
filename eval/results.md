@@ -117,3 +117,38 @@ attempt.
 | 2026-08-12 16:25 UTC | `7dcd0e5+dirty` | openai | `gpt-4o-mini` | 71/72 (99%) | 0 (0%) | 2609 | 1308 ms |
 | 2026-08-12 16:31 UTC | `7dcd0e5+dirty` | openai | `gpt-4o-mini` | 72/72 (100%) | 0 (0%) | 2609 | 1134 ms |
 | 2026-08-12 17:32 UTC | `ce2f65b+dirty` | openai | `gpt-4o-mini` | 71/72 (99%) | 0 (0%) | 2609 | 1086 ms |
+
+### Work mode model bake-off — 2026-08-13 17:31
+
+25 transcripts, temperature 0, scored by FactGuard.
+
+| model | broke a fact | retry rescued | ends in fallback | median |
+|---|---|---|---|---|
+| `llama-3.1-8b-instant` | 61% | 0% | 61% | 201 ms |
+
+### Work mode model bake-off — 2026-08-13 17:32
+
+25 transcripts, temperature 0, scored by FactGuard.
+
+| model | broke a fact | retry rescued | ends in fallback | median |
+|---|---|---|---|---|
+| `llama-3.3-70b-versatile` | 32% | 50% | 16% | 446 ms |
+
+### Work mode model bake-off — 2026-08-13 17:33
+
+25 transcripts, temperature 0, scored by FactGuard.
+
+| model | broke a fact | retry rescued | ends in fallback | median |
+|---|---|---|---|---|
+| `gpt-4o-mini` | 44% | 73% | 12% | 1122 ms |
+
+### Work mode model bake-off — 2026-08-13 17:39
+
+25 transcripts, temperature 0, scored by FactGuard.
+
+| model | broke a fact | retry rescued | ends in fallback | median |
+|---|---|---|---|---|
+| `llama-3.1-8b-instant` | 39% | 0% | 39% | 188 ms |
+| `llama-3.3-70b-versatile` | 20% | 80% | 4% | 380 ms |
+| `gpt-4o-mini` | 20% | 100% | 0% | 1167 ms |
+| `gpt-4.1-mini` | 24% | 83% | 4% | 1030 ms |

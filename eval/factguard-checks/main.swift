@@ -222,6 +222,37 @@ check("but I'll still is",
       violations("the deck needs another pass", "I'll take another pass at the deck.")
         .contains(.inventedCommitment("i'll")))
 
+print("\nfound by the model bake-off, 2026-08-13 — the guard fighting the mode")
+
+// Real output from gpt-4.1-mini on the user's real-1, flagged as losing a
+// negation. The rewrite is CORRECT: it dropped "Doesn't that work for
+// you?", a rhetorical question that is thinking-out-loud, and the
+// negation went with the clause.
+//
+// Decision 1 says deleting thinking-out-loud is expected behaviour, so a
+// rule that fires when a dropped clause takes a negation with it is the
+// guard fighting the mode's whole purpose. Negation was 8 of 13
+// violations across models — the dominant class, and inflating every
+// score.
+//
+// Narrowed: losing SOME negation is allowed, losing ALL of them is not.
+// "I don't think we should ship" -> "We should ship" still fires, because
+// that goes to zero.
+check("dropping a rhetorical question with its negation is allowed",
+      !violations("Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday. Doesn't that work for you?",
+                  "Rohan can't make Wednesday anymore. We should move it to Friday.")
+        .contains(where: { if case .negationLost = $0 { return true }; return false }))
+
+check("but losing the last negation still fires",
+      violations("I don't think we should ship on Friday.",
+                 "We should ship on Friday.")
+        .contains(where: { if case .negationLost = $0 { return true }; return false }))
+
+check("two negations down to zero fires",
+      violations("I don't think we should ship and I can't support it.",
+                 "We should ship and I support it.")
+        .contains(where: { if case .negationLost = $0 { return true }; return false }))
+
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))
 check("pinned block names the number", pinned.contains("15"))

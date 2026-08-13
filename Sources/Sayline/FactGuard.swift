@@ -214,8 +214,16 @@ enum FactGuard {
         // already-negative sentence can legitimately add a second negation
         // ("I don't think so, and I don't want to argue"), so full
         // equality would fire constantly.
+        //
+        // Narrowed after the model bake-off: losing *some* negation is
+        // allowed, losing *all* of it is not. Work mode is supposed to
+        // delete thinking-out-loud, and a dropped rhetorical question
+        // ("Doesn't that work for you?") takes its negation with it. The
+        // strict version fired on correct rewrites and was 8 of 13
+        // violations across every model — the guard fighting the mode it
+        // protects. Going to zero is still the meaning-reversal case.
         let keptNegations = words.filter(negationMarkers.contains).count
-        if keptNegations < facts.negationCount {
+        if facts.negationCount > 0 && keptNegations == 0 {
             violations.append(.negationLost(said: facts.negationCount, kept: keptNegations))
         } else if facts.negationCount == 0 && keptNegations > 0 {
             violations.append(.negationAdded(said: 0, kept: keptNegations))

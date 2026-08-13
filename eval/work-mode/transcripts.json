@@ -38,5 +38,80 @@
   {
     "id": "real-10",
     "raw": "okay so for the customer calls with Mira's team um they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245 can you update the invite and also add Karen this time he wasn't on the last one"
+  },
+  {
+    "id": "made-1",
+    "class": "months",
+    "raw": "so the migration slipped again we said March originally but realistically it's April now maybe even May if the vendor stuff isn't sorted"
+  },
+  {
+    "id": "made-2",
+    "class": "units",
+    "raw": "the export is coming out at like 400 megs which is way too big for email so we need to compress it or split it into two files"
+  },
+  {
+    "id": "made-3",
+    "class": "relative",
+    "raw": "can you send it by end of this week not next week because the client review is on the 15th and I don't want to be scrambling"
+  },
+  {
+    "id": "made-4",
+    "class": "negation",
+    "raw": "I'm not saying we shouldn't do it I'm saying we shouldn't do it now there's a difference and I think the team is conflating the two"
+  },
+  {
+    "id": "made-5",
+    "class": "names",
+    "raw": "Priya and Arjun are both out next week so the release has to wait unless Meera can cover the QA piece but she's already stretched"
+  },
+  {
+    "id": "made-6",
+    "class": "selfcorrect",
+    "raw": "let's target the 12th no sorry the 14th the 12th is a holiday so nothing will get signed off anyway"
+  },
+  {
+    "id": "made-7",
+    "class": "commitment",
+    "raw": "someone needs to own the analytics migration it's been unassigned for two sprints now and it keeps slipping"
+  },
+  {
+    "id": "made-8",
+    "class": "currency",
+    "raw": "the quote came in at 1,20,000 rupees which is over budget by about 20 percent so I want to push back before we sign"
+  },
+  {
+    "id": "made-9",
+    "class": "time",
+    "raw": "the standup moved to 9:45 from 10 so we get the room before the sales team takes it"
+  },
+  {
+    "id": "made-10",
+    "class": "percent",
+    "raw": "conversion dropped from 4.2 percent to 3.1 percent after the redesign which is not what we expected at all"
+  },
+  {
+    "id": "made-11",
+    "class": "mixed",
+    "raw": "quick update on the pilot we're at 80 percent done, Rohan finished the backend on Tuesday, the front end is maybe two more days, so end of next week for the demo"
+  },
+  {
+    "id": "made-12",
+    "class": "opinion",
+    "raw": "honestly I don't love the new onboarding copy it feels condescending but I don't want to block the launch over it so let's ship and revisit"
+  },
+  {
+    "id": "made-13",
+    "class": "question",
+    "raw": "do we still need the Friday sync now that we have the async updates? feels like a lot of meetings for not much"
+  },
+  {
+    "id": "made-14",
+    "class": "bug",
+    "raw": "found something weird if you refresh during checkout the cart empties completely no warning no recovery just gone I lost my test order twice"
+  },
+  {
+    "id": "made-15",
+    "class": "list",
+    "raw": "three things blocking us first the API keys aren't provisioned second legal hasn't signed off on the terms and third we still don't have staging access"
   }
 ]
