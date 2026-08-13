@@ -3074,3 +3074,71 @@ work" are different sentences and this is the second.
 **Next, in order:** the user re-enters the Groq key in Settings, then this
 same command produces the first real work-mode output. Stage 4 stays
 unstarted until that writing has been looked at.
+
+---
+
+## 2026-08-13 — work mode's first real output (Opus)
+
+The key was re-entered and `--work-rewrite` produced rewrites. **The class
+works end to end.** What it produced is worth reading carefully.
+
+**It writes well most of the time.** Four of five are genuinely good:
+
+> said: *"so quick recap from the stand up um ankit is taking the payment
+> flow changes sneha got the dashboard redesign…"*
+> work: *"Ankit is handling the payment flow changes and Sneha is working
+> on the dashboard redesign and analytic migration. Someone should pick up
+> the remaining task this week, as it's been pending for 2 sprints."*
+
+And the self-correction case, which was expected to fall back, came out
+right and passed the guard — the model kept Thursday in the explanation
+rather than dropping it, so the documented false positive never fired:
+
+> said: *"Can we do the demo on Thursday? Actually, wait, no. Thursday is
+> the all hands. Let's do Monday."*
+> work: *"We can do the demo on Monday afternoon, as Thursday is the all
+> hands and doesn't work."*
+
+**The guard fired correctly and the retry earned its place.** Transcript 3
+had `invented-month` on the first attempt and the retry rescued it. That
+is the designed mechanism working on real input for the first time.
+
+### The finding: the accepted risk arrived on transcript one
+
+The amendment the user accepted this afternoon — *qualitative invention is
+bounded, not eliminated* — showed up immediately, and it is not benign:
+
+> said: *"…move it to Friday morning like 11ish. Doesn't that work for you
+> or is Friday bad?"*
+> work: *"Rohan can't make it on Wednesday, so let's move the design review
+> to Friday morning around 11. **Friday morning at 11 won't work if you have
+> a conflict, but it's an option.**"*
+
+Guard verdict: **clean**. The invented sentence carries no number, day,
+month or unit that was not already present, so the subset rule cannot see
+it — exactly as the amendment says. In email register it is worse:
+*"Friday is not confirmed as a suitable alternative, as it is not known if
+it works or if Friday is bad."*
+
+Both are the model trying to render a rhetorical question ("doesn't that
+work for you?") as a statement, and producing something self-contradictory
+that the user would have to notice and delete. Not dangerous — no fact is
+wrong — but it is the failure mode that will decide whether people trust
+the mode, and it happens on a perfectly ordinary sentence.
+
+Worth putting in front of the user with the text, since accepting a risk in
+the abstract and seeing it on your own words are different things.
+
+### Latency, measured
+
+First call **5913 ms**, then 191–607 ms; second run's cold call 7750 ms.
+The cold start is connection setup, not the model — the warm numbers match
+the bake-off's 341 ms median. Decision 7's budget is Clean + ~1 s, which
+the warm path meets and the **first dictation of a session does not**.
+Nothing has been done about it; recorded as a real gap, not designed
+around.
+
+### State
+
+Stage 3 verified end to end for the first time. Stage 4 not started.
+`--work-rewrite` is the way to look at output without the gesture.
