@@ -540,7 +540,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 }
 
                 var finalText = rawText
-                var producedBy = "clean"
+                // "raw" until something better actually lands. This used to
+                // read "clean", which made the log and the history claim a
+                // cleaned transcript on every failure path that fell through
+                // to the raw text — a label that lies exactly when it is
+                // being read to diagnose a failure.
+                var producedBy = "raw"
                 do {
                     // Clean and Work run CONCURRENTLY for a work hold.
                     //
@@ -554,17 +559,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     // budget of about a second.
                     let cleanTask = Task { try await self.cleaner.clean(rawText, context: context) }
                     if workMode {
-                        let outcome = try await workCleaner.rewrite(rawText, context: context)
+                        // Two different failures, and they must not share a
+                        // handler. A guard violation means the rewrite came
+                        // back and was rejected; a THROW means it never came
+                        // back at all — no network, no OpenAI key, a 500.
+                        //
+                        // Both end at Clean, because Clean is already in
+                        // flight and is very likely to have succeeded: the
+                        // rewrite talks to OpenAI, Clean talks to Groq, so
+                        // one being unreachable says nothing about the
+                        // other. Previously a throw fell through to the
+                        // outer catch, which dropped the user all the way to
+                        // the raw transcript AND discarded a Clean result
+                        // that was probably sitting there finished.
+                        // nil means the rewrite never came back. Clean has
+                        // already been used by then, so there is no outcome
+                        // left to switch on.
+                        var outcome: WorkModeCleaner.Outcome?
+                        do {
+                            outcome = try await workCleaner.rewrite(rawText, context: context)
+                        } catch {
+                            SaylineLog.log("[work] rewrite unavailable -> \(error.localizedDescription)")
+                            outcome = nil
+                            // May itself throw, and should: if Clean is down
+                            // too, the outer catch leaves the raw transcript
+                            // standing, which is the honest last resort.
+                            finalText = try await cleanTask.value
+                            producedBy = "work unavailable → clean"
+                            await MainActor.run {
+                                self.indicatorWindow.flashMessage(
+                                    WorkModeCleaner.unavailableMessage, duration: 3.4)
+                            }
+                        }
                         switch outcome {
-                        case .rewritten(let text):
+                        case .none:
+                            break   // handled above
+                        case .rewritten(let text)?:
                             cleanTask.cancel()
                             finalText = text
                             producedBy = "work"
-                        case .rescued(let text, let broke):
+                        case .rescued(let text, let broke)?:
                             cleanTask.cancel()
                             finalText = text
                             producedBy = "work (retry rescued \(broke.map(\.kind).joined(separator: "+")))"
-                        case .fellBack(let reason):
+                        case .fellBack(let reason)?:
                             // The one path that needs Clean, and it is
                             // already in flight rather than starting now.
                             finalText = try await cleanTask.value
@@ -577,10 +615,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                         SaylineLog.log("[work] \(producedBy) -> \(finalText)")
                     } else {
                         finalText = try await cleanTask.value
+                        producedBy = "clean"
                         SaylineLog.log("cleaned transcript (context: \(context.rawValue)) -> \(finalText)")
                     }
 
                 } catch {
+                    // Everything down to the last resort failed, so the raw
+                    // transcript stands. finalText and producedBy are still
+                    // their honest defaults.
                     SaylineLog.log("cleanup failed, using raw transcript -> \(error.localizedDescription)")
                 }
 
