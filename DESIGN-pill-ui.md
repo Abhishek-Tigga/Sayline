@@ -30,7 +30,7 @@ file — it is the card's intent, chosen over every drawn value.
 |---|---|
 | radius | 8 (fixed — the radius rule below is speech-box only) |
 | padding | **12 horizontal, 8 vertical** — overrides the Figma's 16 × 10 |
-| gap | 6, between loader and label |
+| gap | **8**, between loader and label — overrides the Figma's 6 |
 | label | Inter Regular 16, `#f2f2f2` |
 | loader | 15×15, see below |
 

@@ -138,6 +138,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+    /// Refuses to be the second copy of Sayline.
+    ///
+    /// Two instances is never a state anyone wants, and it does not fail
+    /// visibly — it fails as *duplicated work*. Each instance installs its
+    /// own event tap, so one hotkey hold is heard twice: two recordings,
+    /// two transcriptions, two API calls, and the same sentence pasted
+    /// twice at the cursor. Reported by the user 2026-08-14 as "I said it
+    /// once but it pasted it twice", and the log showed every line
+    /// duplicated — `hotkey DOWN` twice, `raw transcript` twice, the
+    /// insertion twice.
+    ///
+    /// The cause was `open -n`, which forces a new instance rather than
+    /// activating the running one. That is easy to do by accident and easy
+    /// to hand to someone else by accident, which is why this is a guard in
+    /// the app rather than a note about which command to type.
+    ///
+    /// The newcomer yields and the incumbent keeps the tap, because the
+    /// incumbent may be mid-dictation and killing it would lose a
+    /// recording.
+    private static func claimSingleInstance() -> Bool {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return true }
+        let mine = NSRunningApplication.current
+        let others = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleID)
+            .filter { $0.processIdentifier != mine.processIdentifier }
+        guard let incumbent = others.first else { return true }
+
+        SaylineLog.log("another Sayline is already running (pid \(incumbent.processIdentifier)) — "
+                       + "this instance is quitting so the hotkey is not handled twice")
+        incumbent.activate()
+        NSApp.terminate(nil)
+        return false
+    }
+
     /// Local only once it's actually ready — while it's still
     /// downloading/loading, dictation silently keeps working via cloud
     /// instead of blocking on a multi-minute first-time download.
@@ -147,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         SaylineLog.startSession()
+        guard Self.claimSingleInstance() else { return }
         StallWatchdog.shared.start()
         // Scaffolding for judging the new pill before it is wired into the
         // live indicator. Costs a normal launch one array lookup; delete

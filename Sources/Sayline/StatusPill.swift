@@ -47,7 +47,8 @@ struct StatusPill: View {
     // speech box — the user's call when the rule card and the drawn frames
     // disagreed. Kept as one view so the two cannot drift apart again,
     // which is exactly what had happened in the Figma.
-    static let gap: CGFloat = 6
+    /// 8, up from the Figma's 6 — settled by eye on the rendered pill.
+    static let gap: CGFloat = 8
     static let label = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
 
     @ViewBuilder
