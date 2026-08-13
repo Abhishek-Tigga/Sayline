@@ -191,6 +191,12 @@ the text is trimmed from the front, keeping the tail.
 
 Gap between the speech box and the pill: **8**.
 
+The box **hugs its text**, up to a maximum width of **288** including
+padding. Short transcripts get a narrow box; long ones saturate at 288 and
+wrap. This is an explicit measured width rather than `.frame(maxWidth:)`,
+which expands to whatever the parent offers — and the indicator hands down
+the full screen width, so a cap alone became the size.
+
 ### Where the file disagrees, and why the rule won
 
 Lines 1 to 3 match node 34:1377 exactly. Lines 4 and 5 do not:

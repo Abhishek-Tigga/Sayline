@@ -239,7 +239,9 @@ private struct SpeechBackBox: View {
     let setAt: Date
     let surface: SurfaceStyle
 
-    static let maxWidth: CGFloat = 324
+    /// The widest the box may get, padding included. It hugs below this —
+    /// see `textWidth(_:horizontalPadding:)`.
+    static let maxWidth: CGFloat = 288
     static let fontSize: CGFloat = 12
     static let lineHeight: CGFloat = 15
     /// Five, per node 34:1377 — the rules for radius and padding are
@@ -262,7 +264,13 @@ private struct SpeechBackBox: View {
                 .font(Typeface.ui(Self.fontSize))
                 .lineSpacing(Self.lineHeight - Self.fontSize - 2)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: Self.maxWidth - metrics.horizontalPadding * 2, alignment: .leading)
+                // An explicit width, not a maximum. `.frame(maxWidth:)`
+                // expands to whatever the parent offers, so a two-word
+                // transcript sat in a full-width box; the indicator hands
+                // down the whole screen width, so the cap became the size.
+                .frame(width: Self.textWidth(fitted,
+                                             horizontalPadding: metrics.horizontalPadding),
+                       alignment: .leading)
                 .padding(.horizontal, metrics.horizontalPadding)
                 .padding(.vertical, metrics.verticalPadding)
                 .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
@@ -333,21 +341,36 @@ private struct SpeechBackBox: View {
         return min(lineCount(text, horizontalPadding: padding), maxLines)
     }
 
+    /// How wide the text actually needs to be, capped at `maxWidth`.
+    ///
+    /// `boundingRect` reports the width the wrapped text really occupies,
+    /// which is what makes the box hug: short transcripts come back
+    /// narrow, long ones saturate at the cap and wrap. Rounded up, because
+    /// a fractional shortfall clips the last glyph.
+    static func textWidth(_ text: String, horizontalPadding: CGFloat) -> CGFloat {
+        let available = maxWidth - horizontalPadding * 2
+        let bounds = measured(text, width: available)
+        return min(available, bounds.width.rounded(.up))
+    }
+
     private static func lineCount(_ text: String, horizontalPadding: CGFloat) -> Int {
         let available = maxWidth - horizontalPadding * 2
-        // Measured in the font it is drawn in. It used to measure in the
-        // system font while rendering in whatever `.font(.system(...))`
-        // resolved to — harmless while those matched, wrong now that the
-        // app ships Inter, and line count is what selects the padding and
-        // radius, so a mismeasure picks the wrong box.
+        return max(1, Int((measured(text, width: available).height / lineHeight).rounded()))
+    }
+
+    /// The one place text is measured, in the font it is drawn in.
+    ///
+    /// It used to measure in `NSFont.systemFont` while rendering with
+    /// `.font(.system(...))` — harmless while those matched, wrong once
+    /// the app started shipping Inter. Line count selects the padding and
+    /// the radius, and now the width too, so a mismeasure picks the wrong
+    /// box entirely.
+    private static func measured(_ text: String, width: CGFloat) -> CGRect {
         let font = NSFont(name: Typeface.familyName, size: fontSize)
             ?? NSFont.systemFont(ofSize: fontSize)
-        let attributed = NSAttributedString(string: text, attributes: [.font: font])
-        let bounds = attributed.boundingRect(
-            with: CGSize(width: available, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading]
-        )
-        return max(1, Int((bounds.height / lineHeight).rounded()))
+        return NSAttributedString(string: text, attributes: [.font: font])
+            .boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                          options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
 
     private static func fit(_ text: String) -> String {
