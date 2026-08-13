@@ -2989,3 +2989,49 @@ weaker promise is the honest one.
 **Stage 3 is unblocked.** The gates were: a ranking from the repaired
 instrument (done — rerun with cohorts separated), and this
 acknowledgment (done).
+
+---
+
+## 2026-08-13 — work mode stage 3: WorkModeCleaner (Opus)
+
+`claimed-fixed`. Builds, all suites green, **Clean untouched** —
+`git diff` over `TranscriptCleaner.swift` and
+`TranscriptCleanupValidator.swift` is empty, which was the stated
+requirement.
+
+Separate file rather than a mode on `TranscriptCleaner`, for a reason
+worth stating: Clean's contract is "never lose a word", enforced by a
+validator that reverts any edit outside a whitelist. That validator would
+revert a rewrite wholesale. Two incompatible safety contracts in one file
+is an invitation for a later edit to apply the wrong one.
+
+Owns: the work prompt, the per-context register fragments, temperature
+**0** (Clean uses 0.2 — a rewrite has more room to wander, and every
+point is another chance to invent something the guard must then catch),
+one corrective retry naming the violated fact, and the fallback decision.
+`Outcome` distinguishes rewritten / rescued / fellBack so the caller can
+flash the right thing and the log can answer "does the guard fire too
+often" as a lookup rather than an argument.
+
+Register fragments follow decision 3 — context adjusts dress, never
+depth. `.code` and `.general` both get neutral-professional; an
+unclassifiable window gets the register that is safe in any room rather
+than a guess about which room it is.
+
+The pinned facts sit in the **system** message with the constraints, and
+the transcript arrives alone in the user message. That shape is the fix
+for the leak, carried over from the harness so the two share it.
+
+Model is `llama-3.3-70b-versatile` with the measurement and the Groq
+free-tier ceiling both recorded in the file's own doc comment, so the
+next reader gets the caveat with the choice.
+
+**Not built, next:** stage 4 (double-tap in `HotkeyManager`,
+`isWorkModeThisRecording`) and stage 5 (mode chip, Settings, history
+field). Nothing is wired to a hotkey yet — `WorkModeCleaner` exists and
+compiles but no code path reaches it.
+
+**Not verified by its author:** no rewrite has gone through this class
+end to end; the numbers behind the model choice come from the harness,
+not from this code. The five-hold dictation smoke test is owed after the
+first build that changes the recording path — stage 4 will be that build.
