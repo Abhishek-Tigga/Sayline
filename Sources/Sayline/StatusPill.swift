@@ -32,9 +32,12 @@ struct StatusPill: View {
     /// Whether the settled label breathes.
     var breathes: Bool = false
 
-    /// How long the announcement holds, and how long it takes to hand over.
+    /// How long the announcement holds at full strength, and how long each
+    /// transition into and out of it takes.
     private static let announcementHold = 0.5
     private static let crossfade = 0.45
+    /// Peak blur on whichever label is leaving or arriving.
+    private static let maxBlur: CGFloat = 3
     /// "Pronounced · Slow" from the breathing-options prototype, and the
     /// same values the pill used before the redesign dropped it.
     private static let breatheCycle = 2.6
@@ -70,9 +73,9 @@ struct StatusPill: View {
     private var label: some View {
         TimelineView(.animation) { timeline in
             let now = timeline.date
-            let elapsed = now.timeIntervalSince(announcedAt)
-            let (announceAlpha, settledAlpha) = Self.crossfadeAlphas(
-                elapsed: elapsed, hasAnnouncement: announcement != nil)
+            let presence = Self.announcementPresence(
+                elapsed: now.timeIntervalSince(announcedAt),
+                hasAnnouncement: announcement != nil)
 
             let breathAlpha: Double = {
                 guard breathes else { return 1 }
@@ -81,14 +84,25 @@ struct StatusPill: View {
                 return 1 - phase * (1 - Self.breatheFloor)
             }()
 
-            ZStack {
+            // One value drives everything, so both directions are the same
+            // motion played forwards and backwards rather than two
+            // hand-written transitions that can drift apart.
+            ZStack(alignment: .leading) {
                 if let announcement {
-                    // Never breathes: it is on screen for under a second and
-                    // has one job, which is to be read.
-                    text(announcement).opacity(announceAlpha)
+                    text(announcement)
+                        .opacity(presence)
+                        .blur(radius: Self.maxBlur * (1 - presence))
                 }
-                text(text).opacity(settledAlpha * breathAlpha)
+                text(text)
+                    .opacity((1 - presence) * breathAlpha)
+                    .blur(radius: Self.maxBlur * presence)
             }
+            // The pill hugs: width follows the same value, so it widens as
+            // the announcement arrives and shrinks as it leaves. Measured
+            // rather than guessed — see `width(of:)`.
+            .frame(width: Self.labelWidth(text: text, announcement: announcement,
+                                          presence: presence),
+                   alignment: .leading)
         }
     }
 
@@ -99,15 +113,50 @@ struct StatusPill: View {
             .fixedSize()          // never wrap; the pill grows instead
     }
 
-    /// Announcement first, then a smoothstep handover. Split out so the
-    /// timing can be reasoned about without the view around it.
-    static func crossfadeAlphas(elapsed: Double, hasAnnouncement: Bool) -> (Double, Double) {
-        guard hasAnnouncement, elapsed >= 0 else { return (0, 1) }
-        if elapsed < announcementHold { return (1, 0) }
-        let k = (elapsed - announcementHold) / crossfade
-        guard k < 1 else { return (0, 1) }
-        let eased = k * k * (3 - 2 * k)
-        return (1 - eased, eased)
+    /// How present the announcement is, 0 to 1.
+    ///
+    /// Rises as work mode is entered, holds, then falls as it hands back.
+    /// Opacity, blur and width are all read off this one number, which is
+    /// why the two transitions are guaranteed to match: they are the same
+    /// curve, one played in reverse.
+    static func announcementPresence(elapsed: Double, hasAnnouncement: Bool) -> Double {
+        guard hasAnnouncement, elapsed >= 0 else { return 0 }
+        if elapsed < crossfade {
+            return smoothstep(elapsed / crossfade)
+        }
+        let afterHold = elapsed - crossfade - announcementHold
+        if afterHold <= 0 { return 1 }
+        guard afterHold < crossfade else { return 0 }
+        return 1 - smoothstep(afterHold / crossfade)
+    }
+
+    private static func smoothstep(_ k: Double) -> Double {
+        let x = min(1, max(0, k))
+        return x * x * (3 - 2 * x)
+    }
+
+    /// Width of the label area at a given presence.
+    ///
+    /// Measured with the real font rather than left to the layout system.
+    /// A ZStack sizes itself to its widest child, so the pill would sit at
+    /// the announcement's width for the entire hold and never shrink —
+    /// which is the thing being fixed.
+    static func labelWidth(text: String, announcement: String?, presence: Double) -> CGFloat {
+        let settled = width(of: text)
+        guard let announcement else { return settled }
+        let announced = width(of: announcement)
+        return settled + (announced - settled) * presence
+    }
+
+    private static var widthCache: [String: CGFloat] = [:]
+
+    static func width(of string: String) -> CGFloat {
+        if let cached = widthCache[string] { return cached }
+        let font = NSFont(name: Typeface.familyName, size: 16) ?? .systemFont(ofSize: 16)
+        let measured = (string as NSString)
+            .size(withAttributes: [.font: font]).width.rounded(.up)
+        widthCache[string] = measured
+        return measured
     }
 
     // MARK: - The shared surface

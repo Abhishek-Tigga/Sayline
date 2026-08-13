@@ -144,3 +144,31 @@ It is the library for the next one of these, not a throwaway: there are
 more states coming that will each want their own motion, and the value is
 in comparing them animating together rather than imagining them one at a
 time.
+
+## The work-mode announcement
+
+Entering work mode shows **Work Mode**, then hands back to **Listening**.
+Chosen from `design/pill-transitions.html`, which offers six treatments.
+
+| | |
+|---|---|
+| transition | blur and fade, **both directions** |
+| in | 0.45 s |
+| hold | 0.5 s |
+| out | 0.45 s |
+| peak blur | 3 pt on whichever label is arriving or leaving |
+| width | hugs — grows into the announcement, shrinks back |
+
+Implemented as a single `announcementPresence` value from 0 to 1: it
+rises, holds, and falls. Opacity, blur and width are all read off it, so
+the two transitions cannot drift apart — they are one curve, the second
+half played in reverse. Verified symmetric.
+
+The width is measured with the real font rather than left to the layout
+system. A ZStack sizes itself to its widest child, so the pill would have
+sat at the announcement's width for the whole hold and never shrunk,
+which is the behaviour this replaces.
+
+Work mode settles on "Listening", the same label as plain dictation. The
+mode is announced once and then carried by the loader's blue, rather than
+spelled out for the entire hold.
