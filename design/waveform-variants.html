@@ -145,6 +145,21 @@
       fn: (i, ph) => P.floor + (1 - P.floor) * pulse(ph - (2 - row(i)) * 0.28, P.width),
     },
     {
+      id: "upwardSweep",
+      name: "Upward sweep",
+      desc: "Fills from the bottom up, holds, then drains. Different from row rise: that is a band travelling through the grid, this is a level accumulating in it — rows stay lit as the next one joins.",
+      fn: (i, ph) => {
+        // Level runs 0..3 over the first 70% of the cycle and drains over
+        // the rest, so the fill is unhurried and the reset is quick —
+        // draining at the same speed reads as an unrelated second motion.
+        const t = wrap01(ph);
+        const level = t < 0.7 ? (t / 0.7) * 3 : 3 * (1 - (t - 0.7) / 0.3);
+        // Row 2 is the bottom, so it fills first.
+        const lit = Math.min(1, Math.max(0, level - (2 - row(i))));
+        return P.floor + (1 - P.floor) * lit;
+      },
+    },
+    {
       id: "columnSweep",
       name: "Column sweep",
       desc: "A band crosses left to right. The most obviously mechanical of the set — scanning, not thinking.",
