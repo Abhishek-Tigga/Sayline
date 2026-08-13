@@ -9,6 +9,19 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Next up (explicitly requested, in order)
 
+- **"Next song" does nothing** (parked 2026-08-13, low priority by the
+  user's call — "we don't want to spend too much time").
+
+  Play and pause work on a browser tab; `NX_KEYTYPE_NEXT` appears to do
+  nothing. Fable's read, unverified: a lone YouTube video registers no
+  next-track handler, so there genuinely is no next — in a playlist or on
+  YouTube Music there would be. **Test against a playlist before changing
+  any code**; play/pause working while next does not is consistent with
+  correct behaviour on a single video.
+
+  If it is real, the fallback is per-browser AppleScript rather than a
+  media key, the same route `closeActiveTab` already uses.
+
 - **Score the eval against the app's own parser** (half built 2026-08-12,
   the other half deliberately not rushed).
 
