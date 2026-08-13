@@ -3825,3 +3825,44 @@ work : "How we should do it:
 rewrite — so the output appeared to be a single bullet and I nearly
 reported truncation. The other two bullets were on the following lines,
 unmatched. A filtered log is not the log.
+
+---
+
+## 2026-08-13 — freeze recurred; the loop fix held, the cause did not (Opus)
+
+**The circuit-breaker fix worked, and the freeze is still open.** Both are
+true and they are different statements.
+
+Evidence from one log: the 24,884-iteration storm sits at 21:57, before
+the fix. After it, at 23:43, there are **two** disables twenty seconds
+apart, each followed by `event tap re-enabled`. No storm, breaker never
+tripped. The runaway loop is gone.
+
+The user's keyboard froze anyway. So the loop was an amplifier, not the
+cause — exactly as the OPEN entry said, and the underlying trigger
+remains unexplained.
+
+**One new fact, and it points away from the previous theory.** The 23:43
+disables carry code **4294967294** (`kCGEventTapDisabledByTimeout`) —
+*not* the 4294967295 (`...ByUserInput`) of the storm. Two different
+disable codes in two different incidents on the same day. `main ok 0.0s`
+and `0.7s` both times, so the main thread was healthy for both. Whatever
+is removing this tap can do it two ways.
+
+**Groq key "missing": OSStatus -25293, `errSecAuthFailed`.** Not a lost
+item — an item this build cannot unlock. macOS binds a Keychain entry to
+the code signature that created it, and ad-hoc signing gives every
+rebuild a new signature. **This session rebuilt roughly ten times**, so
+the key was invalidated roughly ten times, and each time the user paid a
+dialog and a re-entry.
+
+Fixed as far as it can be without a stable identity: an unreadable entry
+is now deleted on the failing read, so the app stops prompting for a
+passphrase it can never accept and the next save is clean.
+`claimed-fixed`.
+
+**The permanent fix is Developer ID signing**, already flagged by Fable
+as "move Developer ID enrollment up from end-of-V2". Every rebuild
+costing the user their Accessibility grant *and* their API key is not a
+minor annoyance — it is the single largest tax on this project's own
+testing loop, and it has cost hours today.

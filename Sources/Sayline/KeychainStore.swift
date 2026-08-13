@@ -45,7 +45,27 @@ enum KeychainStore {
             // -25300 means no such item, -25308 means the user or the
             // system refused without a prompt, and 0 with no data means
             // something else entirely.
-            if status != errSecItemNotFound {
+            // An item we cannot unlock is worse than no item.
+            //
+            // -25293 (errSecAuthFailed) means the entry exists but belongs
+            // to a different build: macOS binds a Keychain item to the code
+            // signature that created it, and ad-hoc signing gives every
+            // rebuild a new one. The stale entry then sits there refusing
+            // every read, and re-entering the key in Settings only works
+            // because `save` deletes first — so the user pays a dialog and
+            // a re-entry for something the app could clear itself.
+            //
+            // Deleting it here makes the next save unambiguous and stops
+            // the app prompting for a passphrase it can never accept.
+            if status == errSecAuthFailed || status == errSecInteractionNotAllowed {
+                SaylineLog.log("keychain entry for \(key.rawValue) belongs to an older build — "
+                    + "removing it so re-entering the key works cleanly")
+                SecItemDelete([
+                    kSecClass as String: kSecClassGenericPassword,
+                    kSecAttrService as String: service,
+                    kSecAttrAccount as String: key.rawValue,
+                ] as CFDictionary)
+            } else if status != errSecItemNotFound {
                 SaylineLog.log("keychain read for \(key.rawValue) failed -> OSStatus \(status) "
                     + "(\(SecCopyErrorMessageString(status, nil) as String? ?? "no description"))")
             }
