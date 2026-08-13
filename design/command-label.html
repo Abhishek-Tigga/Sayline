@@ -1,0 +1,238 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayline — command label typefaces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Press+Start+2P&family=VT323&family=DotGothic16&family=Pixelify+Sans:wght@400..700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#e0a89f; }
+  }
+  :root[data-theme="dark"]  { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#e0a89f; }
+  :root[data-theme="light"] { --bg:#f0ede8; --ink:#1a1a1a; --muted:#6d6862; --line:#d9d3ca; --card:#fff; --accent:#c96a5e; }
+
+  body { margin:0; padding:34px 24px 70px; background:var(--bg); color:var(--ink);
+         font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:24px; }
+  h1 { font-size:20px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  h2 { font-size:11.5px; margin:0 0 12px; font-weight:650; letter-spacing:.09em;
+       text-transform:uppercase; color:var(--muted); }
+  p  { margin:0; color:var(--muted); font-size:13.5px; }
+
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .card .name { font-size:13.5px; font-weight:650; }
+  .card .desc { font-size:11.5px; color:var(--muted); line-height:1.45; }
+  .stage { background:#000; border-radius:10px; padding:20px; display:flex; justify-content:center; }
+
+  /* The speech box, per node 35:1648 — 16x12 padding, radius 8, gap 4
+     between the command header and the transcript. */
+  .box { background:rgba(20,20,20,.75); border:1px solid rgba(102,102,102,.25);
+         border-radius:8px; padding:12px 16px; display:flex; flex-direction:column;
+         gap:4px; align-items:flex-start; }
+  .cmd { display:flex; align-items:center; gap:2px; color:#e6e6e6; }
+  .cmd svg { flex:none; display:block; }
+  .cmd .glyph { font-weight:700; line-height:1; }
+  .cmd .word { line-height:1; white-space:nowrap; }
+  .transcript { font-family:-apple-system, BlinkMacSystemFont, sans-serif;
+                font-size:14px; color:#ccc; white-space:nowrap; }
+
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+              gap:14px 22px; background:var(--card); border:1px solid var(--line);
+              border-radius:12px; padding:18px 20px; }
+  .ctl label { font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
+  .ctl label b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--accent); margin-top:5px; }
+  input[type=text] { width:100%; margin-top:5px; padding:5px 8px; border-radius:6px;
+                     border:1px solid var(--line); background:var(--bg); color:var(--ink);
+                     font:13px ui-monospace,SFMono-Regular,Menlo,monospace; }
+  input[type=text].bad { border-color:#c0392b; }
+  .seg { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .seg button { font:inherit; font-size:12px; padding:4px 10px; border-radius:7px;
+                border:1px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer; }
+  .seg button[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:#231a18; }
+  .note { font-size:12.5px; color:var(--muted); background:var(--card); border:1px solid var(--line);
+          border-radius:10px; padding:14px 16px; }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <h1>Command label — typeface</h1>
+    <p>The <b>Command</b> line and its icon, per node 35:1648: a 12&nbsp;px
+       terminal glyph, gap 2, then the word at 10&nbsp;px in
+       <code>#E6E6E6</code>. Only this line changes — the transcript below
+       stays as it is.</p>
+  </div>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="note" id="note"></div>
+
+  <div class="cards" id="cards"></div>
+
+</div>
+
+<script>
+(() => {
+  const ICON = `<g id="terminal-duotone-svgrepo-com 1">
+<path id="Vector" d="M5.49914 6.28029L2.12414 9.28029C2.0498 9.34636 1.95226 9.3802 1.85297 9.37436C1.75369 9.36852 1.66079 9.32348 1.59471 9.24914C1.52864 9.1748 1.4948 9.07726 1.50064 8.97797C1.50648 8.87869 1.55152 8.78579 1.62586 8.71971L4.68555 6L1.62586 3.28029C1.55152 3.21421 1.50648 3.12131 1.50064 3.02203C1.4948 2.92274 1.52864 2.8252 1.59471 2.75086C1.66079 2.67652 1.75369 2.63148 1.85297 2.62564C1.95226 2.6198 2.0498 2.65364 2.12414 2.71971L5.49914 5.71971C5.53872 5.7549 5.5704 5.79806 5.59209 5.84637C5.61378 5.89468 5.625 5.94704 5.625 6C5.625 6.05296 5.61378 6.10532 5.59209 6.15363C5.5704 6.20194 5.53872 6.2451 5.49914 6.28029ZM10.1247 8.625H5.62473C5.52527 8.625 5.42989 8.66451 5.35956 8.73484C5.28923 8.80516 5.24973 8.90054 5.24973 9C5.24973 9.09946 5.28923 9.19484 5.35956 9.26517C5.42989 9.33549 5.52527 9.375 5.62473 9.375H10.1247C10.2242 9.375 10.3196 9.33549 10.3899 9.26517C10.4602 9.19484 10.4997 9.09946 10.4997 9C10.4997 8.90054 10.4602 8.80516 10.3899 8.73484C10.3196 8.66451 10.2242 8.625 10.1247 8.625Z" fill="#E6E6E6"/>
+</g>`;
+
+  const P = { size: 10, tracking: 0.5, colour: "#E6E6E6", icon: "svg", transcript: "Open WhatsApp" };
+
+  const FONTS = [
+    { id:"silkscreen",  name:"Silkscreen",        stack:"'Silkscreen', monospace",
+      desc:"A true bitmap face designed for small sizes. Crispest of the set at 10px, and the closest to the pixel look without becoming a costume." },
+    { id:"pressstart",  name:"Press Start 2P",     stack:"'Press Start 2P', monospace",
+      desc:"Chunky 8-bit arcade. Unmistakably pixel, and wide — at 10px it will be noticeably longer than the others and may crowd the box." },
+    { id:"vt323",       name:"VT323",              stack:"'VT323', monospace",
+      desc:"A CRT terminal face — tall, narrow, phosphor-era. Reads as terminal rather than as games, which may be the better fit here." },
+    { id:"dotgothic",   name:"DotGothic16",        stack:"'DotGothic16', monospace",
+      desc:"Dot-matrix, like a receipt printer or a dot-matrix display. Softer than a hard pixel grid." },
+    { id:"pixelify",    name:"Pixelify Sans",      stack:"'Pixelify Sans', monospace",
+      desc:"A modern pixel face with real letterforms underneath. The most legible of the pixel options at small sizes." },
+    { id:"sharetech",   name:"Share Tech Mono",    stack:"'Share Tech Mono', monospace",
+      desc:"Not pixel at all — a clean terminal mono. Here as the control: it says 'command line' without the retro." },
+    { id:"plexmono",    name:"IBM Plex Mono",      stack:"'IBM Plex Mono', monospace",
+      desc:"The most restrained option. Says terminal quietly, and will age better than a pixel face if the app grows up around it." },
+    { id:"system",      name:"System monospace",   stack:"ui-monospace, SFMono-Regular, Menlo, monospace",
+      desc:"SF Mono, already on every Mac. Nothing to bundle, nothing to license, and it matches the OS — the zero-cost baseline." },
+  ];
+
+  const cards = document.getElementById("cards");
+  const built = FONTS.map(font => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const stage = document.createElement("div");
+    stage.className = "stage";
+    const box = document.createElement("div");
+    box.className = "box";
+
+    const cmd = document.createElement("div");
+    cmd.className = "cmd";
+    const iconHost = document.createElement("span");
+    const word = document.createElement("span");
+    word.className = "word";
+    word.textContent = "Command";
+    cmd.append(iconHost, word);
+
+    const transcript = document.createElement("div");
+    transcript.className = "transcript";
+
+    box.append(cmd, transcript);
+    stage.appendChild(box);
+
+    const name = document.createElement("div");
+    name.className = "name"; name.textContent = font.name;
+    const desc = document.createElement("div");
+    desc.className = "desc"; desc.textContent = font.desc;
+
+    card.append(stage, name, desc);
+    cards.appendChild(card);
+    return { font, word, iconHost, transcript };
+  });
+
+  function iconMarkup(kind, size, colour) {
+    if (kind === "svg") {
+      return `<svg width="${size}" height="${size}" viewBox="0 0 12 12" fill="none"
+                   style="color:${colour}">${ICON}</svg>`;
+    }
+    if (kind === "chevron") {
+      return `<span class="glyph" style="font-size:${size}px;color:${colour}">&gt;_</span>`;
+    }
+    return "";   // none
+  }
+
+  function render() {
+    built.forEach(({ font, word, iconHost, transcript }) => {
+      word.style.fontFamily = font.stack;
+      word.style.fontSize = P.size + "px";
+      word.style.letterSpacing = P.tracking + "px";
+      word.style.color = P.colour;
+      transcript.textContent = P.transcript;
+      iconHost.innerHTML = iconMarkup(P.icon, Math.round(P.size * 1.2), P.colour);
+      // The glyph option should share the label's face, so the two agree.
+      const glyph = iconHost.querySelector(".glyph");
+      if (glyph) glyph.style.fontFamily = font.stack;
+    });
+    document.getElementById("note").innerHTML =
+      `<b>Pixel faces are size-sensitive.</b> A bitmap design has one true size and ` +
+      `integer multiples of it; between those it is resampled and goes soft. ` +
+      `Silkscreen and Press Start 2P are drawn on an 8px grid, so <b>8px and 16px</b> ` +
+      `render crisp and 10px does not. That is worth knowing before picking a size — ` +
+      `currently <b>${P.size}px</b>.`;
+  }
+
+  const SLIDERS = [
+    ["size",     6,  20,  1,    "Label size",      v => v + " px"],
+    ["tracking", -1, 3,   0.1,  "Letter spacing",  v => v.toFixed(1) + " px"],
+  ];
+  const controls = document.getElementById("controls");
+  SLIDERS.forEach(([key, min, max, step, name, fmt]) => {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = fmt(P[key]);
+    label.append(document.createTextNode(name), out);
+    const input = document.createElement("input");
+    Object.assign(input, { type:"range", min, max, step, value:P[key] });
+    input.addEventListener("input", () => {
+      P[key] = parseFloat(input.value); out.textContent = fmt(P[key]); render();
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  });
+  {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    const out = document.createElement("b"); out.textContent = P.colour;
+    label.append(document.createTextNode("Colour"), out);
+    const input = document.createElement("input");
+    input.type = "text"; input.value = P.colour; input.spellcheck = false;
+    input.addEventListener("input", () => {
+      const raw = input.value.trim().replace(/^#/, "");
+      const ok = /^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw);
+      input.classList.toggle("bad", !ok);
+      out.textContent = ok ? "#" + raw.toLowerCase() : "not a hex code";
+      if (ok) { P.colour = "#" + raw; render(); }
+    });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  }
+  {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    label.append(document.createTextNode("Icon"));
+    const seg = document.createElement("div");
+    seg.className = "seg";
+    [["svg","Figma SVG"], ["chevron","> _ as text"], ["none","No icon"]].forEach(([id, text]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = text;
+      b.setAttribute("aria-pressed", String(P.icon === id));
+      b.addEventListener("click", () => {
+        P.icon = id;
+        [...seg.children].forEach(c => c.setAttribute("aria-pressed", String(c === b)));
+        render();
+      });
+      seg.appendChild(b);
+    });
+    wrap.append(label, seg);
+    controls.appendChild(wrap);
+  }
+  {
+    const wrap = document.createElement("div"); wrap.className = "ctl";
+    const label = document.createElement("label");
+    label.append(document.createTextNode("Transcript"));
+    const input = document.createElement("input");
+    input.type = "text"; input.value = P.transcript;
+    input.addEventListener("input", () => { P.transcript = input.value; render(); });
+    wrap.append(label, input);
+    controls.appendChild(wrap);
+  }
+
+  document.fonts.ready.then(render);
+  render();
+})();
+</script>
