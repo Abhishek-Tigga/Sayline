@@ -78,6 +78,13 @@ final class IndicatorViewModel: ObservableObject {
 enum PillStyle {
     /// #F2F2F2 — hsl(0, 0%, 95%), a pure neutral (no hue/saturation).
     static let foreground = Color(red: 0xF2 / 255, green: 0xF2 / 255, blue: 0xF2 / 255)
+    /// #CCCCCC — the speech box's transcript, dimmer than the pill's label.
+    ///
+    /// Deliberately not `foreground`. The pill is a one-word status the eye
+    /// checks; the speech box is a paragraph it reads, and at that size
+    /// F2F2F2 was bright enough to pull attention away from whatever the
+    /// user was actually working on.
+    static let transcript = Color(red: 0xCC / 255, green: 0xCC / 255, blue: 0xCC / 255)
     /// True black. Opacity is applied per-instance so the comparison
     /// harness can render both surfaces at once.
     static let tintBase = Color(red: 0, green: 0, blue: 0)
@@ -292,7 +299,7 @@ private struct SpeechBackBox: View {
             // ease-out, matching the prototype's cubic-bezier feel
             let eased = 1 - pow(1 - progress, 3)
             var run = AttributedString(word + (index < words.count - 1 ? " " : ""))
-            run.foregroundColor = PillStyle.foreground.opacity(eased)
+            run.foregroundColor = PillStyle.transcript.opacity(eased)
             result += run
         }
         return result
@@ -771,11 +778,11 @@ private struct PillView: View {
             // badly against this surface.
             .borderBeam(
                 viewModel.isAgentMode ? .sm : .pulseInner,
-                // Mono for both dictation modes. Work used to take agent's
-                // ocean, which made the two look related when they are not:
-                // agent is the one doing something to your words. Work is
-                // now distinguished by the loader's blue instead.
-                colorVariant: viewModel.isAgentMode ? .ocean : .mono,
+                // Mono everywhere, for now — the user's call 2026-08-14.
+                // Agent used to take .ocean; the modes are carried by the
+                // loader's motion and colour instead, and a coloured beam
+                // on top of that was a third signal saying the same thing.
+                colorVariant: .mono,
                 active: true,
                 borderRadius: Double(PillStyle.cornerRadius),
                 strength: viewModel.isAgentMode ? 1.0 : 0.4

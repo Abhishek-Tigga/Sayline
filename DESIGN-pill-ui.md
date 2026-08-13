@@ -90,8 +90,10 @@ call: follow the geometry.
 | horizontal | 24 | 28 | 32 | 36 | 36 |
 | vertical | 16 | 20 | 24 | 28 | 28 |
 
-Text is Inter Medium 14. Spoken-but-superseded lines are `#999`; the live
-last line is `#FDFDFD`.
+Transcript text is **`#CCCCCC`**, dimmer than the pill's `#F2F2F2`. The
+pill is a one-word status the eye checks; the speech box is a paragraph it
+reads, and at that size the pill's brightness pulled attention away from
+whatever the user was working on.
 
 ## The loader
 
@@ -224,3 +226,9 @@ this is the paragraph to come back to.
   Medium. Not raised, so not changed — but font size decides how many
   lines a transcript takes, and line count now decides radius and padding,
   so this feeds directly into the rules above.
+
+## The border beam
+
+**Mono in every mode, for now** (2026-08-14). Agent mode previously took
+`.ocean`. The modes are already carried by the loader's motion and colour,
+so a coloured beam was a third signal saying the same thing.
