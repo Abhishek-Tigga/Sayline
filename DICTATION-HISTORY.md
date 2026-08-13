@@ -47,6 +47,38 @@ frozen the whole app, and probably the keyboard with it.
 
 ## Entries, newest first
 
+### 2026-08-13 · Recordings truncated to a fraction of the hold
+
+**Seen:** "not capturing properly" — the first dictation of a session fine,
+later ones capturing little or nothing. Asked whether a dB or gain change
+caused it; no level or threshold was ever touched.
+
+**Log:**
+```
+14:32:54.398  hotkey DOWN
+14:32:54.830  voice processing turned off      (+432ms)
+14:32:55.532  voice processing enabled        (+1134ms)
+14:32:55.579  recording started               (+1181ms)
+14:32:56.046  hotkey UP
+              duration: 0.4777s  frames: 19200  tap fired 4 time(s)
+```
+
+**Cause:** the previous entry's fix toggles voice processing off and on to
+set the input device safely — and that toggle costs about 1.1 seconds, on
+**every hold**. The microphone is not listening while the user is talking.
+Capture itself is healthy: the tap fires, frames arrive, `audio peak
+0.917 -> has speech`.
+
+**Status: open.** Handed to Fable for a plan rather than patched a fourth
+time. The open question is whether voice processing should be enabled once
+at launch instead of per hold, or reverted entirely — it has now caused
+three distinct failures of the core feature in one day.
+
+**Also seen, undiagnosed:** `transcription failed -> The request timed
+out.` twice at 14:33.
+
+**Working until:** the device-ordering fix earlier the same day.
+
 ### 2026-08-13 · Zero frames after the first two holds, `-10851`
 
 **Seen:** first dictation transcribed fine, every later hold captured
