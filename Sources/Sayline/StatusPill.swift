@@ -22,8 +22,10 @@ import SwiftUI
 /// lacks.
 struct StatusPill: View {
     var text: String
-    /// 10 × 8, changed from the Figma's 16 × 10 by the user 2026-08-14.
-    var horizontalPadding: CGFloat = 10
+    /// 12 × 8, against the Figma's 16 × 10. The user tried 10 × 8 first
+    /// and called it crammed, so horizontal came back up to 12; vertical
+    /// stays at 8. Both settled by eye on the rendered pill, 2026-08-14.
+    var horizontalPadding: CGFloat = 12
     var verticalPadding: CGFloat = 8
 
     var body: some View {

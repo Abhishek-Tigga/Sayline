@@ -29,10 +29,14 @@ file — it is the card's intent, chosen over every drawn value.
 | | value |
 |---|---|
 | radius | 8 (fixed — the radius rule below is speech-box only) |
-| padding | 16 horizontal, 10 vertical |
+| padding | **12 horizontal, 8 vertical** — overrides the Figma's 16 × 10 |
 | gap | 6, between loader and label |
 | label | Inter Regular 16, `#f2f2f2` |
 | loader | 15×15, see below |
+
+Padding was settled on the rendered pill rather than in Figma: 16 × 10 was
+the drawn value, 10 × 8 was tried and read as crammed, 12 × 8 is the
+result.
 
 ## Speech box — radius by line count
 
