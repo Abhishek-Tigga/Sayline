@@ -3035,3 +3035,42 @@ compiles but no code path reaches it.
 end to end; the numbers behind the model choice come from the harness,
 not from this code. The five-hold dictation smoke test is owed after the
 first build that changes the recording path — stage 4 will be that build.
+
+---
+
+## 2026-08-13 — `--work-rewrite`, and the first end-to-end attempt (Opus)
+
+`claimed-fixed` for the mode itself; **the rewrite path is still unproven
+end to end.**
+
+Added `Sayline --work-rewrite "<transcript>" [--context email|chat|code|general]`
+(also `--file`). It runs the real `WorkModeCleaner` — real prompt, real
+model, real `FactGuard` verification, real retry and fallback — and prints
+what work mode would insert, with the outcome and the wall clock.
+
+Built because work mode is otherwise untestable until the double-tap
+gesture ships, and that gesture is the riskiest build in the feature: it
+touches the recording path that broke six times in one day. Judging the
+*writing* before committing to the *gesture* separates two decisions that
+would otherwise arrive together, and the user asked exactly the right
+question — whether they were blocked on stage 4 to see any of this.
+
+**First run failed on all five transcripts**, and not in the mode:
+
+```
+work  : failed — Your Groq key can't be read after the last rebuild
+                 — re-enter it in Settings
+```
+
+The Keychain entry is bound to the previous code signature, and this
+session has rebuilt several times. So: the plumbing ran, the error was
+raised and surfaced correctly by the message written for exactly this
+case, and **no rewrite has yet been produced by this class.** The class
+compiles, is reachable, and has never done its job once.
+
+Recorded rather than glossed, because "built and committed" and "seen to
+work" are different sentences and this is the second.
+
+**Next, in order:** the user re-enters the Groq key in Settings, then this
+same command produces the first real work-mode output. Stage 4 stays
+unstarted until that writing has been looked at.

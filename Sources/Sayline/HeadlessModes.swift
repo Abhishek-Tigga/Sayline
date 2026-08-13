@@ -28,6 +28,8 @@ enum HeadlessModes {
             dumpConfig()
         case "--parse-actions":
             parseActions()
+        case "--work-rewrite":
+            workRewrite(arguments: arguments)
         case "--selftest-capture":
             let seconds = arguments.count > 2 ? Double(arguments[2]) ?? 3 : 3
             let holds = arguments.count > 3 ? Int(arguments[3]) ?? 1 : 1
@@ -185,6 +187,67 @@ extension HeadlessModes {
     ///
     /// It answers the contract directly: did audio arrive, how fast, how
     /// much of the window was captured, and in what format.
+    /// Runs a transcript through the real `WorkModeCleaner` and prints
+    /// what work mode would insert.
+    ///
+    ///     Sayline --work-rewrite "so um I was thinking maybe we ship Tuesday"
+    ///     Sayline --work-rewrite --context email --file transcripts.txt
+    ///
+    /// Exists because work mode is otherwise untestable until the
+    /// double-tap gesture ships, and the gesture is the riskiest build in
+    /// the feature — it touches the recording path that broke six times in
+    /// one day. Being able to judge the *writing* before committing to the
+    /// *gesture* separates two decisions that would otherwise arrive
+    /// together. It also runs the real class end to end, which no test
+    /// did.
+    static func workRewrite(arguments: [String]) {
+        var context = AppContext.general
+        if let index = arguments.firstIndex(of: "--context"), index + 1 < arguments.count,
+           let parsed = AppContext(rawValue: arguments[index + 1]) {
+            context = parsed
+        }
+        var inputs: [String] = []
+        if let index = arguments.firstIndex(of: "--file"), index + 1 < arguments.count {
+            let text = (try? String(contentsOfFile: arguments[index + 1], encoding: .utf8)) ?? ""
+            inputs = text.split(separator: "\n").map(String.init).filter { !$0.isEmpty }
+        } else {
+            inputs = arguments.dropFirst(2).filter { !$0.hasPrefix("--") }
+        }
+        guard !inputs.isEmpty else {
+            print("usage: Sayline --work-rewrite \"transcript\" [--context email|chat|code|general]")
+            exit(2)
+        }
+
+        let cleaner = WorkModeCleaner()
+        let done = DispatchSemaphore(value: 0)
+        Task {
+            for raw in inputs {
+                let started = Date()
+                do {
+                    let outcome = try await cleaner.rewrite(raw, context: context)
+                    let ms = Date().timeIntervalSince(started) * 1000
+                    print("\nsaid  : \(raw)")
+                    switch outcome {
+                    case .rewritten(let text):
+                        print(String(format: "work  : %@   [clean, %.0f ms]", text, ms))
+                    case .rescued(let text, let broke):
+                        print(String(format: "work  : %@   [retry rescued %@, %.0f ms]",
+                                     text, broke.map(\.kind).joined(separator: "+"), ms))
+                    case .fellBack(let reason):
+                        print(String(format: "work  : FELL BACK — %@   [%.0f ms]",
+                                     WorkModeCleaner.fallbackMessage(for: reason), ms))
+                    }
+                } catch {
+                    print("\nsaid  : \(raw)")
+                    print("work  : failed — \(error.localizedDescription)")
+                }
+            }
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + 180)
+        exit(0)
+    }
+
     /// Loudest sample in a recorded file. The one number that separates
     /// "we recorded" from "we recorded silence".
     private static func peakAmplitude(of file: AVAudioFile) -> Float {
