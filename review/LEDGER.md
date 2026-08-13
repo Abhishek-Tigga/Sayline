@@ -2353,3 +2353,52 @@ lyric in a transcript, against quietening the user's whole machine.
 registers no next-track handler, so play/pause working while next does
 nothing may be correct behaviour. To be verified against a playlist before
 any code is touched.
+
+---
+
+## 2026-08-13 — work mode, stage 1: FactGuard (Opus)
+
+`claimed-fixed`. Stage 1 of the agreed build order, nothing after it
+started. Sequencing constraint honoured: the SYSTEM-AUDIO fix landed and
+was measured in its own binary (`b30f917`) and confirmed live by the user
+before this began, so no audio-path change shares this build.
+
+`FactGuard.swift` — Foundation only, so the suite holds it without a
+build. `extract` finds numbers (spoken forms normalized, "fifteen" = 15,
+compounds like "twenty five" = 25), day names, capitalized proper nouns
+and a negation count. `verify` returns typed violations with an
+`explanation` for the corrective retry and a `kind` for the log.
+`promptBlock` builds the pinned-facts text **from the same extraction
+that later verifies**, per decision 2 — one source, so prompt and guard
+cannot drift.
+
+`eval/factguard-checks` — 26 cases, all passing, including the five the
+brief named: the Tuesday→Monday swap, the invented "I'll", 15→50, the
+negation flip, and the resolved self-correction **asserted as a known
+false positive** so the limitation is a recorded decision rather than a
+future bug report. Added to `CLAUDE.md`'s verification section.
+
+**Three design choices worth challenging, all made to fix failing cases:**
+
+1. *Proper nouns ignore sentence position.* Excluding the first word of a
+   sentence rejects "The" correctly and "Sarah" wrongly, and names begin
+   sentences constantly. The stopword list does the real work; position
+   only added the bug. Cost: a sentence-initial capitalized verb can be
+   read as a name.
+2. *Verification checks presence, not capitalization.* Which is what makes
+   (1) safe — "Ship on Tuesday" rewritten as "…we ship on Tuesday" is
+   faithful, and a genuinely dropped name is absent in any case.
+3. *Negations are counted, not matched.* "I don't think we should" and "I
+   think we shouldn't" are both faithful; losing one entirely is not.
+
+**One bug found by the suite that the file's own header predicted:**
+`properNouns` kept apostrophes while `tokenize` stripped them, so "I'll"
+was pinned as a name and then sought as "ill". Two normalizations of one
+truth. They now share one.
+
+**Not done, deliberately:** no prompt, no model call, no eval, no hotkey
+work. Stage 2 (the model eval) is next and comes before any production
+prompt, per the brief.
+
+**Not verified by its author:** the suite is mine and passes; nobody else
+has run it, and no model output has been checked against it yet.

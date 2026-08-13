@@ -46,6 +46,7 @@ code, the rejected alternatives are not.
 | `CHANGELOG.md` | One row per meaningful change |
 | `eval/README.md` | What the router metrics mean, and the rules for changing the test set |
 | `review/LEDGER.md` | What has been claimed, what has been independently checked, what is still open |
+| `DESIGN-work-mode.md` | Work mode's eight decisions with their rejected alternatives |
 | `DICTATION-HISTORY.md` | **Read first when dictation, the mic or the hotkey breaks.** Every past failure, its cause, and what was working just before |
 
 If something looks wrong, check these first. Several apparent mistakes are
@@ -97,6 +98,7 @@ swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCata
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift eval/factguard-checks/main.swift && /tmp/chk
 ```
 
 The fast path answers some commands without calling the model at all, so
