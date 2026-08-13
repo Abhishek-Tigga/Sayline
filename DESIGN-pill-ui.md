@@ -172,3 +172,49 @@ which is the behaviour this replaces.
 Work mode settles on "Listening", the same label as plain dictation. The
 mode is announced once and then carried by the loader's blue, rather than
 spelled out for the entire hold.
+
+## The speech box — superseded rules (node 34:1377)
+
+These replace the earlier 10/14/18/22 radius and 24/28/32/36 padding.
+Stated by the user as arithmetic on 2026-08-14 and confirmed by the first
+three frames.
+
+| lines | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| radius | 8 | 10 | 12 | 14 | 16 |
+| horizontal padding | 16 | 18 | 20 | 22 | 24 |
+| vertical padding | 12 | 14 | 16 | 18 | 20 |
+
+Radius starts at 8 and adds 2 per line; padding starts at 16 × 12 and adds
+2 per line. **Five lines maximum** — past that the box stops growing and
+the text is trimmed from the front, keeping the tail.
+
+Gap between the speech box and the pill: **8**.
+
+### Where the file disagrees, and why the rule won
+
+Lines 1 to 3 match node 34:1377 exactly. Lines 4 and 5 do not:
+
+| | rule | drawn |
+|---|---|---|
+| 4-line radius | 14 | 16 |
+| 5-line radius | 16 | 20 |
+| 5-line vertical padding | 20 | 18 |
+
+Two frames breaking an arithmetic the other three keep reads as frames
+that were not updated, and the arithmetic was stated explicitly and most
+recently. The rule wins. If the frames are right and the rule is wrong,
+this is the paragraph to come back to.
+
+### Not changed, and worth knowing
+
+- The **fill, stroke and blur** stay on the shared surface (`#141414` at
+  75%, `#666666` stroke). Node 34:1377 still draws the old drift —
+  `#0F0F0F` with a `#525252` stroke and blur 12 — which was resolved
+  earlier in favour of one treatment for both surfaces.
+- The **pill's own dimensions in this file are not authoritative**, per
+  the user. It draws 10 × 8 padding; the pill ships 12 × 8.
+- The speech box renders at **12pt**, while the file specifies 14pt Inter
+  Medium. Not raised, so not changed — but font size decides how many
+  lines a transcript takes, and line count now decides radius and padding,
+  so this feeds directly into the rules above.

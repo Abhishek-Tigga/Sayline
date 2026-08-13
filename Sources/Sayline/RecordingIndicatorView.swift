@@ -242,10 +242,11 @@ private struct SpeechBackBox: View {
     static let maxWidth: CGFloat = 324
     static let fontSize: CGFloat = 12
     static let lineHeight: CGFloat = 15
-    /// The largest Figma variant ("many line") is ~13 lines. Past that the
-    /// box stops growing and the text is trimmed from the front, keeping
-    /// the end — the tail is usually the actual instruction.
-    static let maxLines = 13
+    /// Five, per node 34:1377 — the rules for radius and padding are
+    /// defined line by line and stop there. Past five the box stops
+    /// growing and the text is trimmed from the front, keeping the end,
+    /// since the tail is usually the actual instruction.
+    static let maxLines = 5
     /// Whole reveal lands in ~0.4s regardless of length. Word by word, not
     /// letter by letter: letters read as a fake typewriter and drag, words
     /// read as a thought forming and are far fewer animation steps.
@@ -258,7 +259,7 @@ private struct SpeechBackBox: View {
 
         TimelineView(.animation) { timeline in
             Text(Self.attributed(fitted, elapsed: timeline.date.timeIntervalSince(setAt)))
-                .font(.system(size: Self.fontSize))
+                .font(Typeface.ui(Self.fontSize))
                 .lineSpacing(Self.lineHeight - Self.fontSize - 2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: Self.maxWidth - metrics.horizontalPadding * 2, alignment: .leading)
@@ -299,29 +300,49 @@ private struct SpeechBackBox: View {
 
     /// Padding scales with the box so the corner radius stays visually
     /// proportional — deliberate in the Figma variants, not drift.
+    /// Radius and padding, line by line.
+    ///
+    /// From node 34:1377, and stated by the user as arithmetic: radius
+    /// starts at 8 and adds 2 per line; padding starts at 16 horizontal
+    /// and 12 vertical and adds 2 per line; five lines maximum.
+    ///
+    /// The stated rule wins over the frames where they disagree. Lines 1
+    /// to 3 match the file exactly; the 4- and 5-line frames do not —
+    /// they draw radius 16 and 20 against the rule's 14 and 16, and the
+    /// 5-line frame draws 18 vertical against the rule's 20. Two frames
+    /// breaking an arithmetic the other three keep reads as frames that
+    /// were not updated, and the user gave the arithmetic explicitly and
+    /// most recently. Recorded in DESIGN-pill-ui.md.
     private static func metrics(for text: String) -> Metrics {
-        switch resolvedLineCount(text) {
-        case 1:      return Metrics(horizontalPadding: 12, verticalPadding: 8, cornerRadius: 12)
-        case 2...3:  return Metrics(horizontalPadding: 16, verticalPadding: 12, cornerRadius: 14)
-        case 4...7:  return Metrics(horizontalPadding: 16, verticalPadding: 12, cornerRadius: 16)
-        default:     return Metrics(horizontalPadding: 20, verticalPadding: 16, cornerRadius: 18)
-        }
+        let lines = min(max(resolvedLineCount(text), 1), maxLines)
+        let step = CGFloat(lines - 1) * 2
+        return Metrics(horizontalPadding: 16 + step,
+                       verticalPadding: 12 + step,
+                       cornerRadius: 8 + step)
     }
 
     /// Padding changes the width available, which can change the line
     /// count, which can change the padding. Two passes settles it.
+    ///
+    /// The first pass assumes the one-line padding, then the second uses
+    /// whatever padding that answer implies. Capped at `maxLines` so a
+    /// long transcript cannot ask for padding the rule does not define.
     private static func resolvedLineCount(_ text: String) -> Int {
         let first = lineCount(text, horizontalPadding: 16)
-        let padding: CGFloat = first == 1 ? 12 : (first >= 8 ? 20 : 16)
-        return lineCount(text, horizontalPadding: padding)
+        let padding = 16 + CGFloat(min(max(first, 1), maxLines) - 1) * 2
+        return min(lineCount(text, horizontalPadding: padding), maxLines)
     }
 
     private static func lineCount(_ text: String, horizontalPadding: CGFloat) -> Int {
         let available = maxWidth - horizontalPadding * 2
-        let attributed = NSAttributedString(
-            string: text,
-            attributes: [.font: NSFont.systemFont(ofSize: fontSize)]
-        )
+        // Measured in the font it is drawn in. It used to measure in the
+        // system font while rendering in whatever `.font(.system(...))`
+        // resolved to — harmless while those matched, wrong now that the
+        // app ships Inter, and line count is what selects the padding and
+        // radius, so a mismeasure picks the wrong box.
+        let font = NSFont(name: Typeface.familyName, size: fontSize)
+            ?? NSFont.systemFont(ofSize: fontSize)
+        let attributed = NSAttributedString(string: text, attributes: [.font: font])
         let bounds = attributed.boundingRect(
             with: CGSize(width: available, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading]

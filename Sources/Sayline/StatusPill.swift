@@ -184,7 +184,7 @@ final class PillPreviewWindowController {
         // with a fixed window over size extrema is what crashed Settings
         // on 2026-08-12.
         hosting.sizingOptions = []
-        hosting.frame = NSRect(x: 0, y: 0, width: 620, height: 420)
+        hosting.frame = NSRect(x: 0, y: 0, width: 1120, height: 560)
 
         let window = NSWindow(
             contentRect: hosting.frame,
@@ -212,6 +212,8 @@ final class PillPreviewWindowController {
 /// goes through the same view the floating window uses.
 /// Renders the REAL indicator, not `StatusPill` on its own, so the label
 /// logic and the shared surface are exercised too.
+/// Renders the REAL indicator, so the label logic, the shared surface and
+/// the speech box's own metrics are all exercised.
 private struct PillPreview: View {
     /// Held in @State, created once. Building them inside `body` meant a
     /// fresh view model on every frame — and since entering work mode
@@ -219,28 +221,55 @@ private struct PillPreview: View {
     /// forever and never hand over to "Listening".
     @State private var plain = IndicatorViewModel()
     @State private var work = PillPreview.workModel()
-    @State private var agent = PillPreview.agentModel()
+    @State private var boxes = PillPreview.speechModels()
 
     private static func workModel() -> IndicatorViewModel {
         let m = IndicatorViewModel(); m.isWorkMode = true; return m
     }
-    private static func agentModel() -> IndicatorViewModel {
-        let m = IndicatorViewModel(); m.isAgentMode = true; return m
+
+    /// One transcript per line count, so the radius and padding rules can
+    /// be seen stepping rather than taken on trust.
+    private static func speechModels() -> [IndicatorViewModel] {
+        let sentences = [
+            "Open WhatsApp",
+            "Widgets are a way to view current battery levels, and more",
+            "Widgets are a way to view current information at a glance, today's headline and weather",
+            "Widgets are a way to view current information at a glance, today's headline, weather, reminders, battery levels and more",
+            "Widgets are a way to view current information at a glance, today's headline, weather, reminders, battery levels and more, plus whatever else happens to be going on right now",
+        ]
+        return sentences.map { sentence in
+            let m = IndicatorViewModel()
+            m.isAgentMode = true
+            m.setTranscript(sentence)
+            return m
+        }
     }
 
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(white: 0.95), Color(white: 0.04)],
                            startPoint: .leading, endPoint: .trailing)
-            VStack(spacing: 22) {
+            VStack(spacing: 16) {
                 HStack(spacing: 20) {
                     RecordingIndicatorView(viewModel: plain).frame(height: 44)
                     RecordingIndicatorView(viewModel: work).frame(height: 44)
-                    RecordingIndicatorView(viewModel: agent).frame(height: 44)
                 }
                 Button("Replay the work-mode flash") {
                     work.isWorkMode = false
                     work.isWorkMode = true
+                }
+                Divider().opacity(0.4)
+                HStack(alignment: .bottom, spacing: 14) {
+                    ForEach(Array(boxes.enumerated()), id: \.offset) { index, model in
+                        VStack(spacing: 4) {
+                            RecordingIndicatorView(viewModel: model)
+                                .frame(width: 340, height: 200)
+                            Text("\(index + 1) line\(index == 0 ? "" : "s")")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black, radius: 2)
+                        }
+                    }
                 }
             }
             .padding(20)
