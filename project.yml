@@ -19,6 +19,14 @@ targets:
     info:
       path: Sources/Sayline/Info.plist
       properties:
+        # Wired to the build settings below. Info.plist is GENERATED from
+        # this block — editing the file directly is silently undone on the
+        # next `xcodegen generate`, which is how these two came to be
+        # hardcoded to 1.0/1 while MARKETING_VERSION and
+        # CURRENT_PROJECT_VERSION sat unused. The version in the log line
+        # is the quickest way to tell whether a build actually took.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSUIElement: true
         NSMicrophoneUsageDescription: "Sayline needs microphone access to transcribe your speech into text."
         # Full access rather than write-only: cancelling a reminder by name
@@ -89,4 +97,4 @@ targets:
         CODE_SIGN_STYLE: Manual
         PROVISIONING_PROFILE_SPECIFIER: ""
         MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"

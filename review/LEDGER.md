@@ -3918,3 +3918,141 @@ types without re-granting.
 
 **Scope.** Development certificate. Fixes this machine. Distribution still
 needs Developer ID + the paid programme — unchanged in BACKLOG.md.
+
+---
+
+## POST-WORKMODE REVIEW · Nine commits, the freeze, the model change (Fable, 2026-08-14)
+
+Answering `review/FABLE-PROMPT-post-workmode.md`. Read the ledger from
+the stage-6 build entries, `HotkeyManager`, `StallWatchdog`,
+`WorkModeCleaner`, `FactGuard` at HEAD. Ran nothing hardware-dependent;
+claims marked as such.
+
+### 1 · The freeze: your evidence is measuring the wrong thread — and
+### the mechanism candidate follows from that
+Confirmed in code: `StallWatchdog` heartbeats the **main** thread only
+("main heartbeat 1s"). The tap lives on its own thread. So "main ok
+0.0s" during a disable is **not evidence against starvation — it is
+evidence about a thread the tap does not run on.** The question you
+asked ("can the tap be starved in a way our heartbeat cannot see") is
+answered yes by construction: nothing measures the tap thread at all.
+
+The mechanism this points to, stated as a theory to instrument rather
+than a conclusion: the system holds keyboard events for an **active**
+tap that is slow to service its mach port. If the tap thread stalls —
+or WindowServer-side delivery backs up for reasons outside our process
+(wake, display changes, load; both disable codes are documented to
+fire spuriously in those windows) — macOS protects the user by
+disabling the tap. Then **our own re-enable becomes the freeze
+sustainer**: re-enable within a second, the system waits on the same
+unhealthy delivery path, holds keystrokes again, disables again. Each
+cycle is a second of dead keyboard. The 23:43 pattern (disable →
+re-enable → disable, 20s apart) is this loop at low frequency; a bad
+episode is the same loop at high frequency, and the main thread is
+healthy throughout — exactly what was observed.
+
+**What to do, in order of leverage:**
+1. **Make the always-on tap listen-only, and scope the active tap to
+   the hold.** This is the architectural fix, not a mitigation. A
+   listen-only tap observes events without the system holding delivery
+   on it — it can be disabled, but it **cannot freeze the keyboard**,
+   by construction. The only reason the tap is active is to swallow
+   Space during a hold; flagsChanged detection (hotkey, Right Command
+   chord) needs no swallowing at all. Shape: the permanent tap becomes
+   listen-only; a tiny active tap for keyDown exists only between
+   hotkey-down and hotkey-up — seconds per day of freeze surface
+   instead of the whole session. "Never break the user's Mac" becomes
+   structural rather than behavioral.
+2. **Give the tap thread its own heartbeat**, checked by the same
+   watchdog, so the next incident says which thread was alive. One
+   timestamp per run-loop slice.
+3. **Measure delivery lag**: `CGEvent.timestamp` vs now, logged when it
+   exceeds ~200ms. Backpressure becomes visible before the disable.
+4. **Re-enable needs proof of life**: after a re-enable, if no event is
+   delivered before the next disable, stop re-enabling, surface
+   "hotkey paused" visibly, and wait for user action or a real event.
+   A tap that cannot serve events must not be re-armed against the
+   user's keyboard.
+On the two disable codes: ByUserInput's exact trigger is
+poorly documented (TCC/secure-input edges are the usual suspects — and
+the ad-hoc-signing era made TCC churn routine, so `c15915c` may reduce
+these); with item 1 in place the distinction stops mattering, because
+neither code can take the keyboard down.
+
+### 2 · The model change: the evidence is contaminated, and the rule
+### that produced it is half-wrong
+`longerThanSpeech` requires strictly-shorter above 9 words. A tight
+12-word utterance ("push the launch to Tuesday, QA is not done, Priya
+has not signed off") has no valid shorter rewrite that keeps every
+pinned fact — the rule manufactures impossible tasks, and "cut, don't
+pad" retries against an impossible task will fail for any model. That
+plausibly explains 0-of-7 better than 70B incompetence. Compounding
+it: six of 31 cases were *written*, not dictated — written text is
+already tight, tight inputs are exactly where the ceiling is
+unsatisfiable, so the synthetic cases over-sampled the impossible
+region. **Fix the rule first**: ≤ input words for inputs under ~20;
+≤ 90% of input words above that (padding is only meaningful at ramble
+length); pinned-fact tokens and authorized additions excluded from the
+count. Then rerun, dictated-only. If 70B recovers, the choice reopens —
+with one counterweight recorded: moving work mode off Groq has
+independent operational value (the 100K/day cap is the standing
+lesson), so a near-tie still favors OpenAI. The decision may end up
+right; the evidence for it today is not.
+
+### 3 · Prompt-vs-guard drift: the split is right; the bugs are
+### extraction ambiguity, and they will recur at a low, budgetable rate
+Both incidents ("first/second/third" as numbers, "second" as a unit)
+happened *inside extraction* — the single source both sides consume —
+not between two copies of the truth. That is the design working: the
+drift surface is one function, each bug is a lexicon rule plus a suite
+case, and the alternative (the rewriter certifying its own facts) was
+rejected for reasons that still hold. Expect this class, budget for
+it, and add the cheap preventive: log the pinned-fact list per
+dictation (it already goes in the prompt), so a misclassification is
+visible the day it happens instead of when it blocks a rewrite.
+
+### 4 · Voice processing: the exit was right; two leads if ever
+### revisited, neither urgent
+Confirmed against the exit criterion — ducking is the OS's designed
+behavior for that unit and `.min` not stopping it ends the road. The
+honest answer to "isolate the mic without touching what the user
+hears": not with current public API from inside the app. Two leads
+worth one line each: macOS's user-controlled **Voice Isolation mic
+mode** (Control Center; app can detect and *guide*, never set — zero
+system modification, the user owns the choice), and post-hoc handling
+(the NowPlaying detector already knows when media was audible during a
+hold; a transcript arriving from such a hold could be flagged rather
+than filtered). Otherwise: stop looking, as offered.
+
+### 5 · Simplification: three concrete items, previous list stands
+(a) `AppDelegate` has passed 600 lines again — the dictation Task
+bodies (plain, work, follow-up) are near-triplets; extract one
+`runDictationPipeline` with mode parameters when next touched, not as
+a standalone refactor. (b) The earlier B-list is still open and still
+correct: `SpokenText` consolidation (now ~8 normalize/tokens variants),
+`CalendarScope` exclusion-inversion, `APIKeyProvider` cache triple —
+none should land in the same build as feature work. (c) `HotkeyManager`
+now carries hotkey + chord + escape + breaker + secure-input policy;
+after the item-1 tap split it should become two small files along the
+same seam (observe vs act). Deferred until then — one surgery, not two.
+
+### 6 · What can still lose a dictation, ranked
+1. **The active tap** (item 1) — can lose the *keyboard*, which
+   outranks losing a dictation. Cut-or-fix: fix, via the listen-only
+   split; no feature needs cutting.
+2. **Work-mode network failure**: `.fellBack` covers guard violations;
+   the *thrown-error* path (OpenAI unreachable) must provably insert
+   Clean's output — I could not fully verify the catch site from
+   reading; one suite/manual case, and if it does not, that is a
+   dictation-loser to fix before anything else ships.
+3. **The unproven signing fix**: if grants still reset on rebuild, the
+   first post-rebuild dictation silently fails — run the one test
+   (rebuild, then dictate without re-granting) before the next feature
+   build; it is ten minutes and it retires a whole recurring class.
+4. Everything else previously rated stands; media control, sound
+   effects, reminders, meetings remain unable to lose a dictation by
+   construction (different subsystems, or read-only paths).
+
+### Owed live, unchanged and repeated
+C1, D1, D2, E6, F3, G1, G2; re-tests of A6 (instrumented, not fixed),
+B2, H1. The signing test above joins the list at the top.

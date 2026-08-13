@@ -174,6 +174,15 @@ final class WorkModeCleaner {
         return .fellBack(reason: retryViolations[0])
     }
 
+    /// Shown when the rewrite never came back at all — no network, no
+    /// OpenAI key, a 500 — as opposed to coming back and being refused.
+    ///
+    /// A separate sentence because it is a separate event, and the user can
+    /// act on this one: the others say the rewrite was wrong, this one says
+    /// there was no rewrite. Same contract as decision 2 either way — never
+    /// silent, never nothing.
+    static let unavailableMessage = "Used the tidied version — the rewrite didn't come back"
+
     /// The sentence shown when the guard refuses a rewrite.
     ///
     /// Names what happened rather than apologising. Decision 2: never
