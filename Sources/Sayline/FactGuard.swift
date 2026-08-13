@@ -332,31 +332,61 @@ enum FactGuard {
         "we will": ["we'll"],
     ]
 
-    /// Words that start sentences and get capitalized without being names.
-    /// Kept small on purpose: a false "name" costs a fallback, and a
-    /// fallback costs the user nothing but their exact words.
-    private static let notNames: Set<String> = [
+    /// Words that get capitalized for grammatical reasons rather than
+    /// because they name something.
+    ///
+    /// **This list is load-bearing and it grows. The rule for growing it:**
+    /// every addition arrives with the real transcript that motivated it,
+    /// added to `eval/factguard-checks` as a case in the same commit. No
+    /// entries added by imagining what might appear — that is how the list
+    /// rots into someone's guess about English. Production is the other
+    /// source: a `name` violation in the fallback log is a candidate,
+    /// because it means a real rewrite was thrown away over a word that is
+    /// not a name.
+    ///
+    /// Grouped so a reader can see why each class exists. Calendar words
+    /// are deliberately **absent** — months and days are pinned facts in
+    /// their own right, not noise to be filtered.
+    private static let notNames: Set<String> = grammarWords
+        .union(contractions)
+        .union(modals)
+        .union(discourseWords)
+
+    /// Articles, pronouns, prepositions, conjunctions — the words that
+    /// open sentences and mean nothing on their own.
+    private static let grammarWords: Set<String> = [
         "i", "the", "a", "an", "and", "but", "so", "then", "this", "that",
         "these", "those", "it", "we", "they", "he", "she", "you", "if",
         "when", "what", "why", "how", "where", "who", "there", "here",
-        "yes", "no", "ok", "okay", "let", "lets", "please", "thanks",
-        "hi", "hey", "hello", "also", "just", "actually", "basically",
-        // Contractions, apostrophe-stripped to match `tokenize`: I'll,
-        // I'm, I've, I'd, we'll, they're, you're, it's, that's, don't.
+        "for", "from", "with", "our", "my", "her", "his", "their", "some",
+        "any", "all", "one", "two", "about", "let", "lets",
+    ]
+
+    /// Apostrophe-stripped, to match `normalizeWords`. Found by reading
+    /// real dictation: "Doesn't that work for you?" was pinning a name.
+    private static let contractions: Set<String> = [
         "ill", "im", "ive", "id", "well", "theyre", "youre", "its",
-        "thats", "dont", "cant", "wont", "lets", "let",
-        // Everything below was found reading ten real dictations, not by
-        // imagination: each was being pinned as a *name*, and a false name
-        // costs a fallback on a rewrite that was perfectly good.
-        "doesnt", "didnt", "isnt", "arent", "wasnt", "werent", "havent",
-        "hasnt", "hadnt", "couldnt", "shouldnt", "wouldnt", "youll",
-        "youve", "youd", "weve", "wed", "theyll", "theyve", "hes", "shes",
-        "can", "could", "should", "would", "will", "yeah", "yes", "sure",
-        "maybe", "quick", "update", "about", "for", "from", "with", "our",
-        "my", "her", "his", "their", "some", "any", "all", "one", "two",
-        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
-        "sunday", "january", "february", "march", "april", "may", "june",
-        "july", "august", "september", "october", "november", "december",
+        "thats", "dont", "cant", "wont", "doesnt", "didnt", "isnt",
+        "arent", "wasnt", "werent", "havent", "hasnt", "hadnt", "couldnt",
+        "shouldnt", "wouldnt", "youll", "youve", "youd", "weve", "wed",
+        "theyll", "theyve", "hes", "shes",
+    ]
+
+    /// Verbs that open a question or a request, which is how half of a
+    /// dictated message begins: "Can we do the demo on Thursday?"
+    private static let modals: Set<String> = [
+        "can", "could", "should", "would", "will", "shall", "may",
+        "might", "must", "do", "does", "did", "is", "are", "was", "were",
+        "have", "has", "had", "need", "needs",
+    ]
+
+    /// The words people actually start spoken sentences with. Every one
+    /// of these was pinned as a name by a real transcript.
+    private static let discourseWords: Set<String> = [
+        "yes", "no", "ok", "okay", "yeah", "sure", "maybe", "please",
+        "thanks", "hi", "hey", "hello", "also", "just", "actually",
+        "basically", "quick", "update", "honestly", "anyway", "right",
+        "look", "listen", "sorry", "great",
     ]
 
     private static func tokenize(_ text: String) -> [String] {
@@ -468,6 +498,12 @@ enum FactGuard {
             let lower = word.lowercased()
                 .replacingOccurrences(of: "'", with: "")
                 .replacingOccurrences(of: "\u{2019}", with: "")
+            // Calendar words are pinned in their own classes, so they must
+            // not *also* be names — a dropped Friday should report one
+            // violation, not two. They left `notNames` when months became
+            // pinned facts; this is where that exclusion belongs, next to
+            // the reason for it.
+            guard !dayNames.contains(lower), !monthNames.contains(lower) else { continue }
             guard !notNames.contains(lower), lower.count > 1 else { continue }
             found.insert(lower)
         }
