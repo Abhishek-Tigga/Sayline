@@ -37,6 +37,11 @@ final class AudioRecorder {
     private var firstBufferLogged = false
     /// Set once — voice processing belongs to the node, not the recording.
     private var voiceProcessingEnabled = false
+    /// Set when voice processing has already broken the engine once this
+    /// session, so later holds do not each pay a failed start to rediscover
+    /// it. Session-scoped rather than persisted: unplugging the display or
+    /// the virtual driver that caused it should get a fresh chance.
+    private var voiceProcessingBroke = false
     /// Name of the device the engine really used, read after `start()`.
     private(set) var lastInputDeviceName = "unknown"
 
@@ -137,35 +142,33 @@ final class AudioRecorder {
         }
     }
 
-    /// Turns on Apple's voice processing: echo cancellation plus noise
-    /// suppression, the same path FaceTime uses.
+    /// Turns Apple's voice processing — echo cancellation plus noise
+    /// suppression, the same path FaceTime uses — on or off.
     ///
-    /// This is what stops dictation transcribing whatever the speakers are
-    /// playing. Sound from the built-in speakers reaches the built-in
-    /// microphone, and Whisper cannot tell a lyric from a sentence — a
-    /// YouTube track was transcribed as if the user had said it.
+    /// On, it stops dictation transcribing whatever the speakers are
+    /// playing: sound from the built-in speakers reaches the built-in
+    /// microphone and Whisper cannot tell a lyric from a sentence.
+    /// Measured before shipping, speaker audio only: peak **0.8085
+    /// without, 0.0230 with** — a 97% reduction.
     ///
-    /// The first attempt at this paused the user's music for the length of
-    /// each hold. It worked and it was hated, correctly: silencing someone's
-    /// music every time they dictate is a worse experience than the problem
-    /// it solved. Cancelling the speaker out of the signal fixes the same
-    /// thing while the music keeps playing.
+    /// An earlier attempt at the same problem paused the user's music for
+    /// the length of every hold. It worked and was rightly hated.
     ///
-    /// Measured on this Mac before shipping it, speaker audio only: peak
-    /// **0.8085 without, 0.0230 with** — a 97% reduction.
-    ///
-    /// Set once per node, before the engine starts. Failure is not fatal:
-    /// a recording with echo in it beats no recording at all.
-    private func enableVoiceProcessing(on input: AVAudioInputNode) {
-        guard !voiceProcessingEnabled else { return }
+    /// It is not universally available, and the failure is not the one you
+    /// would expect: enabling it can succeed and then break `engine.start()`
+    /// one step later, because it couples the input to the output and some
+    /// output devices present a layout it cannot initialise. `startOnAudioQueue`
+    /// therefore treats it as an attempt, not a setting.
+    private func setVoiceProcessing(_ enabled: Bool, on input: AVAudioInputNode) {
+        guard voiceProcessingEnabled != enabled else { return }
         do {
-            try input.setVoiceProcessingEnabled(true)
-            voiceProcessingEnabled = true
-            SaylineLog.log("voice processing enabled — speaker audio cancelled from the mic")
+            try input.setVoiceProcessingEnabled(enabled)
+            voiceProcessingEnabled = enabled
+            SaylineLog.log(enabled
+                ? "voice processing enabled — speaker audio cancelled from the mic"
+                : "voice processing turned off")
         } catch {
-            // Some devices and aggregate configurations refuse it. Carry on
-            // unprocessed rather than losing the hold.
-            SaylineLog.log("voice processing unavailable (\(error.localizedDescription)) — recording raw")
+            SaylineLog.log("could not \(enabled ? "enable" : "disable") voice processing: \(error.localizedDescription)")
         }
     }
 
@@ -174,13 +177,44 @@ final class AudioRecorder {
         // discard, the previous recording dies here.
         discardLastRecording()
 
+        if !voiceProcessingBroke,
+           attemptStart(preferredDeviceUID: preferredDeviceUID, withVoiceProcessing: true) {
+            return true
+        }
+        guard !voiceProcessingBroke else {
+            // Already known bad this session — go straight to the path that
+            // works instead of failing once more to learn the same thing.
+            return attemptStart(preferredDeviceUID: preferredDeviceUID, withVoiceProcessing: false)
+        }
+        voiceProcessingBroke = true
+        // Voice processing turned on happily and then took the engine down
+        // with it — measured 2026-08-13, error -10875 from the *output*
+        // node with the input format reading `48000 Hz, 9ch` and the
+        // hardware input reading `0 Hz`. Enabling it couples input to
+        // output, and a multichannel output device (a monitor, a virtual
+        // conferencing driver) can present a layout the voice-processing
+        // unit cannot initialise.
+        //
+        // Echo in a recording is a small problem. No recording at all is a
+        // dead app, which is what this shipped as. So: try it, and if the
+        // engine will not run, run without it.
+        SaylineLog.log("retrying without voice processing")
+        return attemptStart(preferredDeviceUID: preferredDeviceUID, withVoiceProcessing: false)
+    }
+
+    private func attemptStart(preferredDeviceUID: String?, withVoiceProcessing: Bool) -> Bool {
+        // A failed attempt leaves the graph half-configured; clear it so the
+        // retry starts from the same place the first attempt did.
+        engine.stop()
+        engine.reset()
+
         let input = engine.inputNode
 
         if let preferredDeviceUID, let deviceID = AudioDeviceLister.deviceID(forUID: preferredDeviceUID) {
             setInputDevice(deviceID, on: input)
         }
 
-        enableVoiceProcessing(on: input)
+        setVoiceProcessing(withVoiceProcessing, on: input)
 
         // Read AFTER voice processing is enabled. Turning it on replaces the
         // input format — 16 kHz became 48 kHz in testing — so a format read
@@ -242,9 +276,17 @@ final class AudioRecorder {
             SaylineLog.log("recording started on \(lastInputDeviceName) at \(Int(format.sampleRate)) Hz -> \(url.path)")
             return true
         } catch {
-            SaylineLog.log("failed to start audio engine: \(error)")
+            SaylineLog.log("failed to start audio engine"
+                + (withVoiceProcessing ? " (voice processing on)" : " (voice processing off)")
+                + ": \(error)")
             input.removeTap(onBus: 0)
             audioFile = nil
+            // The file was created before the engine was asked to run, so a
+            // failed attempt leaves an empty .wav behind. Without this the
+            // retry's `discardLastRecording` is the only thing that removes
+            // it, and on the final failure nothing does.
+            try? FileManager.default.removeItem(at: url)
+            lastRecordingURL = nil
             return false
         }
     }

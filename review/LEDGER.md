@@ -1899,3 +1899,46 @@ Two things worth knowing for whoever reviews:
 
 Not verified by its author: needs a human dictating with music on the
 speakers.
+
+---
+
+## 2026-08-13 — voice processing killed dictation outright (Opus)
+
+**Regression I shipped yesterday.** `claimed-fixed`.
+
+Every hold failed with no recording and no permission prompt:
+
+```
+[mic] engine.isRunning before start: false, format 48000.0Hz 9ch, inputNode format 0.0Hz
+failed to start audio engine: Code=-10875
+      failed call = PerformCommand(*outputNode, kAUInitialize, NULL, 0)
+```
+
+`setVoiceProcessingEnabled(true)` **succeeded**, and then `engine.start()`
+failed — from the *output* node, because enabling voice processing couples
+input to output and the output device at that moment presented a layout the
+voice-processing unit could not initialise. No engine, no audio, and no
+microphone prompt, because nothing ever asked for audio.
+
+Yesterday's note claimed this "fails open". It only handled
+`setVoiceProcessingEnabled` *throwing*. The real failure was one step later
+and was not caught at all — a guard written for the wrong half of the
+mechanism.
+
+**Fix:** voice processing is now an attempt, not a setting. If the engine
+will not start with it, the recorder tears the attempt down (including the
+empty .wav it had already created) and starts again without it. A failure
+also sets a session flag, so later holds go straight to the working path
+rather than paying a failed start each time to rediscover the same thing.
+
+**Verified as far as it can be without the failing state:** both branches
+record on this machine — VP off `48000 Hz 1ch, 67200 frames`; VP on
+`48000 Hz 9ch, 72000 frames` — and toggling between them on one reused
+engine works, which is what the recorder does across holds. The failing
+configuration has since cleared (default output is back to MacBook Air
+Speakers), so the fallback branch has **not** been exercised against the
+real failure. `9ch` alone is not the trigger; it is present in the working
+case too.
+
+Open: what exactly about the output device at 14:21 broke it. Unknown, and
+the fallback makes it survivable rather than solved.
