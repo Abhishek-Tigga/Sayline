@@ -4056,3 +4056,149 @@ same seam (observe vs act). Deferred until then — one surgery, not two.
 ### Owed live, unchanged and repeated
 C1, D1, D2, E6, F3, G1, G2; re-tests of A6 (instrumented, not fixed),
 B2, H1. The signing test above joins the list at the top.
+
+---
+
+## KEYCHAIN + PILL · Review (Fable, 2026-08-14)
+
+Answering `review/FABLE-PROMPT-keychain-and-figma.md`. Probed the live
+keychain via the security CLI, read the save path, pulled the Figma
+node's render (28-1254), read the fill code. Branch `ui-pill-redesign`.
+
+### 1 · The key that will not save — two defects found in the UI, and
+### the likeliest story needs no keychain mystery at all
+**Probed live: `GROQ_API_KEY` is genuinely absent from the login
+keychain.** The CLI sees both siblings in the service and no GROQ item —
+no ghost where the siblings live. That shifts suspicion off the
+keychain and onto the path that writes to it, and the path has two
+real defects visible in `SettingsView.swift:36-40`:
+1. **"Saved" is unconditional.** `apiKeySaved = true` runs regardless
+   of `KeychainStore.save`'s return value — the instrumented failure
+   path you just built is silenced by the UI one line above it. Even
+   now, a failing save shows green "Saved". Fix:
+   `apiKeySaved = KeychainStore.save(apiKeyInput)`, and show a visible
+   failure state with the logged OSStatus hint when false.
+2. **The SecureField has no `.onSubmit`.** Typing the key and pressing
+   Enter — or typing and closing the window — saves *nothing*; only a
+   click on "Save Key" does. A user who did that would "enter the key
+   and believe it saved", twice, and produce exactly the observed
+   state: item absent, siblings healthy, zero failure evidence in any
+   log. This is the candidate the evidence currently fits best, and
+   the new logging makes it decisive: **if a save attempt produces no
+   keychain log line at all, the UI never called save.** That absence
+   is now a diagnosis, not a shrug.
+Timeline note: the 02:55 auto-delete (fixed in `4163267`, correctly)
+destroyed the previously-working key, so every later "re-entry" that
+missed the button left the item absent. The two fixed defects plus
+these two UI fixes close the loop without requiring any exotic ACL
+theory — but keep the OSStatus discriminator: **-25299** on a future
+save means a duplicate invisible to the default query (add
+`kSecAttrSynchronizable = kSecAttrSynchronizableAny` to load/delete
+queries — sync ghosts match adds but not deletes); **-25293** means an
+ACL orphan from the signing transition, and *that* is the one
+legitimate occasion for an explicit, user-confirmed delete-and-replace.
+**Shape answer: replace delete-then-add with update-first.** Query;
+`SecItemUpdate` if found; `SecItemAdd` on `errSecItemNotFound`. It
+preserves the item's ACL continuity, cannot leave a
+delete-succeeded/add-collided ghost, and keeps your read-back
+verification as the success test — which was the right instinct.
+
+### 2 · The pill vs the Figma — hypothesis confirmed, amplifier named,
+### and Q3 answered with a no
+**Q3 first, since it was flagged unchecked: colorspace is not the
+culprit.** SwiftUI's `Color(red:green:blue:)` defaults to `.sRGB` — the
+fill (`RecordingIndicatorView.swift:100`) is genuinely sRGB `#141414`
+at 75%. The numbers are right; the compositing differs.
+**The hypothesis is correct, with a specific amplifier you did not
+name: the panel forces `.darkAqua`**
+(`FloatingIndicatorWindow.swift:445`, kept from the glass era).
+Materials are appearance-adaptive recipes — blur + tint + vibrancy +
+luminosity mapping — and under forced dark appearance,
+`.underWindowBackground` renders a dark-tinted base *regardless of the
+desktop behind it*. The Figma render (fetched from node 28-1254)
+composites 75% `#141414` over a neutral gaussian blur of a **light**
+canvas — the pill reads mid-gray there. The app composites the same
+fill over Apple's darkened recipe — it reads near-black. Same hex,
+same opacity, structurally different base. No fill/material
+combination converges, exactly as suspected.
+**Q1: no.** There is no public, untinted, fixed-radius backdrop blur
+on macOS. The two roads are Screen Recording + CIGaussianBlur
+(already rightly rejected for a dictation app) and the private
+`CABackdropLayer` (named here so it is rejected on the record —
+private API in a commercial product is a breakage we would own).
+**Q2, the honest approximation — stop matching the blur, match the
+perceived value.** At pill size, with a dark fill at high opacity, the
+backdrop contributes a whisper; the design *reads* as "dark
+translucent pill". Raise the fill to ~88–92% over the existing
+material — the material's character drops below visibility, the "blur
+too strong" complaint dissolves with it (less backdrop showing IS less
+blur showing), and the result approximates the Figma's perceived
+value. Make it convergent rather than argued: `--preview-pill` already
+exists — render the pill over two or three standard wallpapers,
+pixel-sample, compare against the Figma render target, tune opacity to
+minimize the difference, record the final number in
+`DESIGN-pill-ui.md` as a settled deviation with this reasoning.
+**One product fork to put to the user, not decide silently:** the
+Figma's 75%-over-neutral-blur *lightens over light desktops*; the
+forced-dark app pill stays constant. Constant-dark is arguably better
+for a HUD (the `#f2f2f2` label keeps guaranteed contrast on every
+desktop), but it is a visible deviation from the file and the user
+should own it in one sentence.
+
+### PILL · Adaptivity decided: adapt like the Figma (user, 2026-08-14)
+The pill follows the desktop, as designed — it may lighten over light
+backdrops. Consequences, recorded for the build:
+1. The forced `.darkAqua` at `FloatingIndicatorWindow.swift:445` goes —
+   it is the single thing pinning the material to Apple's dark recipe.
+   It predates this UI (glass era); the glass note it served is parked.
+   The hosted view's colors are hardcoded, not semantic, so the visible
+   risk is limited to material-backed surfaces — verify both system
+   modes once.
+2. The fill stays `#141414` at 75%, per the spec — the raise-to-~90%
+   recommendation belonged to the constant-dark fork and dies with it.
+3. `.underWindowBackground` was chosen as "darkest under forced dark",
+   a criterion that no longer exists. Re-run the six-material
+   comparison in `--preview-pill` over one light and one dark
+   wallpaper, pick whichever pixel-samples closest to the Figma target
+   (neutral blur), and record the winner in `DESIGN-pill-ui.md`.
+4. Contrast floor, so nobody panics later: 75% `#141414` over a pure
+   white blurred backdrop composites to ≈`#4F4F4F`; the `#F2F2F2`
+   label keeps ≳5:1 against it. Adaptive cannot break legibility while
+   the fill opacity holds.
+
+## 2026-08-14 — dictation restored; the two keychain defects are verified (Opus)
+
+**User-verified, not self-assessed.** The user entered the key and
+dictated successfully.
+
+```
+04:33:51  keychain saved GROQ_API_KEY and read it back
+```
+
+Both defects Fable identified in the write path are now confirmed fixed by
+use, and the log tells the whole story in four lines:
+
+```
+23:42  keychain read for GROQ_API_KEY failed -> OSStatus -25293   (x2)
+02:55  keychain entry ... belongs to an older build — removing it
+       [ then silence — the UI was never calling save ]
+04:33  keychain saved GROQ_API_KEY and read it back
+```
+
+- The self-heal deleting the key on a failed read: removed (`4163267`).
+  Its premise — that ad-hoc signing orphans the item every rebuild — died
+  when signing was fixed, and it destroyed a working key at 02:55.
+- The save path reporting success unconditionally, and the SecureField
+  having no `.onSubmit` so Return saved nothing: fixed (`6165589`). The
+  silence between 02:55 and 04:33 is the second defect's signature — no
+  failure line because no save was attempted.
+
+**Still OPEN, and one rebuild away.** Whether the key survives a rebuild —
+the Keychain half of the signing fix. Accessibility is already confirmed
+(new cdhash, still trusted, no re-grant). The next UI change rebuilds the
+app anyway, so the test is free: dictate afterwards without touching
+Settings.
+
+**Also still unexercised:** the work-mode fallback fix (`f2206b6`),
+committed but never run, and the work-mode announcement transition
+(`7ad777c`), built but never seen.
