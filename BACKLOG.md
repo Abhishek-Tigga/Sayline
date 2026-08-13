@@ -763,6 +763,25 @@ and [CHANGELOG.md](CHANGELOG.md).
   enrollment, not yet done
 - Monetization
 
+## OPEN · Enter the Groq key, then finish the signing proof (2026-08-14)
+
+Parked by the user mid-session; recorded so it is not lost.
+
+There is currently **no `GROQ_API_KEY` item in the keychain at all**, so:
+
+- Dictation cannot run end to end — transcription has no credential.
+- The Keychain half of the signing fix is unproven. Accessibility is
+  confirmed fixed (new cdhash `80255aa6`, app launched still trusted, no
+  re-grant). The `errSecAuthFailed` / -25293 path cannot be exercised until
+  a key exists to fail on.
+- Fable's #2 kill-list fix — a failed work rewrite falling back to Clean
+  rather than raw — is committed but has never run. Verifying it needs both
+  keys present, then the OpenAI one removed.
+
+To close all three: enter the Groq key in Settings, rebuild once, dictate.
+If it types with no dialog and no re-grant, the whole rebuild-tax failure
+class is retired and the ledger entry comes off OPEN.
+
 ## DEFERRED · Listen-only tap surgery — the actual freeze fix (Fable, 2026-08-14)
 
 **Status: not built. Instrumentation was built instead** (2026-08-14, user's
