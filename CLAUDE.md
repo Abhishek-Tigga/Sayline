@@ -33,6 +33,24 @@ open --stderr /tmp/sayline.log ~/Library/Developer/Xcode/DerivedData/Sayline-*/B
 history was found by running it and reading `grep "Sayline:" /tmp/sayline.log`,
 not by compiling.
 
+**Rebuilds no longer reset permissions** (since 2026-08-13). The build was
+ad-hoc signed, whose designated requirement is the literal binary hash, so
+every rebuild looked like a different app to macOS: Accessibility and
+Microphone grants dropped, and the Keychain refused the stored Groq key with
+`errSecAuthFailed` (-25293). It now signs with the Apple Development
+certificate in `project.yml`, and the requirement names the certificate
+instead of the hash. If permissions start resetting again, check the app is
+still signed before debugging anything else:
+
+```bash
+codesign -d -r- ~/Library/Developer/Xcode/DerivedData/Sayline-*/Build/Products/Debug/Sayline.app
+```
+
+A requirement reading `cdhash H"..."` means it fell back to ad-hoc — see the
+comment above `CODE_SIGN_IDENTITY` in `project.yml`. This is a development
+certificate: it fixes rebuilds on this machine and does **not** let anyone
+else run the app. Shipping still needs Developer ID and the paid programme.
+
 ## Read these before changing behaviour
 
 The reasoning is the part that gets lost — the decisions are visible in the

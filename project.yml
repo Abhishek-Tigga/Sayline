@@ -37,6 +37,56 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.abhishektigga.sayline
         SWIFT_VERSION: "5.0"
-        CODE_SIGN_STYLE: Automatic
+        # Signed with a real identity rather than ad-hoc.
+        #
+        # macOS binds an Accessibility grant, a Microphone grant and a
+        # Keychain item to the code signature that created them. Ad-hoc
+        # signing mints a new signature on every single build, so every
+        # rebuild looked like a brand-new app: the grants reset and the
+        # stored API key became unreadable (OSStatus -25293). On
+        # 2026-08-13 that happened roughly ten times in one session and
+        # cost hours, including a keychain dialog that blocked the app for
+        # twenty minutes.
+        #
+        # A stable team identity makes macOS recognise the app across
+        # rebuilds. The certificate was already on this machine, unused.
+        #
+        # Apple Development expires in about a year and is for the
+        # developer's own machines. Shipping to other people needs a
+        # Developer ID certificate and the paid programme — a separate
+        # step, recorded in BACKLOG.md.
+        # Manual, not Automatic: automatic signing asks for a "Mac
+        # Development" certificate, and the one on this machine is the
+        # newer unified "Apple Development" type. Naming the identity
+        # directly avoids Xcode hunting for a certificate that does not
+        # exist.
+        DEVELOPMENT_TEAM: U3LU8MZPUM
+        # By SHA-1 fingerprint, not by name. Setting the name "Apple
+        # Development" makes xcodebuild look for the legacy "Mac
+        # Development" type and fail — "No signing certificate 'Mac
+        # Development' found" — even though `codesign -s` with the same
+        # certificate signs the app perfectly. The fingerprint skips the
+        # name lookup entirely.
+        #
+        # The fingerprint rather than the certificate's full name because
+        # the name embeds an email address and this repository is public.
+        #
+        # This identifies one certificate in one machine's keychain, so
+        # another machine overrides it on the command line:
+        #   xcodebuild ... CODE_SIGN_IDENTITY=<their fingerprint>
+        # from `security find-identity -v -p codesigning`. Nothing here
+        # needs to change for that; a wrong fingerprint fails the build
+        # loudly rather than silently falling back to ad-hoc.
+        #
+        # Why it matters at all: ad-hoc signing produces the designated
+        # requirement `cdhash H"..."` — the literal hash of the binary.
+        # TCC (Accessibility, Microphone) and Keychain ACLs match on that
+        # requirement, so every rebuild produced a new hash and reset every
+        # grant, including the stored Groq key. Signed, the requirement is
+        # `identifier + anchor apple generic + leaf CN`, which no longer
+        # mentions the hash. Rebuilds stop costing permissions.
+        CODE_SIGN_IDENTITY: 559E9A687986F4597566BDADF3CF0966CE3B03A6
+        CODE_SIGN_STYLE: Manual
+        PROVISIONING_PROFILE_SPECIFIER: ""
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"

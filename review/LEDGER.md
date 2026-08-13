@@ -3866,3 +3866,55 @@ as "move Developer ID enrollment up from end-of-V2". Every rebuild
 costing the user their Accessibility grant *and* their API key is not a
 minor annoyance — it is the single largest tax on this project's own
 testing loop, and it has cost hours today.
+
+## 2026-08-13 — signed with a stable identity; the rebuild tax is paid (Opus)
+
+**Symptom, recurring for weeks.** Every rebuild reset Accessibility and
+Microphone, and the Keychain returned `errSecAuthFailed` (-25293) for the
+stored Groq key — reported this session as "it was showing that the grok key
+is missing".
+
+**Cause.** The build was ad-hoc signed. Its designated requirement was
+`cdhash H"853ced…"` — the literal hash of the binary. TCC and Keychain ACLs
+match on that requirement, so any code change made the app a different app.
+Not a bug in the app; the grants were never lost, they were never being
+matched.
+
+**Fix.** `project.yml` now signs with the Apple Development certificate
+already in the keychain (team U3LU8MZPUM). No purchase, no new certificate.
+
+Two things cost time and are worth recording:
+
+1. `CODE_SIGN_IDENTITY: "Apple Development"` fails — xcodebuild resolves the
+   name to the legacy "Mac Development" type and reports no such certificate,
+   while `codesign -s` with the same certificate signs the app fine. Set the
+   SHA-1 fingerprint instead. The fingerprint also keeps the certificate's
+   email out of a public repo.
+2. `CODE_SIGN_STYLE: Manual` with an empty `PROVISIONING_PROFILE_SPECIFIER`.
+   Automatic hunts for a profile that does not exist.
+
+**Verified, not asserted.** Designated requirement before and after, from
+`codesign -d -r-`:
+
+```
+ad-hoc  designated => cdhash H"853ced1fd5595fa49cd0ccf0791ff5b8b5d1a911"
+signed  designated => identifier "com.abhishektigga.sayline"
+                      and anchor apple generic
+                      and certificate leaf[subject.CN] = "Apple Development: … (U3LU8MZPUM)"
+                      and certificate 1[field.1.2.840.113635.100.6.2.1]
+```
+
+The hash is gone from the requirement — that is the whole fix. Also checked:
+build succeeds, `codesign --verify --strict` passes, `TeamIdentifier` is
+9B7FR4AJAU rather than `not set`, and the `get-task-allow` entitlement
+survived signing so debugging still works.
+
+**Not verified by me, and the user should confirm.** That the grants actually
+persist across a rebuild. The identity changes once more with this build, so
+Accessibility, Microphone and the Groq key need re-granting **one final
+time** — then a subsequent rebuild should cost nothing. Nobody marks their
+own work VERIFIED; this stays OPEN until a rebuild is done and the app still
+types without re-granting.
+
+**Scope.** Development certificate. Fixes this machine. Distribution still
+needs Developer ID + the paid programme — unchanged in BACKLOG.md.
