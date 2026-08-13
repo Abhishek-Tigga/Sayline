@@ -3493,3 +3493,57 @@ disproven theories. This is a **fourth** distinct signature — different
 disable code, healthy main thread — and should not be merged with the
 CoreAudio deadlock, which was separately explained and fixed on
 2026-08-12.
+
+---
+
+## 2026-08-13 — Settings crashed on open (Opus)
+
+`claimed-fixed`. **Pre-existing, not caused by work mode** — verified
+before assuming otherwise.
+
+**Crash:** `EXC_BREAKPOINT` in
+`+[NSApplication _crashOnException:]` — an uncaught Cocoa exception
+thrown inside AppKit's constraint pass. The stack is a layout
+re-entrancy:
+
+```
+NSHostingView.updateConstraints
+ → updateWindowContentSizeExtremaIfNecessary
+   → minSize → _sizeThatFits → ViewGraph.setProposedSize
+     → graphDidChange → NSHostingView.requestUpdate
+       → NSView.setNeedsUpdateConstraints
+         → _postWindowNeedsUpdateConstraints   ← throws
+```
+
+SwiftUI measures during AppKit's own constraint pass; the measurement
+mutates the view graph; the graph requests another constraint pass from
+inside the current one; AppKit throws; an uncaught exception in a display
+cycle is an instant crash.
+
+**Cause:** the Settings window is created **fixed-size** (`420×420`,
+`[.titled, .closable]` — no `.resizable`), while `NSHostingView` by
+default pushes its content's required size into the window's size
+extrema. Content taller than a window that cannot grow makes that
+negotiation recurse.
+
+**Not mine, and checked rather than assumed.** The identical signature —
+same exception type, same `updateWindowContentSizeExtrema` →
+`_postWindowNeedsUpdateConstraints` frames — appears in
+`Sayline-2026-08-12-222302.ips`, before `SettingsView` was touched. My
+six new rows (two toggles, two captions, a divider) pushed the content
+past 420pt and turned a latent bug into a reliable one. Contributing,
+not causing.
+
+**Fix, three parts, each doing a different job:**
+1. `hosting.sizingOptions = []` — stops the extrema negotiation that is
+   the actual crashing code path.
+2. `.resizable` and a 520pt default with a 320pt minimum — content taller
+   than the window now has an honest way out.
+3. `SettingsView` wrapped in a `ScrollView` — the content's height stops
+   being a demand the window must satisfy. Settings has grown twice this
+   week and will again.
+
+**Not verified by its author.** I cannot open the Settings window without
+a human — the menu-bar click needs Automation permission this process
+does not have. The app relaunches clean and no new crash report has
+appeared, but the actual test is the user clicking Settings.

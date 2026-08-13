@@ -6,6 +6,15 @@ struct SettingsView: View {
     @State private var apiKeySaved = false
 
     var body: some View {
+        // Scrollable, so the content's height is never a demand the window
+        // has to satisfy. Settings has grown twice this week and will
+        // again; a fixed window plus unbounded content is what crashed.
+        ScrollView {
+            settingsForm
+        }
+    }
+
+    private var settingsForm: some View {
         Form {
             Section("Transcription") {
                 Toggle("Use On-Device Transcription", isOn: $appDelegate.useLocalTranscription)
