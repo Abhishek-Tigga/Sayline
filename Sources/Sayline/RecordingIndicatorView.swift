@@ -681,6 +681,26 @@ private struct PillView: View {
 
     var body: some View {
         StatusPill(text: label, surface: surface)
+            // Restored 2026-08-14 at the user's request, having been
+            // dropped when the new surface landed. It sits over the
+            // surface's static 25% stroke rather than replacing it: the
+            // stroke is the design's edge, the beam is the signal that
+            // something is live, and it is also the only thing that still
+            // distinguishes the three modes visually now that the text no
+            // longer breathes.
+            //
+            // Agent gets .sm/.ocean at full strength; plain dictation uses
+            // the pulse family's inward variant at .mono/40% — .pulseInner
+            // rather than .pulseOutside, because the outward bloom read
+            // badly against this surface.
+            .borderBeam(
+                viewModel.isAgentMode ? .sm : .pulseInner,
+                colorVariant: viewModel.isAgentMode ? .ocean
+                    : viewModel.isWorkMode ? .ocean : .mono,
+                active: true,
+                borderRadius: Double(PillStyle.cornerRadius),
+                strength: viewModel.isAgentMode ? 1.0 : 0.4
+            )
     }
 
     private var label: String {

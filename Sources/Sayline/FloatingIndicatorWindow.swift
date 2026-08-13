@@ -435,14 +435,29 @@ final class FloatingIndicatorWindow {
         IndicatorPanel.noteCreated()
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        // Forces dark rendering for the whole hosted view tree regardless
-        // of the system-wide Light/Dark setting — matters for the real
-        // Liquid Glass material (macOS 26+), which is colorScheme-aware.
-        // Doesn't fix the material's separate backdrop-adaptive flicker
-        // (see RecordingIndicatorView's KNOWN OPEN ISSUE note) — that's
-        // driven by content behind the window, not app-declared
-        // appearance — but is still correct to keep regardless.
-        panel.appearance = NSAppearance(named: .darkAqua)
+        // NOT forced to .darkAqua any more. Removed 2026-08-14 on the
+        // user's call, after Fable identified it as the reason the pill
+        // could never match the Figma.
+        //
+        // It was kept from the Liquid Glass era, where the material is
+        // colorScheme-aware. But NSVisualEffectView materials are
+        // appearance-adaptive recipes — blur plus tint plus vibrancy —
+        // and under a forced dark appearance `.underWindowBackground`
+        // renders a dark-tinted base *regardless of the desktop behind
+        // it*. Figma composites 75% #141414 over a neutral blur of the
+        // actual canvas, so its pill lightens over a light background and
+        // reads mid-grey; ours composited the same fill over Apple's
+        // darkened recipe and read near-black. Same hex, same opacity,
+        // structurally different base — which is why no fill or material
+        // value ever converged.
+        //
+        // Letting the panel follow the system appearance restores the
+        // adaptivity the design assumes. The cost the user accepted: the
+        // pill is no longer constant, so the #f2f2f2 label no longer has
+        // guaranteed contrast on every desktop.
+        //
+        // If Liquid Glass is ever unparked, this line has to come back —
+        // that material genuinely needs it.
         // .statusBar (not .floating) so the pill renders above the Dock
         // when it's visible/not-auto-hidden — .floating sits above
         // normal app windows but below the Dock, which let a

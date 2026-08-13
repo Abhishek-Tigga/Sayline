@@ -22,14 +22,14 @@ struct StatusPill: View {
     /// radius is not settable on NSVisualEffectView, so the material is
     /// chosen by eye instead — see `BackdropBlur`.
     var material: NSVisualEffectView.Material = .underWindowBackground
-    /// 14 × 10, settled on the rendered pill by the user 2026-08-14.
+    /// 12 × 8, settled on the rendered pill by the user 2026-08-14.
     ///
-    /// Deliberately NOT node 23:1234's `padding: 8px 16px`. The route here
-    /// was 16 × 10 (first node), 10 × 8 (crammed), 12 × 8, 16 × 8 (second
-    /// node), and finally 14 × 10 — judged on screen rather than in Figma,
-    /// which is why it wins over the file.
-    var horizontalPadding: CGFloat = 14
-    var verticalPadding: CGFloat = 10
+    /// Deliberately NOT node 23:1234's `padding: 8px 16px`. Judged on
+    /// screen rather than in Figma, which is why it wins over the file, and
+    /// it took a while to land: 16 × 10, 10 × 8 (crammed), 12 × 8, 16 × 8,
+    /// 14 × 10, 14 × 8, and back to 12 × 8.
+    var horizontalPadding: CGFloat = 12
+    var verticalPadding: CGFloat = 8
 
     var body: some View {
         HStack(spacing: Self.gap) {
