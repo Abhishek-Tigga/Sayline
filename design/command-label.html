@@ -80,7 +80,83 @@
 <path id="Vector" d="M5.49914 6.28029L2.12414 9.28029C2.0498 9.34636 1.95226 9.3802 1.85297 9.37436C1.75369 9.36852 1.66079 9.32348 1.59471 9.24914C1.52864 9.1748 1.4948 9.07726 1.50064 8.97797C1.50648 8.87869 1.55152 8.78579 1.62586 8.71971L4.68555 6L1.62586 3.28029C1.55152 3.21421 1.50648 3.12131 1.50064 3.02203C1.4948 2.92274 1.52864 2.8252 1.59471 2.75086C1.66079 2.67652 1.75369 2.63148 1.85297 2.62564C1.95226 2.6198 2.0498 2.65364 2.12414 2.71971L5.49914 5.71971C5.53872 5.7549 5.5704 5.79806 5.59209 5.84637C5.61378 5.89468 5.625 5.94704 5.625 6C5.625 6.05296 5.61378 6.10532 5.59209 6.15363C5.5704 6.20194 5.53872 6.2451 5.49914 6.28029ZM10.1247 8.625H5.62473C5.52527 8.625 5.42989 8.66451 5.35956 8.73484C5.28923 8.80516 5.24973 8.90054 5.24973 9C5.24973 9.09946 5.28923 9.19484 5.35956 9.26517C5.42989 9.33549 5.52527 9.375 5.62473 9.375H10.1247C10.2242 9.375 10.3196 9.33549 10.3899 9.26517C10.4602 9.19484 10.4997 9.09946 10.4997 9C10.4997 8.90054 10.4602 8.80516 10.3899 8.73484C10.3196 8.66451 10.2242 8.625 10.1247 8.625Z" fill="#E6E6E6"/>
 </g>`;
 
-  const P = { size: 10, tracking: 0.5, colour: "#E6E6E6", icon: "svg", transcript: "Open WhatsApp" };
+
+  /// Icons drawn on an 8x8 grid, the same grid Silkscreen and Press Start
+  /// 2P are built on. A vector glyph beside a bitmap face is the mismatch
+  /// that makes pixel type look accidental rather than chosen — these are
+  /// made of whole pixels, so they stay square at any integer multiple.
+  const PIXEL_ICONS = {
+    prompt: [
+      "........",
+      "#.......",
+      ".#......",
+      "..#.....",
+      "...#....",
+      "..#.....",
+      ".#......",
+      "#...###.",
+    ],
+    window: [
+      "########",
+      "#......#",
+      "#.#....#",
+      "#..#...#",
+      "#.#....#",
+      "#......#",
+      "#.####.#",
+      "########",
+    ],
+    caret: [
+      "........",
+      "#.......",
+      ".#......",
+      "..#.....",
+      "...#....",
+      "..#.....",
+      ".#......",
+      "#..#####",
+    ],
+    block: [
+      "........",
+      "#.......",
+      ".#......",
+      "..#.....",
+      "...#....",
+      "..#.....",
+      ".#..####",
+      "....####",
+    ],
+  };
+
+  /// One <rect> per lit pixel. `shape-rendering="crispEdges"` keeps the
+  /// squares hard-edged; without it the browser antialiases the grid back
+  /// into the softness the pixel look is meant to avoid.
+  function pixelIcon(name, size, colour) {
+    const rows = PIXEL_ICONS[name];
+    let rects = "";
+    rows.forEach((row, y) => {
+      [...row].forEach((cell, x) => {
+        if (cell === "#") rects += `<rect x="${x}" y="${y}" width="1" height="1"/>`;
+      });
+    });
+    // Snapped to a multiple of 4, not 8.
+    //
+    // What has to be whole is the CELL in device pixels, not the icon in
+    // CSS pixels. On a 2x display an 8-cell grid at 12 CSS px gives 1.5
+    // CSS px per cell — which is 3 device pixels, and perfectly crisp.
+    // Snapping to 8 was over-cautious and actively wrong: it forced a
+    // 10px label's icon up to 16, skipping the 12 the design asks for.
+    // Multiples of 4 keep cells on whole device pixels at 2x and land on
+    // 8, 12, 16.
+    //
+    // On a 1x display only multiples of 8 are exact. Every Mac this ships
+    // to is Retina, so that is accepted rather than designed around.
+    const snapped = Math.max(8, Math.round(size / 4) * 4);
+    return `<svg width="${snapped}" height="${snapped}" viewBox="0 0 8 8"
+                 shape-rendering="crispEdges" fill="${colour}">${rects}</svg>`;
+  }
+
+  const P = { size: 10, tracking: 0.5, colour: "#E6E6E6", icon: "prompt", transcript: "Open WhatsApp" };
 
   const FONTS = [
     { id:"silkscreen",  name:"Silkscreen",        stack:"'Silkscreen', monospace",
@@ -136,6 +212,7 @@
   });
 
   function iconMarkup(kind, size, colour) {
+    if (PIXEL_ICONS[kind]) return pixelIcon(kind, size, colour);
     if (kind === "svg") {
       return `<svg width="${size}" height="${size}" viewBox="0 0 12 12" fill="none"
                    style="color:${colour}">${ICON}</svg>`;
@@ -207,7 +284,9 @@
     label.append(document.createTextNode("Icon"));
     const seg = document.createElement("div");
     seg.className = "seg";
-    [["svg","Figma SVG"], ["chevron","> _ as text"], ["none","No icon"]].forEach(([id, text]) => {
+    [["prompt","Pixel > _"], ["block","Pixel > block"], ["window","Pixel window"],
+     ["caret","Pixel > line"], ["svg","Figma SVG"], ["chevron","> _ as text"],
+     ["none","No icon"]].forEach(([id, text]) => {
       const b = document.createElement("button");
       b.type = "button"; b.textContent = text;
       b.setAttribute("aria-pressed", String(P.icon === id));
