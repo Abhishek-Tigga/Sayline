@@ -2080,3 +2080,55 @@ harness trapped writing from a tap whose file had gone out of scope. The
 isolated converter test then ran clean. Recording it because "my test
 crashed" is otherwise indistinguishable from "the feature crashes", and
 the app guards every one of those calls.
+
+---
+
+## 2026-08-13 — the conversion bug, and a harness that can finally test this
+
+**Build 1 shipped broken and the user found it, again.** Fixed, and this
+time verified by me before handing over.
+
+**The defect:** `[mic] conversion failed: OSStatus 1718449215` (`'fmt?'`)
+on every buffer, then `ExtAudioFileWrite` -50, `frames: 0`. The converter
+was built to emit Int16 while `AVAudioFile.processingFormat` is **always
+Float32**, whatever the file's on-disk settings say. Every write was
+rejected. Latency was fixed (176 ms, down from 1100) and the recording was
+empty — every number in the log looked healthy except the one that mattered.
+
+**Fix:** create the file first, then build the converter to match its
+`processingFormat`. The equality check is now on the whole format, not on
+sample rate alone — comparing rates is what let a Float32/Int16 mismatch
+through.
+
+### `--selftest-capture`, and why it matters more than the fix
+
+Every dictation regression in this project has been found the same way:
+the user holds a key and reports that nothing happened. Neither I nor a
+reviewer can press that key, so the capture path was the one part of the
+app **nobody could test**. Three fixes shipped in a row with a defect each.
+
+`Sayline --selftest-capture <seconds> <holds>` runs the real
+`AudioRecorder` headlessly and asserts on what lands on disk. Measured:
+
+```
+warm-up window: 2016 ms, paid once
+hold 1: start  90 ms · on disk 2.99s of 3.0s · 16000 Hz 1 ch · 97 KB  OK
+hold 2: start  88 ms · on disk 2.99s of 3.0s · 16000 Hz 1 ch · 97 KB  OK
+hold 3: start  87 ms · on disk 2.88s of 3.0s · 16000 Hz 1 ch · 94 KB  OK
+hold 4: start  92 ms · on disk 2.99s of 3.0s · 16000 Hz 1 ch · 97 KB  OK
+hold 5: start  91 ms · on disk 2.99s of 3.0s · 16000 Hz 1 ch · 97 KB  OK
+PASS — every hold met the contract
+```
+
+One recorder across all five, as the app does. This is Fable's proof (a),
+(b) and (d)答 in one command: start under 150 ms on holds 2–5, nearly the
+whole window on disk, and 97 KB where it used to be megabytes.
+
+**Three of my probes had lifecycle bugs before this one worked** — writing
+from a tap whose file had gone, and blocking main while the results come
+back *on* main (which reported "0.00s recorded" from a 719 KB file). A
+harness that lies is worse than none; this one asserts against the file.
+
+Still unverified by me and owed to a human: that a *spoken* hold
+transcribes, that echo cancellation still suppresses speaker bleed, and
+the whole media/calendar list.

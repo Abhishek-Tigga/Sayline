@@ -294,24 +294,38 @@ final class AudioRecorder {
 
         // Whisper wants 16 kHz mono, and voice processing hands us 48 kHz
         // multichannel float. Writing that raw quadrupled the upload and is
-        // the mechanism behind the transcription timeouts — a 5s take went
-        // out as megabytes of audio the API downsamples on arrival anyway.
+        // the mechanism behind the transcription timeouts.
         //
-        // Converting here rather than before upload means the file on disk
-        // is small too, which matters because it holds someone's speech.
-        let target = AVAudioFormat(commonFormat: .pcmFormatInt16,
-                                   sampleRate: 16000, channels: 1, interleaved: true)
-        converter = target.flatMap { AVAudioConverter(from: format, to: $0) }
-        if converter == nil {
-            SaylineLog.log("[mic] no converter for \(Int(format.sampleRate))Hz \(format.channelCount)ch — writing raw")
-        }
-        let writeFormat = converter == nil ? format : (target ?? format)
+        // The file is created FIRST and the converter is built to match its
+        // `processingFormat`, not the other way round. That ordering is the
+        // whole fix: `AVAudioFile.processingFormat` is always Float32,
+        // whatever the file's on-disk settings say, so a converter built to
+        // emit Int16 produces buffers the file rejects — every write failed
+        // with -50 and `'fmt?'`, and the recording came out empty while
+        // every other number looked healthy.
+        let fileSettings = AVAudioFormat(commonFormat: .pcmFormatInt16,
+                                         sampleRate: 16000, channels: 1,
+                                         interleaved: true)?.settings
 
         do {
-            audioFile = try AVAudioFile(forWriting: url, settings: writeFormat.settings)
+            audioFile = try AVAudioFile(forWriting: url, settings: fileSettings ?? format.settings)
         } catch {
             SaylineLog.log("failed to create audio file: \(error)")
             return false
+        }
+
+        // Ask the file what it wants, then build a converter that produces
+        // exactly that.
+        if let processing = audioFile?.processingFormat, processing != format {
+            converter = AVAudioConverter(from: format, to: processing)
+            if converter == nil {
+                SaylineLog.log("[mic] no converter \(Int(format.sampleRate))Hz \(format.channelCount)ch"
+                    + " -> \(Int(processing.sampleRate))Hz \(processing.channelCount)ch — recording raw instead")
+                // Rewrite the file in the hardware format so writes match.
+                audioFile = try? AVAudioFile(forWriting: url, settings: format.settings)
+            }
+        } else {
+            converter = nil
         }
 
         framesWritten = 0
@@ -514,7 +528,10 @@ final class AudioRecorder {
     /// transcribes, a dropped one does not.
     private func converted(_ buffer: AVAudioPCMBuffer,
                            to format: AVAudioFormat) -> AVAudioPCMBuffer? {
-        guard let converter, converter.outputFormat.sampleRate == format.sampleRate else { return nil }
+        // Identity, not just sample rate: a converter emitting Int16 into a
+        // Float32 file is exactly the mismatch that silently produced empty
+        // recordings, and comparing sample rates alone did not catch it.
+        guard let converter, converter.outputFormat == format else { return nil }
         let ratio = format.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 64)
         guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }

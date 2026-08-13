@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 /// Command-line modes the app answers before it becomes an app.
 ///
@@ -27,6 +28,10 @@ enum HeadlessModes {
             dumpConfig()
         case "--parse-actions":
             parseActions()
+        case "--selftest-capture":
+            let seconds = arguments.count > 2 ? Double(arguments[2]) ?? 3 : 3
+            let holds = arguments.count > 3 ? Int(arguments[3]) ?? 1 : 1
+            selftestCapture(seconds: seconds, holds: holds)
         default:
             return
         }
@@ -163,5 +168,94 @@ enum HeadlessModes {
                                                      options: [.sortedKeys]),
               let text = String(data: data, encoding: .utf8) else { return }
         print(text)
+    }
+}
+
+extension HeadlessModes {
+    /// Records for a few seconds through the real `AudioRecorder` and
+    /// reports what landed on disk.
+    ///
+    /// Exists because every dictation regression in this project has been
+    /// found by the user holding a key and reporting that nothing happened.
+    /// Neither I nor a reviewer can press that key, so the capture path was
+    /// the one part of the app nobody could test — which is why three fixes
+    /// shipped in a row with a defect each. This makes it runnable:
+    ///
+    ///     Sayline --selftest-capture 3
+    ///
+    /// It answers the contract directly: did audio arrive, how fast, how
+    /// much of the window was captured, and in what format.
+    static func selftestCapture(seconds: Double, holds: Int = 1) {
+        guard AudioRecorder.micAuthorization == .authorized else {
+            print("microphone not authorized — grant it and rerun")
+            exit(2)
+        }
+
+        // `AudioRecorder` hands its results back on the **main queue**, so
+        // main has to keep servicing work rather than blocking on a
+        // semaphore. Blocking it is why the first version of this reported
+        // a 0.00s recording from a 719 KB file: the completions never ran,
+        // and the harness read state that had not been finalised.
+        //
+        // Two probes before this one had the same shape of bug. A harness
+        // that lies is worse than no harness, so this one spins the run
+        // loop and asserts on what is actually on disk.
+        func pump(until predicate: () -> Bool, limit: TimeInterval) {
+            let deadline = Date().addingTimeInterval(limit)
+            while !predicate() && Date() < deadline {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            }
+        }
+
+        // ONE recorder across every hold, exactly as the app does. Holds
+        // two onward are what matters: all three regressions were invisible
+        // on the first hold and obvious on the second.
+        let recorder = AudioRecorder()
+        let warmStart = Date()
+        recorder.warmUp()
+        pump(until: { false }, limit: 2.0)
+        print(String(format: "warm-up window: %.0f ms, paid once", Date().timeIntervalSince(warmStart) * 1000))
+
+        var failures = 0
+        for hold in 1...max(1, holds) {
+            var engineUp: Bool?
+            let requested = Date()
+            recorder.start { engineUp = $0 }
+            pump(until: { engineUp != nil }, limit: 10)
+            guard engineUp == true else {
+                print("hold \(hold): FAIL — engine did not start")
+                failures += 1
+                continue
+            }
+            let latency = Date().timeIntervalSince(requested) * 1000
+
+            pump(until: { false }, limit: seconds)
+
+            var stopped = false
+            recorder.stop { stopped = true }
+            pump(until: { stopped }, limit: 10)
+
+            guard let url = recorder.lastRecordingURL,
+                  let file = try? AVAudioFile(forReading: url) else {
+                print("hold \(hold): FAIL — no readable recording")
+                failures += 1
+                continue
+            }
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let kb = ((attrs?[.size] as? Int) ?? 0) / 1024
+            let onDisk = Double(file.length) / file.fileFormat.sampleRate
+            // The contract: fast to start, and nearly all of the window
+            // actually on disk.
+            let ok = latency < 150 && onDisk > seconds * 0.8
+            if !ok { failures += 1 }
+            print(String(format: "hold %d: start %3.0f ms · on disk %.2fs of %.1fs · %d Hz %d ch · %d KB  %@",
+                         hold, latency, onDisk, seconds,
+                         Int(file.fileFormat.sampleRate), file.fileFormat.channelCount, kb,
+                         ok ? "OK" : "<-- BREAKS THE CONTRACT"))
+            recorder.discardRecording(at: url)
+        }
+        print(failures == 0 ? "PASS — every hold met the contract"
+                            : "FAIL — \(failures) hold(s) broke the contract")
+        exit(failures == 0 ? 0 : 1)
     }
 }
