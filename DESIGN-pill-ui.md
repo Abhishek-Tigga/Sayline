@@ -29,14 +29,14 @@ file — it is the card's intent, chosen over every drawn value.
 | | value |
 |---|---|
 | radius | 8 (fixed — the radius rule below is speech-box only) |
-| padding | **16 horizontal, 8 vertical** — Figma node 23:1234, `padding: 8px 16px` |
+| padding | **14 horizontal, 10 vertical** — settled on screen, overrides node 23:1234's 16 × 8 |
 | gap | **8**, between loader and label — overrides the Figma's 6 |
 | label | Inter Regular 16, `#f2f2f2` |
 | loader | 15×15, see below |
 
-Padding took a detour: the first node said 16 × 10, 10 × 8 was tried and
-read as crammed, 12 × 8 was a guess in between, and node 23:1234 settles
-it at 16 × 8.
+Padding took a long detour and the final value is **not** in the Figma:
+16 × 10 (first node), 10 × 8 (crammed), 12 × 8, 16 × 8 (node 23:1234),
+then 14 × 10 judged on the rendered pill. The screen wins over the file.
 
 ### Backdrop blur is not implementable as specified
 
