@@ -18,6 +18,53 @@ Every entry records: what the user saw, what the log said, the actual
 cause, the fix, and **what was working immediately before** — the last
 question is usually the fastest route to the answer.
 
+## What the 2026-08-13 session taught
+
+Six failures in one day, on the one path the product exists for. Every fix
+was correct about the layer it touched and wrong about the layer beneath:
+latency, then engine start, then device binding, then file format, then
+channel mapping. These are the rules that came out of it.
+
+**Verify the contract, not the delta.** Each fix was checked against the
+symptom it was meant to remove, and the invariant went unwatched: *a hold
+of N seconds yields ≈N seconds of audible audio, starting fast, on the
+fifth hold as well as the first.* Every regression was visible in the very
+log that shipped with its fix — the `+1134 ms` line was printed by the
+change that caused it.
+
+**Assert on the payload, not the envelope.** A recording had the right
+duration, sample rate, channel count and file size, and contained pure
+silence. Duration, bytes and format are the envelope. Peak amplitude is
+the payload. A check that never looks inside will pass while the feature
+is dead.
+
+**Which prompt did *not* appear is evidence.** The user located a failure
+faster than the instrumentation did by noticing the missing password
+prompt — the Keychain unlocking the API key. Its absence proved
+transcription was never reached, placing the fault downstream of capture.
+Absent side effects narrow the search as well as present ones.
+
+**Write guards against induced failures, not expected ones.** "Fails open"
+covered `setVoiceProcessingEnabled` *throwing*. It succeeded and broke the
+engine one call later, and nothing caught it. If a guard has never been
+seen to fire, it has not been tested.
+
+**A harness with a lifecycle bug lies.** Three probes gave false answers
+before one worked — writing from a tap whose file had gone, and blocking
+the main thread while results were delivered *on* the main thread (which
+reported "0.00s recorded" from a 719 KB file). Prove the harness on a
+known-good case before trusting it on a broken one.
+
+**Run the capture self-test after any `AudioRecorder` change. Not
+optional.**
+
+```bash
+Sayline --selftest-capture 3 5
+```
+
+Five holds on one recorder, asserting start latency, duration on disk and
+peak amplitude. Every failure below would have been caught by it.
+
 ## Recurring mechanisms
 
 Ranked by how often they have turned out to be the cause.

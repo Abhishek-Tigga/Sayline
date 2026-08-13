@@ -108,6 +108,19 @@ wrong answer, it silently drops the rest of the sentence.
 accounts are readable; `meeting-checks` covers meeting parsing and link
 detection. Both are pure and framework-free on purpose.
 
+**Capture path** — the one part of the app that used to be untestable
+without a human holding the hotkey, which is why six dictation
+regressions shipped in a day. Mandatory after **any** `AudioRecorder`
+change:
+
+```bash
+Sayline --selftest-capture 3 5
+```
+
+Five holds on one recorder. Asserts start latency < 150 ms, ~the whole
+window on disk, and **peak amplitude** — a recording of the right length,
+rate and size can still be pure silence, and was.
+
 **Live URLs** — the catalog is compiled in, so a moved URL needs a release.
 This detects, it cannot heal:
 
@@ -129,6 +142,15 @@ table, `LocalTimestamp`. When we know the answer, don't ask the model.
 **Write the test case before the fix.** The test set is the record of what
 broke. A case added after the fix tends to describe the fix rather than the
 bug.
+
+**Verify the contract, not the delta.** Check the invariant the feature
+must always satisfy, not just the symptom you removed. Every dictation
+regression on 2026-08-13 was visible in the log that shipped with its own
+fix. See `DICTATION-HISTORY.md`.
+
+**Assert on the payload, not the envelope.** Duration, byte count and
+format are the envelope; a silent recording has all three correct. Look
+inside.
 
 **Measure before and after.** Accuracy, prompt tokens, latency. The standing
 rule is that a new feature must not make the system slower; when a change
