@@ -18,10 +18,12 @@ struct StatusPill: View {
     /// Defaults to what ships, so the preview needs no argument and the
     /// indicator can still pass the parked glass style through.
     var surface: SurfaceStyle = .shipping
-    /// 12 × 8, against the Figma's 16 × 10. The user tried 10 × 8 first
-    /// and called it crammed, so horizontal came back up to 12; vertical
-    /// stays at 8. Both settled by eye on the rendered pill, 2026-08-14.
-    var horizontalPadding: CGFloat = 12
+    /// 16 × 8, matching Figma node 23:1234 (`padding: 8px 16px`).
+    ///
+    /// Took a detour to get here: the earlier node said 16 × 10, 10 × 8 was
+    /// tried and read as crammed, 12 × 8 was a guess in between, and the
+    /// updated node settles it at 16 × 8.
+    var horizontalPadding: CGFloat = 16
     var verticalPadding: CGFloat = 8
 
     var body: some View {
@@ -105,7 +107,24 @@ private struct PillPreview: View {
         let viewModel = IndicatorViewModel()
         viewModel.isAgentMode = (mode == "agent")
         viewModel.isWorkMode = (mode == "work")
-        return RecordingIndicatorView(viewModel: viewModel)
-            .frame(height: 60)
+        return VStack(spacing: 6) {
+            RecordingIndicatorView(viewModel: viewModel)
+                .frame(height: 44)
+            // Measured, not asserted: Figma gives the agent pill as
+            // 175 x 37, and a screenshot cannot be trusted to a point.
+            StatusPill(text: label(mode))
+                .overlay(GeometryReader { geometry in
+                    Text("\(Int(geometry.size.width.rounded()))×\(Int(geometry.size.height.rounded()))")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 3)
+                        .background(.yellow)
+                        .offset(y: geometry.size.height + 2)
+                })
+        }
+    }
+
+    private func label(_ mode: String) -> String {
+        mode == "agent" ? "Agent Listening" : mode == "work" ? "Work Listening" : "Listening"
     }
 }

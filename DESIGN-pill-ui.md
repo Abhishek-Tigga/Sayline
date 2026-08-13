@@ -16,7 +16,7 @@ values. The drawn frames had drifted apart and neither matched the card.
 |---|---|
 | fill | `#141414` at 75% |
 | stroke | `#666666` at 25%, weight 1 |
-| backdrop blur | 4 |
+| backdrop blur | see note — 4 per rule card, 8 per node 23:1234, neither settable in code |
 | drop shadow | `#616161` at 25%, x 0, y 1, blur 4 |
 
 What was drawn, and is now deliberately **not** used: speech boxes had fill
@@ -29,14 +29,40 @@ file — it is the card's intent, chosen over every drawn value.
 | | value |
 |---|---|
 | radius | 8 (fixed — the radius rule below is speech-box only) |
-| padding | **12 horizontal, 8 vertical** — overrides the Figma's 16 × 10 |
+| padding | **16 horizontal, 8 vertical** — Figma node 23:1234, `padding: 8px 16px` |
 | gap | **8**, between loader and label — overrides the Figma's 6 |
 | label | Inter Regular 16, `#f2f2f2` |
 | loader | 15×15, see below |
 
-Padding was settled on the rendered pill rather than in Figma: 16 × 10 was
-the drawn value, 10 × 8 was tried and read as crammed, 12 × 8 is the
-result.
+Padding took a detour: the first node said 16 × 10, 10 × 8 was tried and
+read as crammed, 12 × 8 was a guess in between, and node 23:1234 settles
+it at 16 × 8.
+
+### Backdrop blur is not implementable as specified
+
+The rule card said 4, node 23:1234 says 8, and the app can honour neither.
+`BackdropBlur` is an `NSVisualEffectView` with `.hudWindow` / `.behindWindow`,
+and AppKit chooses the blur radius per material — there is no radius to
+set. Matching a specific pixel blur would mean replacing it with a
+hand-rolled CIFilter backdrop, which is a real piece of work and has not
+been asked for. Recorded so nobody goes looking for the setting.
+
+### The pill is 168 × 35, not 175 × 37 — and that is the typeface
+
+Measured with a GeometryReader on the built pill, against the node's
+175 × 37. Every specified value matches, so the whole difference is font
+metrics:
+
+| | Figma (Inter Regular 16) | built (SF Pro 16) |
+|---|---|---|
+| "Agent Listening" width | 120 | 113 |
+| content height | 21 | 19 |
+
+Figma specifies Inter; the app uses `.system(size: 16)`, which is SF Pro —
+as it did before this redesign. Keeping SF Pro is a deliberate default: it
+is the macOS system font and this is a system-level overlay, so Inter would
+read subtly foreign. Bundling Inter would match the Figma exactly and is a
+one-line change plus a font file, if the exact match matters more.
 
 ## Speech box — radius by line count
 
