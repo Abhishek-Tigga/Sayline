@@ -96,17 +96,20 @@ final class PillPreviewWindowController {
 /// Showing `StatusPill` alone would prove only that the pill draws; this
 /// goes through the same view the floating window uses.
 private struct PillPreview: View {
-    /// Candidates for the backdrop. `backdrop-filter: blur(8px)` cannot be
-    /// asked for directly, so the job is to pick whichever material reads
-    /// closest to it. Named so the winner can be identified on sight.
-    private static let candidates: [(String, NSVisualEffectView.Material)] = [
-        ("hudWindow (previous)", .hudWindow),
-        ("popover", .popover),
-        ("menu", .menu),
-        ("sidebar", .sidebar),
-        ("fullScreenUI", .fullScreenUI),
-        ("underWindowBackground (SHIPPING)", .underWindowBackground),
-    ]
+    /// Fill opacities to choose between.
+    ///
+    /// The material is settled; this is the remaining lever on how much
+    /// blurred backdrop shows. Figma asks for a 16 background blur (which
+    /// it exports as `blur(8px)` — Figma writes CSS at half its own
+    /// value), and NSVisualEffectView has no radius to set, so "less
+    /// blur" has to be bought by letting less of the backdrop through the
+    /// fill. 0.75 is the spec.
+    private static let fills: [Double] = [0.75, 0.82, 0.88, 0.94, 1.0]
+
+    private static func surface(_ opacity: Double) -> SurfaceStyle {
+        .flat(fill: Color(red: 0x14 / 255, green: 0x14 / 255, blue: 0x14 / 255)
+            .opacity(opacity))
+    }
 
     var body: some View {
         ZStack {
@@ -124,22 +127,16 @@ private struct PillPreview: View {
                         .frame(height: 40)
                 }
                 Divider().opacity(0.4)
-                ForEach(Array(Self.candidates.enumerated()), id: \.offset) { _, candidate in
+                ForEach(Array(Self.fills.enumerated()), id: \.offset) { _, opacity in
                     HStack(spacing: 12) {
-                        Text(candidate.0)
-                            .font(.system(size: 10, weight: .semibold))
+                        Text(opacity == 0.75 ? "75% (spec)"
+                             : opacity == 1.0 ? "100% (opaque)"
+                             : "\(Int(opacity * 100))%")
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white)
                             .shadow(color: .black, radius: 2)
-                            .frame(width: 150, alignment: .trailing)
-                        StatusPill(text: "Agent Listening", material: candidate.1)
-                            .overlay(GeometryReader { geometry in
-                                Text("\(Int(geometry.size.width.rounded()))×\(Int(geometry.size.height.rounded()))")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 3)
-                                    .background(.yellow)
-                                    .offset(x: geometry.size.width + 6, y: 8)
-                            })
+                            .frame(width: 110, alignment: .trailing)
+                        StatusPill(text: "Agent Listening", surface: Self.surface(opacity))
                     }
                 }
             }

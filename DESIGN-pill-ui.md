@@ -40,7 +40,10 @@ then 14 × 10 judged on the rendered pill. The screen wins over the file.
 
 ### Backdrop blur is not implementable as specified
 
-The rule card said 4, node 23:1234 says 8, and the app can honour neither.
+Figma's Effects panel shows **Background blur 16** on the pill. Figma
+exports background blur at HALF its own value, which is why the CSS reads
+`backdrop-filter: blur(8px)` and why the rule card's "4" was a Figma 4
+(CSS 2) rather than a contradiction. Mystery solved, and irrelevant:
 `BackdropBlur` is an `NSVisualEffectView` with `.hudWindow` / `.behindWindow`,
 and AppKit chooses the blur radius per material — there is no radius to
 set. Matching a specific pixel blur would mean replacing it with a
