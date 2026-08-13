@@ -92,8 +92,12 @@ private struct PillPreview: View {
             // Something for the blur and the faint stroke to sit against —
             // both are invisible on a flat backdrop, and a preview that
             // hides them is not showing the design.
-            LinearGradient(colors: [Color(white: 0.32), Color(white: 0.06)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            // Runs from near-white to near-black on purpose. A drop shadow
+            // meant to darken has to be judged at both ends: over light
+            // content it should be visible, and over dark content it must
+            // not turn into a pale halo.
+            LinearGradient(colors: [Color(white: 0.95), Color(white: 0.04)],
+                           startPoint: .leading, endPoint: .trailing)
             HStack(spacing: 22) {
                 indicator(mode: "plain")
                 indicator(mode: "work")

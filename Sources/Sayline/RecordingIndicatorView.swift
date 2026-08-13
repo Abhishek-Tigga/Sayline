@@ -763,10 +763,22 @@ extension View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius)
         shape
             .fill(Color.black)
-            // #616161 at 25%, x0 y1, CSS blur 4 — SwiftUI's radius is
-            // roughly half a CSS blur, hence 2.
-            .shadow(color: Color(red: 0x61 / 255, green: 0x61 / 255, blue: 0x61 / 255)
-                .opacity(0.25), radius: 2, x: 0, y: 1)
+            // Figma: #616161 at 25%, x0 y1, blur 4, **blend mode darken**.
+            //
+            // Darken cannot be reproduced. It is min(backdrop, shadow) per
+            // channel, so it needs the pixels behind the window, and an app
+            // cannot read those — see the note on backdrop blur below.
+            // Rendered normally, #616161 is a mid grey: over a dark
+            // wallpaper it would LIGHTEN, producing a pale halo where the
+            // design intends nothing at all, since darken leaves anything
+            // darker than #616161 untouched.
+            //
+            // Black approximates the intent far better than the literal
+            // colour does: it only ever darkens, which is the half of
+            // darken's behaviour that is reachable. Opacity is dropped to
+            // 0.18 because black at 0.25 reads heavier than a grey at 0.25.
+            // The radius is 2 for a CSS blur of 4.
+            .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
             .compositingGroup()
             .mask(
                 Rectangle()
