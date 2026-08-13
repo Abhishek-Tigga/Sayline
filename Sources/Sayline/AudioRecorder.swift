@@ -42,6 +42,14 @@ final class AudioRecorder {
     /// it. Session-scoped rather than persisted: unplugging the display or
     /// the virtual driver that caused it should get a fresh chance.
     private var voiceProcessingBroke = false
+    /// The device currently pinned on the unit, so a pin is applied once
+    /// rather than on every hold.
+    private var appliedDeviceID: AudioDeviceID?
+    /// Converts the hardware format down to what Whisper actually wants.
+    private var converter: AVAudioConverter?
+    /// Set by AVAudioEngineConfigurationChange — the device list moved
+    /// under us, so the next hold rebuilds rather than trusting the graph.
+    private var configurationChanged = false
     /// Name of the device the engine really used, read after `start()`.
     private(set) var lastInputDeviceName = "unknown"
 
@@ -71,9 +79,16 @@ final class AudioRecorder {
     /// leaks exactly one recording until the next hold rather than all of
     /// them — the lifecycle belongs to whoever creates the file, not to
     /// whoever happens to consume it.
-    func discardLastRecording() {
-        guard let url = lastRecordingURL else { return }
-        lastRecordingURL = nil
+    /// Deletes a specific recording.
+    ///
+    /// Keyed to the URL the caller owns, never to "the last one". A hold
+    /// that begins while the previous hold's transcription is still in
+    /// flight moves `lastRecordingURL` — so the older transcription's
+    /// deferred cleanup would delete the *new* recording out from under it.
+    /// Rare, silent, and it costs a take.
+    func discardRecording(at url: URL?) {
+        guard let url else { return }
+        if url == lastRecordingURL { lastRecordingURL = nil }
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -103,6 +118,22 @@ final class AudioRecorder {
     /// perfectly fine and simply not permitted.
     static var micAuthorization: AVAuthorizationStatus {
         AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
+    init() {
+        // This Mac's device list demonstrably churns — a duplicated
+        // Bluetooth device, a Continuity microphone, a virtual driver. When
+        // it moves, the engine's graph can be stale in ways that show up as
+        // silence rather than as an error. Note it and rebuild next hold.
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine, queue: nil
+        ) { [weak self] _ in
+            self?.audioQueue.async {
+                self?.configurationChanged = true
+                SaylineLog.log("[mic] audio configuration changed — next hold rebuilds the graph")
+            }
+        }
     }
 
     func requestMicPermission(completion: @escaping (Bool) -> Void) {
@@ -172,11 +203,28 @@ final class AudioRecorder {
         }
     }
 
-    private func startOnAudioQueue(preferredDeviceUID: String?) -> Bool {
-        // Safety net for the lifecycle above: even if a consumer forgot to
-        // discard, the previous recording dies here.
-        discardLastRecording()
+    /// Brings voice processing up **once**, at launch, off the hot path.
+    ///
+    /// It used to be toggled off and on inside every hold, to make device
+    /// pinning safe. Measured cost of that dance: **1.1 seconds per hold**,
+    /// during which the microphone is not listening — so a 1.6s hold
+    /// captured 0.48s and the user's first words were simply gone. Worse,
+    /// it was protecting a device-set call that is skipped on every hold,
+    /// because the pinned device is already the system default.
+    ///
+    /// Enabled once and left alone. It survives `stop()`/`start()`, so
+    /// holds two through five cost nothing.
+    func warmUp() {
+        audioQueue.async { [weak self] in
+            guard let self, !self.voiceProcessingBroke else { return }
+            let started = Date()
+            self.setVoiceProcessing(true, on: self.engine.inputNode)
+            SaylineLog.log(String(format: "[mic] warm-up took %.0f ms — later holds pay none of it",
+                                  Date().timeIntervalSince(started) * 1000))
+        }
+    }
 
+    private func startOnAudioQueue(preferredDeviceUID: String?) -> Bool {
         if !voiceProcessingBroke,
            attemptStart(preferredDeviceUID: preferredDeviceUID, withVoiceProcessing: true) {
             return true
@@ -207,6 +255,14 @@ final class AudioRecorder {
         // retry starts from the same place the first attempt did.
         engine.stop()
         engine.reset()
+        if configurationChanged {
+            // The device list moved since the last hold. Drop the pin we
+            // think is applied, so it is re-established against the devices
+            // that exist now rather than the ones that did.
+            configurationChanged = false
+            appliedDeviceID = nil
+            SaylineLog.log("[mic] rebuilding after a configuration change")
+        }
 
         let input = engine.inputNode
 
@@ -220,8 +276,13 @@ final class AudioRecorder {
         // "unknown (id 0)", and records silence. Measured 2026-08-13: two
         // holds worked, and every hold after the aggregate appeared
         // captured zero frames.
-        setVoiceProcessing(false, on: input)
-        applyPreferredDevice(preferredDeviceUID, on: input)
+        // Only touched when the pin actually has to change. The off→on
+        // dance is what truncated every recording; it now runs when a real
+        // device change needs a plain unit to land on, and not otherwise.
+        if deviceNeedsApplying(preferredDeviceUID) {
+            setVoiceProcessing(false, on: input)
+            applyPreferredDevice(preferredDeviceUID, on: input)
+        }
         setVoiceProcessing(withVoiceProcessing, on: input)
 
         // Read AFTER voice processing is enabled. Turning it on replaces the
@@ -231,8 +292,23 @@ final class AudioRecorder {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("sayline-\(UUID().uuidString).wav")
 
+        // Whisper wants 16 kHz mono, and voice processing hands us 48 kHz
+        // multichannel float. Writing that raw quadrupled the upload and is
+        // the mechanism behind the transcription timeouts — a 5s take went
+        // out as megabytes of audio the API downsamples on arrival anyway.
+        //
+        // Converting here rather than before upload means the file on disk
+        // is small too, which matters because it holds someone's speech.
+        let target = AVAudioFormat(commonFormat: .pcmFormatInt16,
+                                   sampleRate: 16000, channels: 1, interleaved: true)
+        converter = target.flatMap { AVAudioConverter(from: format, to: $0) }
+        if converter == nil {
+            SaylineLog.log("[mic] no converter for \(Int(format.sampleRate))Hz \(format.channelCount)ch — writing raw")
+        }
+        let writeFormat = converter == nil ? format : (target ?? format)
+
         do {
-            audioFile = try AVAudioFile(forWriting: url, settings: format.settings)
+            audioFile = try AVAudioFile(forWriting: url, settings: writeFormat.settings)
         } catch {
             SaylineLog.log("failed to create audio file: \(error)")
             return false
@@ -246,6 +322,10 @@ final class AudioRecorder {
         // could not: does the tap fire at all, and if so with what?
         tapCallbacks = 0
         firstBufferLogged = false
+        // The number the whole plan turns on: how long after the key went
+        // down did real audio arrive. The per-hold voice-processing toggle
+        // pushed this past a second, and nothing measured it.
+        startRequestedAt = Date()
         SaylineLog.log("[mic] engine.isRunning before start: \(engine.isRunning), "
             + "format \(format.sampleRate)Hz \(format.channelCount)ch, "
             + "inputNode format \(input.inputFormat(forBus: 0).sampleRate)Hz")
@@ -259,13 +339,15 @@ final class AudioRecorder {
                 if let data = buffer.floatChannelData?[0] {
                     for i in 0..<Int(buffer.frameLength) { peak = max(peak, abs(data[i])) }
                 }
-                SaylineLog.log("[mic] first tap buffer: \(buffer.frameLength) frames, peak \(peak), "
-                    + "file \(self.audioFile == nil ? "MISSING" : "ready")")
+                let waited = self.startRequestedAt.map { Date().timeIntervalSince($0) * 1000 } ?? -1
+                SaylineLog.log(String(format: "[mic] first audio after %.0f ms — %u frames, peak %.3f",
+                                      waited, buffer.frameLength, peak))
             }
             guard let file = self.audioFile else { return }
             do {
-                try file.write(from: buffer)
-                self.framesWritten += AVAudioFramePosition(buffer.frameLength)
+                let toWrite = self.converted(buffer, to: file.processingFormat) ?? buffer
+                try file.write(from: toWrite)
+                self.framesWritten += AVAudioFramePosition(toWrite.frameLength)
             } catch {
                 SaylineLog.log("failed writing audio buffer: \(error)")
             }
@@ -281,6 +363,9 @@ final class AudioRecorder {
             // actually on a Bluetooth device. Logging the format too, because
             // 16 kHz on a device that should do 48 kHz is the tell.
             lastInputDeviceName = currentInputDeviceName()
+            audioFileFormatDescription = audioFile.map {
+                "\(Int($0.processingFormat.sampleRate))Hz \($0.processingFormat.channelCount)ch"
+            }
             SaylineLog.log("recording started on \(lastInputDeviceName) at \(Int(format.sampleRate)) Hz -> \(url.path)")
             return true
         } catch {
@@ -311,13 +396,23 @@ final class AudioRecorder {
         }
     }
 
+    /// What actually landed on disk, for the upload-size question.
+    private var audioFileFormatDescription: String?
+    /// When this hold asked for the engine, so first-audio latency is a
+    /// measured number rather than an impression.
+    private var startRequestedAt: Date?
+
     private func stopOnAudioQueue() {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         audioFile = nil
         lastRecordingDuration = recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
         SaylineLog.log("recording stopped -> \(lastRecordingURL?.path ?? "?") duration: \(lastRecordingDuration)s frames: \(framesWritten)")
-        SaylineLog.log("[mic] tap fired \(tapCallbacks) time(s) during that recording")
+        let bytes = lastRecordingURL
+            .flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? Int } ?? 0
+        let written = audioFileFormatDescription ?? "?"
+        SaylineLog.log("[mic] tap fired \(tapCallbacks) time(s); wrote \(written); "
+            + "file \(bytes / 1024) KB")
     }
 
     /// True only if the just-finished recording is an accidental hotkey tap
@@ -379,9 +474,27 @@ final class AudioRecorder {
     /// and leave the unit deviceless, so the safest version of this work is
     /// the version that does not happen.
     private func applyPreferredDevice(_ uid: String?, on input: AVAudioInputNode) {
-        guard let uid, let deviceID = AudioDeviceLister.deviceID(forUID: uid) else { return }
-        guard deviceID != Self.defaultInputDeviceID() else { return }
+        guard let deviceID = resolvedPin(uid) else { return }
         setInputDevice(deviceID, on: input)
+        appliedDeviceID = deviceID
+    }
+
+    /// The device we should pin to, or nil for "follow the system".
+    ///
+    /// A pin equal to the current default is normalised away entirely. That
+    /// is the common case — the stored pin was `BuiltInMicrophoneDevice`,
+    /// which *is* the default — and it is the call that failed with -10851
+    /// and left the unit with no device at all. Work that need not happen
+    /// cannot fail.
+    private func resolvedPin(_ uid: String?) -> AudioDeviceID? {
+        guard let uid, let deviceID = AudioDeviceLister.deviceID(forUID: uid) else { return nil }
+        return deviceID == Self.defaultInputDeviceID() ? nil : deviceID
+    }
+
+    /// True only when the pin differs from what is already applied.
+    private func deviceNeedsApplying(_ uid: String?) -> Bool {
+        guard let deviceID = resolvedPin(uid) else { return false }
+        return deviceID != appliedDeviceID
     }
 
     private static func defaultInputDeviceID() -> AudioDeviceID {
@@ -394,6 +507,34 @@ final class AudioRecorder {
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
                                          &address, 0, nil, &size, &id) == noErr else { return 0 }
         return id
+    }
+
+    /// Downsamples one tap buffer. Returns nil to write the original,
+    /// which is the fail-open path — an oversized recording still
+    /// transcribes, a dropped one does not.
+    private func converted(_ buffer: AVAudioPCMBuffer,
+                           to format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        guard let converter, converter.outputFormat.sampleRate == format.sampleRate else { return nil }
+        let ratio = format.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 64)
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+
+        var supplied = false
+        var conversionError: NSError?
+        converter.convert(to: output, error: &conversionError) { _, status in
+            if supplied {
+                status.pointee = .noDataNow
+                return nil
+            }
+            supplied = true
+            status.pointee = .haveData
+            return buffer
+        }
+        if let conversionError {
+            SaylineLog.log("[mic] conversion failed: \(conversionError.localizedDescription)")
+            return nil
+        }
+        return output.frameLength > 0 ? output : nil
     }
 
     private func setInputDevice(_ deviceID: AudioDeviceID, on node: AVAudioInputNode) {

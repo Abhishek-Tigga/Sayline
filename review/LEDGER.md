@@ -1942,3 +1942,141 @@ case too.
 
 Open: what exactly about the output device at 14:21 broke it. Unknown, and
 the fallback makes it survivable rather than solved.
+
+---
+
+## Dictation-path triage (Fable, 2026-08-13) — plan, not patch
+
+Requested after three consecutive fixes each broke the path differently.
+Full reasoning delivered in-session; this entry records the decisions so
+the build session can be checked against them.
+
+### Decision: keep voice processing, in the steady-state shape
+The per-hold toggle is removed, not the feature. Key fact from reading
+`attemptStart`: the 1.1s off→on dance runs on EVERY hold to protect a
+device-set call that is SKIPPED on every hold (pinned device == default).
+The dance must run only when a non-default pin actually needs applying
+and only when that pin has changed. Voice processing is enabled once
+(warm-up at launch after the mic-permission check, on the audio queue)
+and stays on across stop/start; the -10875 fallback and session flag
+stay exactly as they are. Rationale: all three failures were interaction
+bugs in toggling/pinning, not in VP's steady operation; the bleed fix is
+real (97% measured) and the alternative (pausing music) was rejected by
+the user.
+
+### Found during the audit, previously unlisted
+- **Symptom 5 has a mechanism: the upload quadrupled.** VP moved capture
+  from 16 kHz to 48 kHz float and `GroqTranscriber` uploads the WAV
+  as-written (verified: no conversion code). Whisper wants 16 kHz mono
+  anyway. Convert before upload; log file bytes + upload ms at the same
+  time. If timeouts persist with small files, THEN it is network and
+  earns its own entry.
+- **A discard race can delete a live recording.** `discardLastRecording`
+  is keyed to "last": hold B starting while hold A's transcription is in
+  flight means A's deferred discard can delete B's file. Fix: consumers
+  discard the URL they own, not "last".
+- **`AVAudioEngineConfigurationChange` is unobserved** on a machine whose
+  device list demonstrably churns. Observe it, log it, reset engine
+  state between holds when it fired.
+- **Multichannel capture suspected**: one log showed the input format at
+  9 channels. If the WAV is written multichannel float, uploads are
+  ~1.7 MB/s. The stop log should print channel count and file bytes.
+
+### The audit, ranked by severity × frequency (today's code)
+| # | Feature | Breaks dictation? | Severity | Frequency | Call |
+|---|---|---|---|---|---|
+| 1 | VP per-hold toggle | proven | dead-ish (truncation) | every hold | fix (steady-state) |
+| 2 | Rebuild TCC resets | proven | dead | every rebuild | process: move Developer ID signing up from end-of-V2 |
+| 3 | Device pinning + VP | proven (-10851) | dead (silent) | dormant (pin==default) | keep; apply only on change; normalize pin==default → nil |
+| 4 | Tap circuit breaker (secure input) | plausible | hotkey dead | rare | keep; re-log once/min while waiting (still owed from 2026-08-11) |
+| 5 | 48 kHz/multichannel upload | mechanism found | degraded (timeouts) | network-dependent | fix (convert to 16 kHz mono) |
+| 6 | Discard race | found by reading | degraded (loses one take) | rare | fix (discard-by-URL) |
+| 7 | Config-change unobserved | plausible | degraded | device churn | observe + log |
+| 8 | NowPlaying CoreAudio enumeration | unproven | degraded | rare | keep; never on audioQueue, skip while recording |
+| 9 | SoundEffectPlayer | unproven | cosmetic | every hold | keep; note VP cancels the chime from the take |
+| 10 | WhisperKit load | unlikely | degraded | opt-in, once | keep as gated |
+| 11 | Agent/follow-up recorder sharing | historically | trust, not dead | rare | keep; suites cover; live tap still owed |
+
+Nothing recommended for removal. Device pinning came closest; it stays
+because the desk-mic use case is real and the safe shape (apply only on
+change, only when ≠ default) removes its entire failure surface while
+pin==default.
+
+### Build plan (one rebuild per stage — rebuilds cost the user grants)
+**Build 1 (everything above the line, one binary):** steady-state VP;
+pin normalization; discard-by-URL; config-change observer (log only);
+16 kHz mono conversion before upload; stop-log prints channels + bytes.
+**Prove before stage 2, from the log, five holds in one session:**
+(a) `hotkey DOWN → recording started` < 150 ms on holds 2–5;
+(b) spoken 5s ≈ recorded 5s duration;
+(c) music playing + silent hold → peak < 0.05 (bleed still cancelled);
+(d) upload bytes and round-trip ms, before/after conversion;
+(e) first-hold warm-up cost, once, named in the log.
+**Stage 2:** pin a genuinely non-default device (the Bluetooth speaker)
+and prove the changed-pin dance runs once, not per hold. **Stage 3:**
+process — Developer ID enrollment moved up; the five-hold check above
+becomes the mandatory smoke test after ANY AudioRecorder change,
+recorded in DICTATION-HISTORY.md.
+
+### Process finding, said plainly
+Each fix was verified against the reported symptom, never against the
+path's invariant ("a hold of N seconds yields ≈N seconds of audio,
+starting fast, on the fifth hold as well as the first"). All three
+regressions were visible in the very logs that shipped with their fixes
+— the +1134 ms line was printed by the fix that caused it. A five-hold
+smoke test with timing assertions would have caught every one. The
+guards were also written against the *expected* failure shape (throwing)
+rather than induced and observed. Verification effort was high; its
+scope was the delta, and the contract went unwatched.
+
+---
+
+## 2026-08-13 — Fable's plan, Build 1 (Opus)
+
+Built exactly the "everything above the line" binary. `claimed-fixed`,
+none of it verified — the proof is five live holds, which only the user
+can run.
+
+**Steady-state voice processing.** `warmUp()` enables it once at launch,
+on the audio queue, after the microphone grant. `attemptStart` no longer
+toggles it. The -10875 fallback and the session flag are untouched, as the
+plan required. Measured warm-up cost in a standalone probe: **657–747 ms,
+paid once**, versus ~1100 ms *per hold* before.
+
+**Pin normalisation.** A pin equal to the current default input is
+normalised to nil, so the call that failed with -10851 does not happen at
+all in the common case. `deviceNeedsApplying` compares against
+`appliedDeviceID`, so the off→on dance runs only when a genuinely
+different device has to be applied, and only when it changed.
+
+**Discard by URL.** `discardLastRecording()` is gone; `discardRecording(at:)`
+takes the URL the caller owns. The compiler found all four call sites, and
+three of them had the correct `url` already in scope — which is exactly
+the race Fable described. Two early-return paths (`capturedNoAudio`,
+too-short) now discard explicitly, since `start()` no longer sweeps.
+
+**16 kHz mono conversion.** An `AVAudioConverter` in the tap writes 16 kHz
+mono Int16 instead of 48 kHz multichannel float. Proven on this hardware
+in isolation: a 4800-frame 9-channel buffer converts to 1360 frames at
+16 kHz with no error. Falls back to writing raw when no converter can be
+made, and on any conversion error — an oversized recording still
+transcribes.
+
+**Configuration-change observer.** `AVAudioEngineConfigurationChange` is
+observed; it logs, and clears `appliedDeviceID` so the next hold
+re-establishes the pin against the devices that exist now.
+
+**Instrumentation for the proof.** First-audio latency is now measured
+from the moment the hold requested the engine (`[mic] first audio after
+N ms`), and the stop line prints the written format and file size in KB.
+Both exist specifically so (a), (b), (d) and (e) of the plan's proof are
+read off the log rather than judged by feel.
+
+**Not done, deliberately:** stage 2 (non-default pin) and stage 3
+(Developer ID signing, smoke test as process) wait for stage 1 to pass.
+
+**A probe of mine crashed and it was the probe's fault.** A five-hold
+harness trapped writing from a tap whose file had gone out of scope. The
+isolated converter test then ran clean. Recording it because "my test
+crashed" is otherwise indistinguishable from "the feature crashes", and
+the app guards every one of those calls.

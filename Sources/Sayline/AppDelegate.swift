@@ -192,6 +192,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         audioRecorder.requestMicPermission { [weak self] granted in
             self?.isMicAuthorized = granted
+            // Pay the ~1s voice-processing setup here, once, while nobody
+            // is speaking — rather than inside every hold, which is what
+            // swallowed the first second of each recording.
+            if granted { self?.audioRecorder.warmUp() }
         }
 
         if useLocalTranscription {
@@ -296,7 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             // Nothing was started, so make sure the hotkey-up handler does
             // not find a stale file from an earlier hold and try to
             // transcribe it.
-            audioRecorder.discardLastRecording()
+            audioRecorder.discardRecording(at: audioRecorder.lastRecordingURL)
             return
         }
         SoundEffectPlayer.shared.playHotkeyDown()
@@ -379,6 +383,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 + "— mic authorized: \(authorized)")
             indicatorWindow.show(state: .message(
                 authorized ? "No audio from \(device)" : "Microphone access is off"))
+            audioRecorder.discardRecording(at: url)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) { [weak self] in
                 self?.indicatorWindow.hide()
             }
@@ -387,6 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         guard !audioRecorder.isTooShortOrSilent() else {
             SaylineLog.log("recording too short/silent (\(audioRecorder.lastRecordingDuration)s) -> skipping transcription")
+            audioRecorder.discardRecording(at: url)
             indicatorWindow.hide()
             return
         }
@@ -413,7 +419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.show(state: .transcribing)
         Task {
             do {
-                defer { self.audioRecorder.discardLastRecording() }
+                defer { self.audioRecorder.discardRecording(at: url) }
                 let rawText = try await activeTranscriber.transcribe(fileURL: url)
                 SaylineLog.log("raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
@@ -480,7 +486,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func handleSpokenFollowUpAnswer(url: URL) {
         indicatorWindow.show(state: .transcribing)
         Task {
-            defer { self.audioRecorder.discardLastRecording() }
+            defer { self.audioRecorder.discardRecording(at: url) }
             let text = try? await activeTranscriber.transcribe(fileURL: url)
             await MainActor.run {
                 guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -502,7 +508,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.show(state: .transcribing)
         Task {
             do {
-                defer { self.audioRecorder.discardLastRecording() }
+                defer { self.audioRecorder.discardRecording(at: url) }
                 let transcript = try await activeTranscriber.transcribe(fileURL: url)
                 SaylineLog.log("agent transcript -> \(transcript)")
 
