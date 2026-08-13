@@ -738,10 +738,42 @@ extension View {
                     .strokeBorder(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)
                         .opacity(0.25), lineWidth: 1)
             )
-            // #616161 at 25%, x0 y1 blur4. SwiftUI's radius is roughly half
-            // a CSS blur, hence 2.
+            .background(outerShadow(cornerRadius: cornerRadius))
+    }
+
+    /// The drop shadow, clipped so it exists only OUTSIDE the surface.
+    ///
+    /// `.shadow()` cannot be used directly here. SwiftUI paints a blurred
+    /// copy of the shape behind the *whole* view, including the area the
+    /// shape itself covers — unlike CSS `box-shadow`, which is clipped to
+    /// outside the border box. Our fill is 75% opaque, so that dark copy
+    /// showed straight through it and darkened the surface: the pill read
+    /// as near-black instead of `#141414` over a blur, with a grey bloom
+    /// around it. Reported by the user as "the drop shadow has a darken
+    /// effect on top", and confirmed by rendering the same view with the
+    /// shadow disabled — the fill came back to its intended lightness and
+    /// the bloom vanished.
+    ///
+    /// So the shadow is cast by an opaque shape and the shape's own area
+    /// is then punched out, leaving only the part that should have been
+    /// outside all along. The mask is inflated so the blur is not clipped
+    /// at the edge of the punched rectangle.
+    @ViewBuilder
+    private func outerShadow(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+        shape
+            .fill(Color.black)
+            // #616161 at 25%, x0 y1, CSS blur 4 — SwiftUI's radius is
+            // roughly half a CSS blur, hence 2.
             .shadow(color: Color(red: 0x61 / 255, green: 0x61 / 255, blue: 0x61 / 255)
                 .opacity(0.25), radius: 2, x: 0, y: 1)
+            .compositingGroup()
+            .mask(
+                Rectangle()
+                    .padding(-12)
+                    .overlay(shape.blendMode(.destinationOut))
+                    .compositingGroup()
+            )
     }
 
     @ViewBuilder
