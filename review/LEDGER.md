@@ -2637,3 +2637,91 @@ project to lie before it worked.
 quality. The guard measures fact survival, not whether the output is good
 writing — a model could score perfectly by returning the input unchanged.
 Spot-reading a sample is a live-owed item.
+
+---
+
+## 2026-08-13 — reading the actual rewrites (Opus) — FINDINGS FOR REVIEW
+
+The bake-off measured fact *survival*. Nobody had read the output. Five
+rewrites from the recommended model, `llama-3.3-70b-versatile`, read by
+hand. **The table in the previous entry is not wrong, but it is not the
+whole picture, and I would not ship on it now.**
+
+### 1 · The model invents content, and the guard cannot see it
+
+`real-1`, guard verdict **clean**:
+
+> said: *"Rohan said he can't make Wednesday anymore. So I'm thinking we
+> move it to Friday morning like 11ish. Doesn't that work for you?"*
+>
+> wrote: *"Rohan can no longer make it on Wednesday, so we are considering
+> moving the design review to Friday morning at 11. **This change may not
+> work for everyone, as there are 2 potential issues with the new time.**"*
+
+There are no two potential issues. The model invented a sentence, with a
+number in it, and the guard passed it — because `FactGuard` checks that
+raw facts *survive*, and only checks invention for **names** and
+**commitments**. An invented number, date or claim is invisible.
+
+`made-15` does it too: *"The api is affected by these issues."* — invented,
+guard clean on that clause.
+
+This is the same class as the original silent-data-loss bug that
+`PRODUCT.md` records, arriving from the other direction. Decision 2's
+promise is "nothing substantive may appear that was never said"; the
+implementation only enforces that for two categories.
+
+### 2 · The pinned-facts block leaks into the output
+
+`real-7` ends with a literal fragment of my prompt:
+
+> *"...until we actually talk to sales. **| negations: 2 — do not reverse
+> any statement**"*
+
+The harness joins the pin block with `" | "` (the verifier's `--pin` mode
+flattens newlines). The model treated it as content. My bug, in the
+harness rather than the guard, but the production prompt will have the
+same shape and needs a format the model cannot mistake for text.
+
+### 3 · "one" as a pronoun is extracted as the number 1
+
+`real-8` "quick **one**", `real-10` "he wasn't on the last **one**" — both
+pinned as the number 1, both dropped by a faithful rewrite, both counted
+as `numberLost`. Two of the five samples carry a false positive from this
+alone, which means the 20% first-pass figure is **inflated**, in the
+opposite direction to finding 1.
+
+### 4 · `negationAdded` fires on a faithful rendering
+
+`real-8`: raw *"or it slips to the next month cycle"* → rewrite *"**If it
+is not** cleared by then, it will slip"*. Same meaning, expressed with a
+negation the speaker did not use. Zero-to-one is exactly the rule Fable
+proposed and I implemented, and here it is wrong.
+
+### What this means for the numbers
+
+The 20%/380 ms recommendation stands on measurements that are wrong in
+both directions: inflated by findings 3 and 4, and understated by finding
+1, which is the dangerous one. **I no longer trust the ranking enough to
+pick a model on it**, and stage 3 should not start until the guard
+measures what decision 2 actually promises.
+
+### Questions for review
+
+1. **How should invention be caught** without an LLM judge and without
+   forbidding the connective words a rewrite must add? A "no new numbers
+   or dates" rule is cheap and would have caught both cases here. Is that
+   sufficient, or is the general case needed?
+2. **Is `negationAdded` worth keeping** given finding 4, or does
+   zero-to-one cost more than it protects?
+3. **Does "one"/"two" need a pronoun exclusion**, and where does that end?
+   ("no one", "the last one", "one more thing")
+4. **Does the model choice survive re-measurement**, or should the
+   bake-off be re-run once the guard is corrected? My assumption is re-run;
+   the ranking may not hold.
+
+Samples verbatim in this session's transcript; the harness reproduces them
+with `eval/work-mode/run.py --model llama-3.3-70b-versatile`.
+
+**Nothing built on this.** Stage 3 not started, no production prompt
+written, no model wired in.
