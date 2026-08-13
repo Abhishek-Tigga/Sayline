@@ -210,10 +210,18 @@ final class AudioRecorder {
 
         let input = engine.inputNode
 
-        if let preferredDeviceUID, let deviceID = AudioDeviceLister.deviceID(forUID: preferredDeviceUID) {
-            setInputDevice(deviceID, on: input)
-        }
-
+        // Device selection must happen on a *plain* input unit.
+        //
+        // Voice processing binds the node to a private aggregate device
+        // (`CADefaultDeviceAggregate-<pid>-0` in the log). Setting
+        // `kAudioOutputUnitProperty_CurrentDevice` on that fails with
+        // -10851 and — the part that actually hurt — leaves the unit with
+        // **no device at all**. It then starts happily, reports
+        // "unknown (id 0)", and records silence. Measured 2026-08-13: two
+        // holds worked, and every hold after the aggregate appeared
+        // captured zero frames.
+        setVoiceProcessing(false, on: input)
+        applyPreferredDevice(preferredDeviceUID, on: input)
         setVoiceProcessing(withVoiceProcessing, on: input)
 
         // Read AFTER voice processing is enabled. Turning it on replaces the
@@ -363,6 +371,31 @@ final class AudioRecorder {
         return isSilent
     }
 
+    /// Pins the input to a chosen device, when that is worth doing at all.
+    ///
+    /// Skipped when the chosen device is already the system default — which
+    /// is the common case, since the default pick is the built-in
+    /// microphone. Forcing it gains nothing and is the call that can fail
+    /// and leave the unit deviceless, so the safest version of this work is
+    /// the version that does not happen.
+    private func applyPreferredDevice(_ uid: String?, on input: AVAudioInputNode) {
+        guard let uid, let deviceID = AudioDeviceLister.deviceID(forUID: uid) else { return }
+        guard deviceID != Self.defaultInputDeviceID() else { return }
+        setInputDevice(deviceID, on: input)
+    }
+
+    private static func defaultInputDeviceID() -> AudioDeviceID {
+        var id = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                         &address, 0, nil, &size, &id) == noErr else { return 0 }
+        return id
+    }
+
     private func setInputDevice(_ deviceID: AudioDeviceID, on node: AVAudioInputNode) {
         guard let audioUnit = node.audioUnit else {
             SaylineLog.log("no audio unit available to set preferred input device")
@@ -378,7 +411,17 @@ final class AudioRecorder {
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
         if status != noErr {
-            SaylineLog.log("failed to set preferred input device -> status \(status)")
+            // Do not leave a half-set unit behind. The failure itself is
+            // survivable — the system default input is a perfectly good
+            // fallback — but a unit left pointing at nothing records
+            // silence while claiming to work.
+            SaylineLog.log("couldn't pin the input device (status \(status)) — following the system default instead")
+            var fallback = Self.defaultInputDeviceID()
+            if fallback != 0 {
+                AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_CurrentDevice,
+                                     kAudioUnitScope_Global, 0, &fallback,
+                                     UInt32(MemoryLayout<AudioDeviceID>.size))
+            }
         }
     }
 
