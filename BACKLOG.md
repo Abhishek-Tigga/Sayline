@@ -763,6 +763,22 @@ and [CHANGELOG.md](CHANGELOG.md).
   enrollment, not yet done
 - Monetization
 
+## OPEN · Revoke the API keys that were pasted into chat (2026-08-14)
+
+API keys were pasted into a chat transcript earlier in development.
+Anything that has been in a transcript should be treated as exposed,
+regardless of where the transcript lives.
+
+- **Groq**: being replaced anyway — the old key was lost when the
+  keychain self-heal deleted it, and a new one is being created. Revoke
+  the old one in the Groq console rather than leaving it live.
+- **OpenAI**: still in the keychain and still powering work mode's
+  rewrite. Not yet rotated. Rotating it means creating a new key,
+  entering it in Settings, and revoking the old one.
+
+Nothing is committed — checked, no key material appears in any tracked
+file. This is about keys that left the machine, not keys in the repo.
+
 ## OPEN · Enter the Groq key, then finish the signing proof (2026-08-14)
 
 Parked by the user mid-session; recorded so it is not lost.
