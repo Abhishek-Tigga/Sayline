@@ -65,7 +65,7 @@
 
   <div>
     <h1>3×3 loader variations</h1>
-    <p>Eight motions on the same grid: hard-edged squares, no gap, opacity
+    <p>Nine motions on the same grid: hard-edged squares, no gap, opacity
        only, colour never changes. <b>Outward dip</b> is what ships today and
        is here as the reference — the job is picking something for plain
        dictation that cannot be mistaken for it.</p>
@@ -199,6 +199,16 @@
       desc: "A band crosses corner to corner. Same idea as the column sweep but softer, because the diagonals are uneven.",
       fn: (i, ph) => P.floor + (1 - P.floor)
         * pulse(ph - ((row(i) + col(i)) / 4) * 0.6, P.width),
+    },
+    {
+      id: "diagonalSweepReverse",
+      name: "Diagonal sweep — reverse",
+      desc: "The same band, running the other way: bottom-right corner to top-left. Pairs with the diagonal sweep the way the upward sweep pairs with a downward one.",
+      // Identical to the diagonal, with the travel index mirrored. (row+col)
+      // runs 0 at the top-left corner to 4 at the bottom-right, so
+      // subtracting it from 4 starts the band at the far corner instead.
+      fn: (i, ph) => P.floor + (1 - P.floor)
+        * pulse(ph - ((4 - (row(i) + col(i))) / 4) * 0.6, P.width),
     },
     {
       id: "twinkle",
