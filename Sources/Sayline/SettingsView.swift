@@ -4,6 +4,24 @@ struct SettingsView: View {
     @EnvironmentObject private var appDelegate: AppDelegate
     @State private var apiKeyInput: String = KeychainStore.load() ?? ""
     @State private var apiKeySaved = false
+    @State private var apiKeySaveFailed = false
+
+
+    /// The only place the key is written, so the button and Return cannot
+    /// diverge.
+    ///
+    /// `apiKeySaved` now reflects what actually happened. It used to be set
+    /// to `true` unconditionally, one line after a `save` whose result was
+    /// discarded — so a failed write still showed a green "Saved". Between
+    /// that and the missing `.onSubmit`, the UI could report success in
+    /// every case, including the ones that stored nothing.
+    private func saveAPIKey() {
+        guard !apiKeyInput.isEmpty else { return }
+        let stored = KeychainStore.save(apiKeyInput)
+        APIKeyProvider.invalidateCache()
+        apiKeySaved = stored
+        apiKeySaveFailed = !stored
+    }
 
     var body: some View {
         // Scrollable, so the content's height is never a demand the window
@@ -29,21 +47,29 @@ struct SettingsView: View {
                         .foregroundStyle(.green)
                 }
 
+                // `.onSubmit` so Enter saves. Without it, typing the key and
+                // pressing Return saved NOTHING — only clicking the button
+                // did — while the field still showed the key. That is the
+                // best fit for what happened on 2026-08-14: the key entered
+                // twice, believed saved twice, absent from the keychain
+                // both times, and no failure in any log because `save` was
+                // never called.
                 SecureField("Groq API Key", text: $apiKeyInput)
                     .textFieldStyle(.roundedBorder)
+                    .onSubmit(saveAPIKey)
 
                 HStack {
-                    Button("Save Key") {
-                        KeychainStore.save(apiKeyInput)
-                        APIKeyProvider.invalidateCache()
-                        apiKeySaved = true
-                    }
-                    .disabled(apiKeyInput.isEmpty)
+                    Button("Save Key", action: saveAPIKey)
+                        .disabled(apiKeyInput.isEmpty)
 
                     if apiKeySaved {
                         Text("Saved")
                             .font(.caption)
                             .foregroundStyle(.green)
+                    } else if apiKeySaveFailed {
+                        Text("Couldn't save — see the log")
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
                 }
 

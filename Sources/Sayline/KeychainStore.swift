@@ -37,18 +37,34 @@ enum KeychainStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key.rawValue
         ]
-        let deleteStatus = SecItemDelete(query as CFDictionary)
-        if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
-            SaylineLog.log("keychain delete-before-save for \(key.rawValue) returned "
-                + "OSStatus \(deleteStatus) (\(message(deleteStatus)))")
+        // Update first, add only if there is nothing to update — Fable's
+        // shape, 2026-08-14, replacing delete-then-add.
+        //
+        // Delete-then-add threw away the item's ACL continuity on every
+        // save and could leave the worst possible middle state: delete
+        // reports success, add then collides with something the default
+        // query cannot see, and the key is gone with a "saved" on screen.
+        // Update keeps the existing item and its access control intact.
+        let update = SecItemUpdate(query as CFDictionary,
+                                   [kSecValueData as String: data] as CFDictionary)
+        var status = update
+        if update == errSecItemNotFound {
+            var newItem = query
+            newItem[kSecValueData as String] = data
+            status = SecItemAdd(newItem as CFDictionary, nil)
         }
-
-        var newItem = query
-        newItem[kSecValueData as String] = data
-        let status = SecItemAdd(newItem as CFDictionary, nil)
         guard status == errSecSuccess else {
+            // Two codes worth recognising on sight, per Fable:
+            //  -25299 duplicate the default query cannot see — usually an
+            //         iCloud-synchronised ghost, which matches an add but
+            //         not a delete. Retry with kSecAttrSynchronizableAny.
+            //  -25293 an ACL orphan from the signing transition. That is
+            //         the one case where deleting and replacing is right,
+            //         and it should be the user's explicit choice.
             SaylineLog.log("KEYCHAIN SAVE FAILED for \(key.rawValue) -> OSStatus \(status) "
-                + "(\(message(status))). The key was NOT stored.")
+                + "(\(message(status))). The key was NOT stored."
+                + (status == -25299 ? " -25299: a hidden duplicate, likely an iCloud-synced ghost." : "")
+                + (status == -25293 ? " -25293: an ACL orphan; the item needs replacing deliberately." : ""))
             return false
         }
 
