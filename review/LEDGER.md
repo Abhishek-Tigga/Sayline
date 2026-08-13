@@ -2175,3 +2175,45 @@ remains a human check.
 touched and wrong about the layer beneath. Latency, then format, then
 channel mapping. Each was verified against what had just broken rather
 than against "does a spoken sentence come out as text".
+
+---
+
+## 2026-08-13 — Sayline quietens the whole system (Opus) — OPEN, escalated
+
+**Not fixed. Escalated to Fable rather than guessed at**, at the user's
+invitation and because my last theory here was wrong within ten minutes.
+
+**Reported:** all system audio plays quietly, music at maximum sounds like
+minimum, and it resolves when Sayline is killed. The user asked whether we
+turn their volume down while the app is active, and named the principle:
+we must not modify their system to suit ourselves. They are right.
+
+**Established:**
+- We never change the volume setting. `setVolume` is reachable only from
+  an explicit command, and the setting read **100** throughout.
+- Sayline holds an audio **output** stream open for its whole lifetime,
+  idle or not. `outputting now -> Sayline` while running, `NONE` after
+  `pkill`.
+- The holder is `SoundEffectPlayer`: it starts an `AVAudioEngine` in
+  `init()` and never stops it. This predates voice processing — the same
+  line appears in probes from 2026-08-12.
+
+**Disproved (mine, within ten minutes of proposing it):** that the
+steady-state voice-processing unit ducks the system. Measured — VP idle
+does not hold output; only an actively recording engine does, and stopping
+it releases. What remains untested is the *combination* now shipping: a
+permanently-running output engine alongside a voice-processing input unit.
+
+**Cannot determine alone:** whether any of that is what the user hears.
+Ducking is perceptual; I can measure which process holds a stream, not how
+loud other apps sound. Prompt at `review/FABLE-PROMPT-system-audio.md`
+asks for the mechanism, a way to *measure* it, the ranked fix, and whether
+voice processing should now be removed outright — it is 5-for-5 in causing
+failures.
+
+**Sayline left stopped** so the user has their audio back while this is
+open.
+
+**Also open, untouched:** "next song" does nothing while play/pause works.
+The browser path posts `NX_KEYTYPE_NEXT` and was never verified against a
+browser tab. Not investigated, deliberately.
