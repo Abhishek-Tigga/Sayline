@@ -267,23 +267,20 @@ private struct SpeechBackBox: View {
         let metrics = Self.metrics(for: fitted)
 
         TimelineView(.animation) { timeline in
-            VStack(alignment: .leading, spacing: CommandHeader.gapToTranscript) {
-                CommandHeader()
-                Text(Self.attributed(fitted, elapsed: timeline.date.timeIntervalSince(setAt)))
-                    .font(Typeface.ui(Self.fontSize))
+            Text(Self.attributed(fitted, elapsed: timeline.date.timeIntervalSince(setAt)))
+                .font(Typeface.ui(Self.fontSize))
                 .lineSpacing(Self.lineHeight - Self.fontSize - 2)
                 .fixedSize(horizontal: false, vertical: true)
                 // An explicit width, not a maximum. `.frame(maxWidth:)`
                 // expands to whatever the parent offers, so a two-word
                 // transcript sat in a full-width box; the indicator hands
                 // down the whole screen width, so the cap became the size.
-                    .frame(width: Self.contentWidth(fitted,
-                                                     horizontalPadding: metrics.horizontalPadding),
-                           alignment: .leading)
-            }
-            .padding(.horizontal, metrics.horizontalPadding)
-            .padding(.vertical, metrics.verticalPadding)
-            .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
+                .frame(width: Self.textWidth(fitted,
+                                             horizontalPadding: metrics.horizontalPadding),
+                       alignment: .leading)
+                .padding(.horizontal, metrics.horizontalPadding)
+                .padding(.vertical, metrics.verticalPadding)
+                .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
         }
     }
 
@@ -310,7 +307,7 @@ private struct SpeechBackBox: View {
 
     // MARK: Sizing
 
-    private struct Metrics {
+    struct Metrics {
         let horizontalPadding: CGFloat
         let verticalPadding: CGFloat
         let cornerRadius: CGFloat
@@ -331,7 +328,7 @@ private struct SpeechBackBox: View {
     /// breaking an arithmetic the other three keep reads as frames that
     /// were not updated, and the user gave the arithmetic explicitly and
     /// most recently. Recorded in DESIGN-pill-ui.md.
-    private static func metrics(for text: String) -> Metrics {
+    static func metrics(for text: String) -> Metrics {
         let lines = min(max(resolvedLineCount(text), 1), maxLines)
         let step = CGFloat(lines - 1) * 2
         return Metrics(horizontalPadding: 16 + step,
@@ -361,17 +358,6 @@ private struct SpeechBackBox: View {
         let available = maxWidth - horizontalPadding * 2
         let bounds = measured(text, width: available)
         return min(available, bounds.width.rounded(.up))
-    }
-
-    /// The wider of the transcript and the "Command" header.
-    ///
-    /// The box hugs its content, and the header is content — sizing to the
-    /// transcript alone clips the header whenever the transcript is the
-    /// shorter of the two, which a one-word command usually is.
-    static func contentWidth(_ text: String, horizontalPadding: CGFloat) -> CGFloat {
-        let available = maxWidth - horizontalPadding * 2
-        return min(available, max(textWidth(text, horizontalPadding: horizontalPadding),
-                                  CommandHeader.width))
     }
 
     private static func lineCount(_ text: String, horizontalPadding: CGFloat) -> Int {
@@ -456,37 +442,51 @@ private struct LinearProcessingDots: View {
 ///
 /// Deliberately plain for now — no countdown, nothing to press. A proper
 /// result surface is still to be designed.
+/// What Sayline is telling the user — an answer, or a failure it needs to
+/// surface. Shares the speech box's treatment.
+///
+/// It used to have its own: a fixed 324 width, a fixed radius of 14, and
+/// `.frame(maxWidth:)`, which expands to whatever the parent offers rather
+/// than capping — so a three-word answer sat in a box as wide as the
+/// screen allowed. It now hugs, and takes its radius and padding from the
+/// same line-count rules, so an answer and a transcript are the same
+/// object saying different things.
 private struct NoticeBox: View {
     let text: String
     let detail: String?
     let surface: SurfaceStyle
 
     var body: some View {
+        // Metrics come from everything in the box, not just the headline —
+        // a short answer with a long detail line is a tall box, and the
+        // rules are defined on how tall it ends up.
+        let all = [text, detail].compactMap { $0 }.joined(separator: " ")
+        let metrics = SpeechBackBox.metrics(for: all)
+        let width = SpeechBackBox.textWidth(all, horizontalPadding: metrics.horizontalPadding)
+
         VStack(alignment: .leading, spacing: 0) {
             SaylineMarker()
             Text(text)
-                .font(.system(size: SpeechBackBox.fontSize, weight: .semibold))
-                .foregroundStyle(PillStyle.foreground)
+                .font(Typeface.ui(SpeechBackBox.fontSize, weight: .semibold))
+                .foregroundStyle(PillStyle.transcript)
                 .fixedSize(horizontal: false, vertical: true)
             if let detail {
                 Text(detail)
-                    .font(.system(size: SpeechBackBox.fontSize))
-                    .foregroundStyle(PillStyle.foreground)
+                    .font(Typeface.ui(SpeechBackBox.fontSize))
+                    .foregroundStyle(PillStyle.transcript)
                     .opacity(0.75)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 3)
             }
         }
-        .frame(maxWidth: 324 - 32, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .surfaceBackground(surface, cornerRadius: 14)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(width: width, alignment: .leading)
+        .padding(.horizontal, metrics.horizontalPadding)
+        .padding(.vertical, metrics.verticalPadding)
+        .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)
+        .clipShape(RoundedRectangle(cornerRadius: metrics.cornerRadius, style: .continuous))
     }
 }
 
-/// Marks a box as Sayline speaking rather than the user's own words read
-/// back. Shared so a notice and a question are unmistakably the same voice.
 private struct SaylineMarker: View {
     var body: some View {
         HStack(spacing: 6) {

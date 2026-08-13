@@ -233,7 +233,16 @@ this is the paragraph to come back to.
 `.ocean`. The modes are already carried by the loader's motion and colour,
 so a coloured beam was a third signal saying the same thing.
 
-## The command header
+## The command header — REMOVED
+
+Built from node 35:1648 and removed the same day at the user's call: the
+header read badly in place. The chooser that produced it,
+`design/command-label.html`, is kept — it compares eight terminal and
+pixel faces inside the real box shape and is worth having if a command
+marker is ever wanted again.
+
+IBM Plex Mono and the pixel `>_` icon went with it; nothing else used
+them. What it was:
 
 Node 35:1648 adds a header to the speech box, marking the transcript as a
 command rather than dictation.
@@ -263,3 +272,22 @@ ships to.
 The box hugs the **wider of the header and the transcript**. Sizing to the
 transcript alone clips the header whenever the transcript is shorter,
 which a one-word command usually is.
+
+## Answers use the speech box
+
+An answer to a spoken question — "what is my storage?" — renders in the
+same treatment as a transcript: hugging to content up to 288, radius and
+padding by line count, `#CCCCCC` text.
+
+It previously had its own: a fixed 324 width, a fixed radius of 14, and
+`.frame(maxWidth:)`, which expands to whatever the parent offers rather
+than capping, so a three-word answer sat in a box as wide as the screen
+allowed.
+
+Metrics are computed from the headline **and** the detail line together,
+since the rules are defined on how tall the box ends up.
+
+**Still carrying the Sayline marker**, which the speech box does not have.
+It is the only thing distinguishing "Sayline is telling you something"
+from "this is what you said" — worth a deliberate decision rather than
+dropping it for symmetry.

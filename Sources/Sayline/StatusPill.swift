@@ -222,6 +222,14 @@ private struct PillPreview: View {
     @State private var plain = IndicatorViewModel()
     @State private var work = PillPreview.workModel()
     @State private var boxes = PillPreview.speechModels()
+    @State private var answer = PillPreview.answerModel()
+
+    /// An answer, in the box a question gets replied in.
+    private static func answerModel() -> IndicatorViewModel {
+        let m = IndicatorViewModel()
+        m.setNotice("312 GB free of 994 GB", detail: "Macintosh HD")
+        return m
+    }
 
     private static func workModel() -> IndicatorViewModel {
         let m = IndicatorViewModel(); m.isWorkMode = true; return m
@@ -260,6 +268,14 @@ private struct PillPreview: View {
                 }
                 Divider().opacity(0.4)
                 HStack(alignment: .bottom, spacing: 14) {
+                    VStack(spacing: 4) {
+                        RecordingIndicatorView(viewModel: answer)
+                            .frame(width: 340, height: 200)
+                        Text("answer")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black, radius: 2)
+                    }
                     ForEach(Array(boxes.enumerated()), id: \.offset) { index, model in
                         VStack(spacing: 4) {
                             RecordingIndicatorView(viewModel: model)
