@@ -12,19 +12,31 @@ import Foundation
 /// could apply the wrong one. Clean's prompt and validator are untouched
 /// by anything here.
 ///
-/// The model and the numbers behind it: measured 2026-08-13 over 25
-/// transcripts, ten of them real, scored by `FactGuard`.
-/// `llama-3.3-70b-versatile` broke a fact in 24% of transcripts, the
-/// single corrective retry rescued 83% of those, 4% ended in fallback, at
-/// a 341 ms median. It was chosen over `gpt-4o-mini` — better on the real
-/// ten at 2/10 against 3/10 — because 1319 ms plus a retry lands near
-/// 2.6 s, and decision 7 calls that "reads as broken". See
-/// `review/LEDGER.md`.
+/// **The model changed when Voice 2 landed, and the reason is worth
+/// keeping.** Measured 2026-08-13 over 31 transcripts — ten real, six
+/// Voice-2 style cases — scored by `FactGuard`:
 ///
-/// **Known ceiling:** this rides Groq's free tier, which eval work alone
-/// capped twice at 100K tokens/day. If that bites before the backend
-/// exists, `gpt-4o-mini` is the fallback and the mode gets slower rather
-/// than broken.
+/// ```
+///                          broke   rescued   fallback   median
+/// llama-3.3-70b-versatile   24%       0%       24%      291 ms
+/// gpt-4o-mini               23%      43%       13%      922 ms
+/// gpt-4.1-mini              26%      75%        6%     2244 ms
+/// ```
+///
+/// Under the earlier free-rewrite prompt the 70B rescued **83%** of its
+/// own violations and fell back 4% of the time. Voice 2 adds a hard
+/// length ceiling, and told "cut, don't pad" the 70B rescued **0 of 7** —
+/// a quarter of work dictations would silently deliver Clean instead. The
+/// fastest model stopped being the best one.
+///
+/// `gpt-4o-mini` costs 631 ms more and halves the fallback rate; with
+/// Clean running concurrently the user waits about a second, against the
+/// ~2 s decision 7 allows. `gpt-4.1-mini` is better again on fallback and
+/// blows the budget at 2.2 s.
+///
+/// Incidentally this leaves Groq's free tier, the standing operational
+/// risk — the 8B baseline aborted that very run at 13 of 31 calls.
+///
 final class WorkModeCleaner {
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
     private let model = "gpt-4o-mini"
