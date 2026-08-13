@@ -215,17 +215,47 @@ enum FactGuard {
         // I'm, I've, I'd, we'll, they're, you're, it's, that's, don't.
         "ill", "im", "ive", "id", "well", "theyre", "youre", "its",
         "thats", "dont", "cant", "wont", "lets",
+        // Everything below was found reading ten real dictations, not by
+        // imagination: each was being pinned as a *name*, and a false name
+        // costs a fallback on a rewrite that was perfectly good.
+        "doesnt", "didnt", "isnt", "arent", "wasnt", "werent", "havent",
+        "hasnt", "hadnt", "couldnt", "shouldnt", "wouldnt", "youll",
+        "youve", "youd", "weve", "wed", "theyll", "theyve", "hes", "shes",
+        "can", "could", "should", "would", "will", "yeah", "yes", "sure",
+        "maybe", "quick", "update", "about", "for", "from", "with", "our",
+        "my", "her", "his", "their", "some", "any", "all", "one", "two",
         "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
         "sunday", "january", "february", "march", "april", "may", "june",
         "july", "august", "september", "october", "november", "december",
     ]
 
     private static func tokenize(_ text: String) -> [String] {
-        text.lowercased()
+        // Thousands separators are removed before splitting. "45,000
+        // rupees" used to split on the comma into 45 and 000 — so an
+        // invoice amount became two wrong numbers, and the figure that
+        // mattered most in the sentence was the one being mangled. Found
+        // in real dictation; no invented case had a comma in a number.
+        stripThousandsSeparators(text)
+            .lowercased()
             .replacingOccurrences(of: "'", with: "")
             .replacingOccurrences(of: "\u{2019}", with: "")
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
             .map(String.init)
+    }
+
+    /// Turns "45,000" into "45000" so a comma cannot split one number
+    /// into two. Only between digits, so ordinary commas are untouched.
+    private static func stripThousandsSeparators(_ text: String) -> String {
+        var out = ""
+        let characters = Array(text)
+        for (index, character) in characters.enumerated() {
+            if character == ",", index > 0, index + 1 < characters.count,
+               characters[index - 1].isNumber, characters[index + 1].isNumber {
+                continue
+            }
+            out.append(character)
+        }
+        return out
     }
 
     /// Capitalized words that are probably names.
@@ -284,6 +314,22 @@ enum FactGuard {
         "seventy": 70, "eighty": 80, "ninety": 90,
     ]
 
+    private static let spokenOrdinals: [String: Int] = [
+        "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+        "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+        "eleventh": 11, "twelfth": 12, "thirteenth": 13, "fourteenth": 14,
+        "fifteenth": 15, "sixteenth": 16, "seventeenth": 17,
+        "eighteenth": 18, "nineteenth": 19, "twentieth": 20, "thirtieth": 30,
+    ]
+
+    /// "30th" -> 30. Nil when the word is not a digit-plus-suffix ordinal.
+    private static func ordinalValue(_ word: String) -> Int? {
+        guard word.count > 2 else { return nil }
+        let suffix = String(word.suffix(2))
+        guard ["st", "nd", "rd", "th"].contains(suffix) else { return nil }
+        return Int(word.dropLast(2))
+    }
+
     /// Every number in the text, as digits.
     ///
     /// "Fifteen" and "15" are the same fact and must compare equal — the
@@ -300,14 +346,25 @@ enum FactGuard {
                 index += 1
                 continue
             }
-            if let unit = spokenUnits[word] {
+            // "30th", "1st", "22nd" — a deadline is a number even when it
+            // wears a suffix, and "cleared before the 30th" was previously
+            // invisible to the guard entirely.
+            if let ordinal = ordinalValue(word) {
+                found.insert(ordinal)
+                index += 1
+                continue
+            }
+            if let unit = spokenUnits[word] ?? spokenOrdinals[word] {
                 found.insert(unit)
                 index += 1
                 continue
             }
             if let tens = spokenTens[word] {
                 // "twenty five" is one number, not two.
-                if index + 1 < words.count, let unit = spokenUnits[words[index + 1]], unit < 10 {
+                // "twenty five" and "twenty first" are both one number.
+                if index + 1 < words.count,
+                   let unit = spokenUnits[words[index + 1]] ?? spokenOrdinals[words[index + 1]],
+                   unit < 10 {
                     found.insert(tens + unit)
                     index += 2
                 } else {

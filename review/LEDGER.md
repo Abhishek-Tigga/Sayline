@@ -2402,3 +2402,45 @@ prompt, per the brief.
 
 **Not verified by its author:** the suite is mine and passes; nobody else
 has run it, and no model output has been checked against it yet.
+
+---
+
+## 2026-08-13 — FactGuard vs ten real dictations (Opus)
+
+`claimed-fixed`. The user dictated ten genuine work messages rather than
+letting me invent them, on the grounds that a test set I author for my own
+feature is a weak exam. That call was correct: **the suite passed 26
+invented cases and the real transcripts broke it in four places within a
+minute.**
+
+Failing cases added first, per the house rule, then fixed:
+
+1. **Contractions read as names.** "Doesn't that work for you?" pinned
+   `doesnt` as a name; so did `Can`, `Yeah`. Each would have cost a
+   fallback on a perfectly good rewrite. `notNames` extended with the
+   contraction forms and the sentence-openers real speech actually uses.
+2. **"45,000 rupees" became 45 and 0.** The thousands comma split one
+   number into two, so the figure that mattered most in an invoice message
+   was the one being mangled. Separators are now stripped between digits
+   before tokenizing. No invented case had a comma in a number.
+3. **"before the 30th" was invisible.** Ordinals matched nothing. `30th`,
+   `1st`, `22nd` and the spoken forms ("twenty first") now resolve.
+4. Times as bare digits ("430 to 2 … told them 245") already worked.
+
+Suite now 34 cases, all passing. Extraction over the ten real transcripts
+is in the ledger's linked run; the set is frozen at
+`eval/work-mode/transcripts.json`.
+
+**A structural limit found and NOT fixed, flagged for decision.** Whisper
+often returns lowercase text, and the guard finds names by capitalization.
+In `real-4` — "ankit is taking the payment flow, sneha got the dashboard"
+— **no names were pinned at all**, so a model could drop or swap either
+name and the guard would not notice. This is not a bug in the extractor;
+it is the signal being absent from the input. Options, none taken yet:
+accept it (names in lowercase transcripts are unprotected), or check the
+inverse direction (a capitalized name in the *rewrite* that appears
+nowhere in the raw is an invention). The second is cheap and catches the
+more dangerous half. Raised before stage 2 because it may change what the
+prompt pins.
+
+**Stage 2 not started.** No model has been called; no money spent.

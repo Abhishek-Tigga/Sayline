@@ -113,6 +113,40 @@ check("names and numbers surviving a heavy rewrite is fine",
       violations("um so Priya said like fifteen units by Tuesday I think",
                  "Priya needs 15 units by Tuesday.").isEmpty)
 
+print("\nfound by real dictation, 2026-08-13 — invented cases missed all four")
+
+// Every one of these came from the user's own speech. The suite passed
+// 26 cases without them.
+
+// "Doesn't that work for you" — a contraction read as a name.
+check("contractions are not names",
+      !FactGuard.extract(from: "So we move it to Friday. Doesn't that work for you?")
+        .names.contains("doesnt"))
+
+// "Can we do the demo on Thursday? ... Yeah, Monday afternoon."
+check("sentence-opening Can is not a name",
+      !FactGuard.extract(from: "Can we do the demo on Thursday?").names.contains("can"))
+check("Yeah is not a name",
+      !FactGuard.extract(from: "Yeah, Monday afternoon works better.").names.contains("yeah"))
+
+// "the one from design well for 45,000 rupees" — an invoice amount split
+// into 45 and 0 by the thousands comma. The number that matters most in
+// the sentence was the one being mangled.
+let invoice = FactGuard.extract(from: "approve the vendor invoice for 45,000 rupees")
+check("thousands separators survive", invoice.numbers.contains(45000))
+check("and do not become two numbers", !invoice.numbers.contains(45) && !invoice.numbers.contains(0))
+
+// "finance needs it cleared before the 30th" — an ordinal deadline,
+// previously invisible to the guard entirely.
+check("ordinals are found",
+      FactGuard.extract(from: "finance needs it cleared before the 30th").numbers.contains(30))
+check("ordinal words too",
+      FactGuard.extract(from: "due on the twenty first").numbers.contains(21))
+
+// Times as digits: "move it from 430 to 2 ... I told them 245"
+let times = FactGuard.extract(from: "move it from 430 to 2 but I told them 245")
+check("times are kept as spoken digits", times.numbers.contains(430) && times.numbers.contains(245))
+
 print("\nthe prompt block is built from the same extraction that verifies")
 let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: "Priya needs fifteen by Tuesday."))
 check("pinned block names the number", pinned.contains("15"))
