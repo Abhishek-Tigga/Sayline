@@ -66,6 +66,7 @@ code, the rejected alternatives are not.
 | `review/LEDGER.md` | What has been claimed, what has been independently checked, what is still open |
 | `DESIGN-work-mode.md` | Work mode's eight decisions with their rejected alternatives |
 | `DESIGN-whatsapp-share.md` | Share-the-current-page: twelve decisions, confirmed 2026-08-14. **Not built** |
+| `DESIGN-vocabulary-biasing.md` | Transcription vocabulary biasing: nine decisions + guardrails, confirmed 2026-08-14. **Not built** |
 | `DICTATION-HISTORY.md` | **Read first when dictation, the mic or the hotkey breaks.** Every past failure, its cause, and what was working just before |
 
 If something looks wrong, check these first. Several apparent mistakes are
@@ -130,6 +131,8 @@ swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCata
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/ShareLink.swift \
+  eval/whatsapp-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/SpokenNumbers.swift \
   Sources/Sayline/AppContext.swift eval/factguard-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/SpeechPatterns.swift \
