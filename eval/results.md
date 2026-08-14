@@ -279,3 +279,21 @@ Key terms are the names, brands and figures whose loss actually costs something 
 | 2026-08-14 15:15 UTC | `3700269+dirty` | openai | `gpt-4o-mini` | 75/81 (93%) | 0 (0%) | 2836 | 1104 ms |
 | 2026-08-14 15:18 UTC | `3700269+dirty` | openai | `gpt-4o-mini` | 76/81 (94%) | 0 (0%) | 2836 | 1205 ms |
 | 2026-08-14 15:21 UTC | `dd24987+dirty` | openai | `gpt-4o-mini` | 79/81 (98%) | 0 (0%) | 2836 | 1081 ms |
+
+### Transcription bake-off — 2026-08-14 20:56
+
+10 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current) + bias (app)` | 12.9% | 67% | 371 ms |
+
+### Transcription bake-off — 2026-08-14 20:56
+
+10 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 16.6% | 61% | 345 ms |

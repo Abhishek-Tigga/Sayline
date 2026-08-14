@@ -134,6 +134,8 @@ swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swi
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/ShareLink.swift \
   eval/whatsapp-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/VocabularyBias.swift \
+  eval/bias-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/SpokenNumbers.swift \
   Sources/Sayline/AppContext.swift eval/factguard-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/SpeechPatterns.swift \

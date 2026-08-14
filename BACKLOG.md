@@ -872,6 +872,17 @@ cause is outside the process and the listen-only change is still correct but
 for a different reason. Either way the next freeze produces evidence instead
 of another theory.
 
+## Vocabulary biasing: the local (WhisperKit) arm sends no hint (2026-08-14)
+
+**Parked as a known deviation from design decision 4 ("one list,
+applied everywhere").** The cloud transcriber sends the glossary; the
+on-device WhisperKit path does not — its prompt mechanism
+(`promptTokens`) needs its own tokenizer work, and local transcription
+is itself an off-by-default arm. Fail-open applies: local dictations
+simply run unbiased, exactly as they always have. Unparks when local
+transcription gets real usage, or the biasing win proves large enough
+to justify the tokenizer plumbing.
+
 ## Longer-term "grand vision" (explicitly one-step-at-a-time, not this phase)
 
 - Email search ("look through my emails for anything from a recruiter")

@@ -6931,3 +6931,71 @@ Verification suggestions: re-run the eval three times and see whether the
 94–98% spread reproduces; check that no `share_page` argument ever
 carries a URL; confirm by hand that a plain dictation fires no Apple
 Event at the browser.
+
+---
+
+## BIASING · Vocabulary biasing landed (Fable, 2026-08-14) — claimed-fixed, Opus to verify
+
+Built to `DESIGN-vocabulary-biasing.md`. Claimed-fixed per the rule;
+promotion is Opus's, after running something.
+
+**What changed.** `VocabularyBias.swift` (pure ladder, Foundation-only),
+`VocabularyBiasBuilder.swift` (sources + fail-open + the locked store
+the transcriber reads), a `prompt` field in `GroqTranscriber` when a
+glossary exists, launch/notification/Settings-edit rebuild wiring in
+`AppDelegate`, the "my words" field in Settings, `biasGlossary` in
+`--dump-config`, `eval/bias-checks` (13 cases green) with its CLAUDE.md
+line in the same commit, `--bias simulated|app` modes plus the
+control-clip injection guardrail in `eval/transcription/run.py`, and
+three control scripts in `script.json`.
+
+**Found by running, not by reviewing:** the first `--dump-config`
+glossary was all CoreServices internals — `AOSUIPrefPaneLauncher` et
+al., alphabetically early, not in any dictionary, spoken by no one —
+eating the entire budget. Bias source narrowed to user-installed app
+paths only (31 of 209 apps); Apple's own app names are in every model's
+training data anyway. The design doc said "installed apps"; the code
+now deliberately reads "user-installed apps," and this entry is the
+record of why.
+
+**What I ran.**
+- Suite: 13/13 green (ladder order, filter scope, history
+  ranks-never-adds, dedup, budget cap, template, fail-open).
+- Build green; app relaunched; log shows `[bias] glossary rebuilt — 22
+  entries, ~66 tokens` at launch.
+- Acceptance pair, same session, production glossary: WER 12.9% vs
+  16.6% baseline, key terms 67% vs 61%, median +26 ms. Guardrail 1
+  (never worse) and 3 (≤50 ms) pass. Note: an earlier cross-session
+  comparison read +62 ms — stale baseline; Whisper latency and even
+  output bounce between sessions, so guardrail comparisons must be
+  same-session pairs. Recorded here as method, not just result.
+
+**What I could not verify.**
+- **Guardrail 2 (injection) is unmeasured** — the three control clips
+  are scripted (`control-1..3`, sound-alike traps: sigma/figure→Figma,
+  canal→Kunal, mirror→Meera) but the user has not recorded them. The
+  harness prints NO CONTROL CLIPS RECORDED until they exist.
+- **The name wins can't fully reproduce yet**: Contacts is not granted
+  on this machine and the box is empty, so the production glossary is
+  apps-only. The full acceptance (names in the glossary) needs the
+  user to grant Contacts via the WhatsApp flow or type names in the
+  box.
+- **The local WhisperKit arm sends no hint** — a recorded deviation
+  from design decision 4, parked in BACKLOG.md with its unpark
+  condition.
+
+**Housekeeping for the record:** commit `e4f8636` (Opus's WhatsApp
+build) swept in the then-uncommitted first half of these bias files —
+two agents, one working tree. Nothing is wrong with the code; the
+boundary between the two features' diffs is this entry plus the
+follow-up commit, not the commit graph. Coordination rule going
+forward: commit before the other agent does, or tell the user a commit
+is pending.
+
+**Verification suggestions for Opus:** run the suite line from
+CLAUDE.md; `--dump-config | python3 -c "...biasGlossary..."` and check
+the glossary is sane on sight (no system junk, ~tens of entries); one
+live dictation containing "Figma" or "WhatsApp" and confirm the raw
+transcript hears it; kill the network mid-launch if you want to see
+fail-open. Guardrail 2 runs once the user records the control clips:
+`python3 eval/transcription/run.py --model whisper-large-v3 --bias app`.

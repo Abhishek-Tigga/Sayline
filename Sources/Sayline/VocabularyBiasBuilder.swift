@@ -46,7 +46,7 @@ enum VocabularyBiasBuilder {
         let glossary = VocabularyBias.glossary(
             myWords: myWords,
             contactFirstNames: contactFirstNames(),
-            appNames: InstalledAppCatalog.allNames,
+            appNames: InstalledAppCatalog.biasCandidateNames,
             historyText: historyText,
             isKnownWord: { knownWords.isEmpty ? false : knownWords.contains($0) })
 

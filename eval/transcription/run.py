@@ -20,7 +20,7 @@ Scored on two numbers, deliberately:
                    what actually costs the user something
 """
 
-import argparse, json, statistics, sys, time
+import argparse, json, statistics, subprocess, sys, time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -172,9 +172,34 @@ def transcribe(provider, model, key, clip, bias=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model")
-    ap.add_argument("--bias", action="store_true",
-                    help="send the simulated per-user vocabulary list as the Whisper prompt")
+    ap.add_argument("--bias", nargs="?", const="simulated",
+                    choices=["simulated", "app"],
+                    help="send a vocabulary hint: 'simulated' is the fixed list above; "
+                         "'app' reads the production glossary from the built binary "
+                         "(the acceptance mode — build first, always)")
     args = ap.parse_args()
+
+    bias_text = None
+    if args.bias == "simulated":
+        bias_text = "Glossary: " + SIMULATED_BIAS
+    elif args.bias == "app":
+        apps = sorted(Path.home().glob(
+            "Library/Developer/Xcode/DerivedData/Sayline-*/Build/Products/Debug/Sayline.app"),
+            key=lambda p: p.stat().st_mtime, reverse=True)
+        if not apps:
+            sys.exit("No built Sayline.app — build first, the glossary comes from the binary.")
+        out = subprocess.run([str(apps[0] / "Contents/MacOS/Sayline"), "--dump-config"],
+                             capture_output=True, text=True)
+        if out.returncode != 0:
+            sys.exit(f"--dump-config failed: {out.stderr[:300]}")
+        config = json.loads(out.stdout)
+        if "biasGlossary" not in config:
+            sys.exit("binary is older than this harness — no 'biasGlossary' in --dump-config")
+        bias_text = config["biasGlossary"]
+        if not bias_text:
+            sys.exit("production glossary is empty — nothing to measure. "
+                     "Add words in Settings or grant Contacts, then rerun.")
+        print(f"production glossary ({len(bias_text)} chars): {bias_text[:120]}…\n")
 
     script = {line["id"]: line["text"] for line in json.loads(SCRIPT.read_text())}
     clips = {p.stem: p for p in sorted(CLIPS.glob("*.wav"))}
@@ -191,8 +216,16 @@ def main():
     for label, provider, model in CANDIDATES:
         if args.model and args.model != model:
             continue
-        if args.bias:
-            label += " + bias"
+        if bias_text:
+            label += f" + bias ({args.bias})"
+        # Guardrail 2 (DESIGN-vocabulary-biasing.md): on clips that
+        # contain none of the bias words, no bias word may appear in the
+        # transcript. The hint must help hearing, never invent it.
+        bias_words = set()
+        if bias_text:
+            bias_words = {w.strip().lower()
+                          for w in bias_text.split(":", 1)[-1].split(",") if w.strip()}
+        injections = 0
         print(f"\n=== {label} ===")
         wers, latencies, hits, total_terms, errors = [], [], 0, 0, 0
         for clip_id, clip in clips.items():
@@ -200,7 +233,7 @@ def main():
                 continue
             try:
                 heard, ms = transcribe(provider, model, keys[provider], clip,
-                                       bias=SIMULATED_BIAS if args.bias else None)
+                                       bias=bias_text)
             except Exception as exc:
                 print(f"  {clip_id}: FAILED — {str(exc)[:90]}")
                 errors += 1
@@ -214,6 +247,11 @@ def main():
             hits += got
             total_terms += len(terms)
             flag = "" if got == len(terms) else f"  missed: {[t for t in terms if t not in words]}"
+            if clip_id.startswith("control") and bias_words:
+                injected = sorted(bias_words & words)
+                if injected:
+                    injections += len(injected)
+                    flag += f"  INJECTED: {injected}"
             print(f"  {clip_id:<11} WER {score:5.1f}%  {ms:5.0f}ms{flag}")
             if score > 0:
                 print(f"              heard: {heard[:100]}")
@@ -221,6 +259,15 @@ def main():
         if errors and not wers:
             print(f"  ABORTED — every request failed")
             continue
+        if bias_words:
+            controls = [c for c in clips if c.startswith("control")]
+            if controls:
+                print(f"  injection guardrail: {injections} bias word(s) invented "
+                      f"across {len(controls)} control clip(s)"
+                      + ("  <-- GUARDRAIL BROKEN" if injections else " — clean"))
+            else:
+                print("  injection guardrail: NO CONTROL CLIPS RECORDED — "
+                      "guardrail 2 unmeasured (see DESIGN-vocabulary-biasing.md)")
         rows.append({
             "label": label, "wer": statistics.mean(wers) if wers else 0,
             "key": hits / total_terms * 100 if total_terms else 0,
