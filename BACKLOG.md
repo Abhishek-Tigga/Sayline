@@ -740,6 +740,22 @@ and [CHANGELOG.md](CHANGELOG.md).
 
 ## Unresolved from testing
 
+- **Router drops trailing actions in compound commands (2026-08-14).**
+  "Open Safari then open WhatsApp then close both" → the model emitted
+  only the two opens; no close actions were planned at all. The
+  executor did its job — the loss was at routing. "Both" needs the
+  model to resolve a reference, and open-then-close reads as a
+  contradiction models quietly "fix" by skipping. Parked as an edge
+  case (user's call). Unparks when: it shows up in real use, or the
+  router test set grows a compound-with-anaphora section. Per the
+  standing rule, the test case gets written before any fix.
+- **One agent route took 23 s with nothing logged (2026-08-14,
+  19:35:33→19:35:56).** Normal is ~2 s. Either the API was slow or
+  something retried silently; the log cannot tell, which is the actual
+  defect — a stall that long should say something. Cheap fix when
+  touched next: a log line (and maybe the notice box) once routing
+  passes ~5 s. Parked with the above (user's call).
+
 - **E2 regression (voice commands) — root cause not confirmed.** During
   the agent-mode test pass, "scratch that" failed to undo once. Likely
   explanation is the AX-insertion undo limitation above resurfacing
