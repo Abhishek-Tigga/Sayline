@@ -249,8 +249,12 @@ private struct SpeechBackBox: View {
     /// The widest the box may get, padding included. It hugs below this —
     /// see `textWidth(_:horizontalPadding:)`.
     static let maxWidth: CGFloat = 288
-    static let fontSize: CGFloat = 12
-    static let lineHeight: CGFloat = 15
+    /// 14, as the Figma specifies. It was 12, which read as too small in
+    /// place. Line height moves with it — the measurement divides by this
+    /// to get a line count, and line count picks the radius and padding,
+    /// so the two cannot be set independently.
+    static let fontSize: CGFloat = 14
+    static let lineHeight: CGFloat = 18
     /// Five, per node 34:1377 — the rules for radius and padding are
     /// defined line by line and stop there. Past five the box stops
     /// growing and the text is trimmed from the front, keeping the end,
@@ -329,8 +333,14 @@ private struct SpeechBackBox: View {
     /// were not updated, and the user gave the arithmetic explicitly and
     /// most recently. Recorded in DESIGN-pill-ui.md.
     static func metrics(for text: String) -> Metrics {
-        let lines = min(max(resolvedLineCount(text), 1), maxLines)
-        let step = CGFloat(lines - 1) * 2
+        metrics(lines: resolvedLineCount(text))
+    }
+
+    /// The arithmetic on its own, so a box holding two stacked texts can
+    /// add their line counts rather than measuring them glued together.
+    static func metrics(lines: Int) -> Metrics {
+        let clamped = min(max(lines, 1), maxLines)
+        let step = CGFloat(clamped - 1) * 2
         return Metrics(horizontalPadding: 16 + step,
                        verticalPadding: 12 + step,
                        cornerRadius: 8 + step)
@@ -342,10 +352,10 @@ private struct SpeechBackBox: View {
     /// The first pass assumes the one-line padding, then the second uses
     /// whatever padding that answer implies. Capped at `maxLines` so a
     /// long transcript cannot ask for padding the rule does not define.
-    private static func resolvedLineCount(_ text: String) -> Int {
-        let first = lineCount(text, horizontalPadding: 16)
+    static func resolvedLineCount(_ text: String, weight: NSFont.Weight = .regular) -> Int {
+        let first = lineCount(text, horizontalPadding: 16, weight: weight)
         let padding = 16 + CGFloat(min(max(first, 1), maxLines) - 1) * 2
-        return min(lineCount(text, horizontalPadding: padding), maxLines)
+        return min(lineCount(text, horizontalPadding: padding, weight: weight), maxLines)
     }
 
     /// How wide the text actually needs to be, capped at `maxWidth`.
@@ -354,15 +364,16 @@ private struct SpeechBackBox: View {
     /// which is what makes the box hug: short transcripts come back
     /// narrow, long ones saturate at the cap and wrap. Rounded up, because
     /// a fractional shortfall clips the last glyph.
-    static func textWidth(_ text: String, horizontalPadding: CGFloat) -> CGFloat {
+    static func textWidth(_ text: String, horizontalPadding: CGFloat,
+                          weight: NSFont.Weight = .regular) -> CGFloat {
         let available = maxWidth - horizontalPadding * 2
-        let bounds = measured(text, width: available)
-        return min(available, bounds.width.rounded(.up))
+        return min(available, measured(text, width: available, weight: weight).width.rounded(.up))
     }
 
-    private static func lineCount(_ text: String, horizontalPadding: CGFloat) -> Int {
+    private static func lineCount(_ text: String, horizontalPadding: CGFloat,
+                                  weight: NSFont.Weight = .regular) -> Int {
         let available = maxWidth - horizontalPadding * 2
-        return max(1, Int((measured(text, width: available).height / lineHeight).rounded()))
+        return max(1, Int((measured(text, width: available, weight: weight).height / lineHeight).rounded()))
     }
 
     /// The one place text is measured, in the font it is drawn in.
@@ -372,10 +383,9 @@ private struct SpeechBackBox: View {
     /// the app started shipping Inter. Line count selects the padding and
     /// the radius, and now the width too, so a mismeasure picks the wrong
     /// box entirely.
-    private static func measured(_ text: String, width: CGFloat) -> CGRect {
-        let font = NSFont(name: Typeface.familyName, size: fontSize)
-            ?? NSFont.systemFont(ofSize: fontSize)
-        return NSAttributedString(string: text, attributes: [.font: font])
+    private static func measured(_ text: String, width: CGFloat,
+                                 weight: NSFont.Weight = .regular) -> CGRect {
+        NSAttributedString(string: text, attributes: [.font: Typeface.nsFont(fontSize, weight: weight)])
             .boundingRect(with: CGSize(width: width, height: .greatestFiniteMagnitude),
                           options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
@@ -457,29 +467,41 @@ private struct NoticeBox: View {
     let surface: SurfaceStyle
 
     var body: some View {
-        // Metrics come from everything in the box, not just the headline —
-        // a short answer with a long detail line is a tall box, and the
-        // rules are defined on how tall it ends up.
-        let all = [text, detail].compactMap { $0 }.joined(separator: " ")
-        let metrics = SpeechBackBox.metrics(for: all)
-        let width = SpeechBackBox.textWidth(all, horizontalPadding: metrics.horizontalPadding)
+        // Each text measured on its own. Joining them first sized the box
+        // to their combined length, which is wider than either — a short
+        // answer with a short footer came out as one long line's worth of
+        // box. Height still adds, because they stack.
+        let lines = SpeechBackBox.resolvedLineCount(text, weight: .semibold)
+            + (detail.map { SpeechBackBox.resolvedLineCount($0) } ?? 0)
+        let metrics = SpeechBackBox.metrics(lines: lines)
+        let width = max(
+            SpeechBackBox.textWidth(text, horizontalPadding: metrics.horizontalPadding,
+                                    weight: .semibold),
+            detail.map { SpeechBackBox.textWidth($0, horizontalPadding: metrics.horizontalPadding) } ?? 0
+        )
 
-        VStack(alignment: .leading, spacing: 0) {
-            SaylineMarker()
+        VStack(alignment: .center, spacing: 0) {
             Text(text)
                 .font(Typeface.ui(SpeechBackBox.fontSize, weight: .semibold))
                 .foregroundStyle(PillStyle.transcript)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let detail {
+                // Centred, and the answer above it is not. The footer names
+                // what the answer is about — a caption to it rather than a
+                // second line of it — and centring is what makes that read
+                // as a different kind of thing at a glance.
                 Text(detail)
                     .font(Typeface.ui(SpeechBackBox.fontSize))
                     .foregroundStyle(PillStyle.transcript)
                     .opacity(0.75)
                     .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 3)
             }
         }
-        .frame(width: width, alignment: .leading)
+        .frame(width: width)
         .padding(.horizontal, metrics.horizontalPadding)
         .padding(.vertical, metrics.verticalPadding)
         .surfaceBackground(surface, cornerRadius: metrics.cornerRadius)

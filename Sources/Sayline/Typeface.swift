@@ -25,6 +25,20 @@ enum Typeface {
         return available
     }()
 
+    /// The AppKit font, for measuring. Must match what `ui` renders —
+    /// measuring in one weight and drawing in another sizes a box too
+    /// narrow for its own text, and it then wraps where it should not.
+    static func nsFont(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        guard isAvailable else { return .systemFont(ofSize: size, weight: weight) }
+        let descriptor = NSFontDescriptor(fontAttributes: [
+            .family: familyName,
+            .traits: [NSFontDescriptor.TraitKey.weight: weight.rawValue],
+        ])
+        return NSFont(descriptor: descriptor, size: size)
+            ?? NSFont(name: familyName, size: size)
+            ?? .systemFont(ofSize: size, weight: weight)
+    }
+
     /// Inter at a size and weight, or the system font if it is missing.
     static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         isAvailable

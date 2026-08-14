@@ -222,10 +222,10 @@ this is the paragraph to come back to.
   earlier in favour of one treatment for both surfaces.
 - The **pill's own dimensions in this file are not authoritative**, per
   the user. It draws 10 × 8 padding; the pill ships 12 × 8.
-- The speech box renders at **12pt**, while the file specifies 14pt Inter
-  Medium. Not raised, so not changed — but font size decides how many
-  lines a transcript takes, and line count now decides radius and padding,
-  so this feeds directly into the rules above.
+- The speech box renders at **14pt**, matching the file. It was 12pt and
+  read as too small in place. Line height moved with it, 15 → 18: the
+  measurement divides by line height to get a line count, and line count
+  picks the radius and padding, so the two cannot be set independently.
 
 ## The border beam
 
@@ -287,7 +287,15 @@ allowed.
 Metrics are computed from the headline **and** the detail line together,
 since the rules are defined on how tall the box ends up.
 
-**Still carrying the Sayline marker**, which the speech box does not have.
-It is the only thing distinguishing "Sayline is telling you something"
-from "this is what you said" — worth a deliberate decision rather than
-dropping it for symmetry.
+The Sayline marker is **removed** (2026-08-14). An answer and a transcript
+now look the same; they are told apart by what they say and by the fact
+that one follows the other.
+
+The box has three parts and only two are content: the answer, in semibold,
+leading-aligned; and an optional footer naming what the answer is about —
+"Macintosh HD" under a storage figure — **centred**, at 75% opacity. The
+footer is a caption to the answer rather than a second line of it, and
+centring is what makes that read at a glance.
+
+Width is the wider of the two lines measured separately. Measuring them
+joined sized the box to their combined length, which is wider than either.
