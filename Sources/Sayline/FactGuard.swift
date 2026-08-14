@@ -1,4 +1,5 @@
 import Foundation
+import NaturalLanguage
 
 /// The deterministic half of work mode's safety contract.
 ///
@@ -223,7 +224,15 @@ enum FactGuard {
 
     // MARK: - Verification
 
-    static func verify(raw facts: FactSet, rewrite: String) -> [Violation] {
+    /// Words an email shell may add: "Hi <name>," and "Best,\n<name>".
+    ///
+    /// Twelve is deliberately generous — the shell is four to six words,
+    /// and a ceiling that a compliant email can graze is a ceiling that
+    /// will refuse good rewrites for the sake of arithmetic.
+    static let emailShellAllowance = 12
+
+    static func verify(raw facts: FactSet, rewrite: String,
+                       context: AppContext = .general) -> [Violation] {
         let words = tokenize(rewrite)
         let present = numbers(in: words)
         var violations: [Violation] = []
@@ -301,8 +310,9 @@ enum FactGuard {
 
     /// Full check including invention, which needs the original text
     /// rather than only the extracted facts.
-    static func verify(raw: String, rewrite: String) -> [Violation] {
-        var violations = verify(raw: extract(from: raw), rewrite: rewrite)
+    static func verify(raw: String, rewrite: String,
+                       context: AppContext = .general) -> [Violation] {
+        var violations = verify(raw: extract(from: raw), rewrite: rewrite, context: context)
 
         // The inverse check, and the more dangerous half. A name the model
         // introduced is a person put in the user's mouth; a dropped name
@@ -341,15 +351,28 @@ enum FactGuard {
             violations.append(.inventedUnit(unit))
         }
 
-        // Voice 2, rule 5a — the length ceiling.
+        // Voice 2, rule 5a — the length ceiling. Reworked 2026-08-14.
         //
-        // Under about ten words a rewrite cannot meaningfully compress
-        // ("push it to Tuesday" is already the sentence), so the ceiling
-        // is "no longer than" rather than "strictly shorter". Above that,
-        // work mode's whole job is to shorten.
+        // **Was:** strictly shorter above nine words. **Now:** never
+        // longer, at any length, plus an allowance for an email shell.
+        //
+        // Two pieces of live evidence killed the old rule. Taste round 1:
+        // the rewrite deleted the opener in roughly half of eighteen cases
+        // — "quick status on X", "heads up", "hi Nikhil" — and the leading
+        // theory is that a strictly-shorter budget teaches the model to
+        // make room by chopping the head. And in S2 the guard refused a
+        // corrective RETRY for "26 words in, 26 out": an equal-length,
+        // possibly-good rescue thrown away because the rule demanded one
+        // word fewer. Equal length is not padding.
+        //
+        // The email allowance exists because the approved email shell —
+        // greeting plus "Best, [name]" — ADDS words by design. Without it
+        // every compliant email would violate the ceiling, and the
+        // decapitation this change exists to stop would come back wearing
+        // a different hat.
         let spokenWords = tokenize(raw).count
         let writtenWords = tokenize(rewrite).count
-        let ceiling = spokenWords < 10 ? spokenWords : spokenWords - 1
+        let ceiling = spokenWords + (context == .email ? emailShellAllowance : 0)
         if writtenWords > ceiling {
             violations.append(.longerThanSpeech(said: spokenWords, wrote: writtenWords))
         }
@@ -660,6 +683,37 @@ enum FactGuard {
         .union(contractions)
         .union(modals)
         .union(discourseWords)
+        .union(imperativeVerbs)
+        .union(genericPlaceNouns)
+
+    /// Verbs that open a dictated sentence and get capitalized for it.
+    ///
+    /// The belt behind `NLTagger`. Measured 2026-08-14: the tagger tags
+    /// "Tell" in "Tell Rohit the deploy is done" as a personal name and
+    /// does NOT tag it as a verb, so the lexical-class check misses it.
+    /// The tagger is right that a name is nearby and wrong about which
+    /// word; this list settles the argument for the words people actually
+    /// start dictating with.
+    private static let imperativeVerbs: Set<String> = [
+        "tell", "ask", "make", "see", "push", "send", "check", "keep",
+        "give", "take", "move", "call", "email", "ping", "remind", "note",
+        "add", "remove", "update", "fix", "ship", "try", "use", "get",
+        "put", "run", "look", "think", "know", "say", "said", "want",
+        "need", "start", "stop", "hold", "wait", "follow", "review",
+        "share", "draft", "write", "read", "book", "schedule", "cancel",
+    ]
+
+    /// Common nouns that follow a real name in a place or building name.
+    ///
+    /// "Sterling Essentia Apartment" pins the first two words correctly
+    /// and would pin the third from its mid-sentence capital. A rewrite
+    /// saying "the Sterling Essentia" is faithful, so pinning "apartment"
+    /// buys a false violation and nothing else.
+    private static let genericPlaceNouns: Set<String> = [
+        "apartment", "apartments", "building", "tower", "towers", "house",
+        "street", "road", "avenue", "lane", "block", "office", "room",
+        "floor", "campus", "park", "plaza", "centre", "center",
+    ]
 
     /// Articles, pronouns, prepositions, conjunctions — the words that
     /// open sentences and mean nothing on their own.
@@ -771,59 +825,128 @@ enum FactGuard {
         return out
     }
 
-    /// Capitalized words that are probably names.
+    /// Words that are actually names, per Apple's on-device tagger.
     ///
-    /// Deliberately ignores the first word of the text and anything after
-    /// a full stop — "Tuesday works" should not make "Tuesday" a name on
-    /// top of being a day, and "The meeting" should not make "The" one.
+    /// **This replaces a capitalization heuristic that live data
+    /// convicted.** The old rule took any capitalized word not on a
+    /// stopword list. Dictation capitalizes the start of every sentence,
+    /// so on 2026-08-14 the guard pinned "See", "Make", "First", "After",
+    /// "Whether" and — in "Sterling Essentia Apartment" — "Apartment" as
+    /// people. Each phantom forced a corrective retry, a second full API
+    /// round trip. Names were the largest single driver of a ~50% retry
+    /// rate and roughly doubled work mode's latency.
+    ///
+    /// The old comment argued a false name was cheap: "costs one fallback
+    /// — the user gets their exact words". Measurement disagreed. It cost
+    /// a round trip on more than half of all work dictations.
+    ///
+    /// **A deliberate bend in this file's stated virtue.** FactGuard's
+    /// value has been that it is dumb, deterministic code rather than a
+    /// second model. `NLTagger` is not dumb code — it is a trained
+    /// on-device tagger. It is still deterministic for a given input, runs
+    /// in milliseconds, needs no network, and cannot invent text. The
+    /// trade was made because a capitalization rule cannot tell "Make use
+    /// of this" from "Priya needs 15 units", and pretending otherwise cost
+    /// the user latency on every second dictation. Flagged rather than
+    /// slipped in.
+    ///
+    /// The stopword list stays as a belt: the tagger occasionally marks a
+    /// sentence-initial verb as a personal name, and `notNames` catches
+    /// what it should never have been. Ordinals join it unconditionally —
+    /// they were evicted from number-pinning and landed here instead,
+    /// which is whack-a-mole rather than a fix.
     private static func properNouns(in text: String) -> Set<String> {
-        // Capitalization plus a stopword list, and deliberately NOT
-        // sentence position.
-        //
-        // The first draft skipped the first word of each sentence, which
-        // rejects "The" correctly and "Sarah" wrongly — and names start
-        // sentences constantly ("Priya needs 15 units"). One rule, three
-        // failing cases. The stopword list already rejects the words that
-        // get capitalized for grammatical reasons; position added nothing
-        // but the bug.
-        //
-        // Errs toward calling something a name. A false name costs one
-        // fallback — the user gets their exact words — while a missed name
-        // means the guard silently stops protecting it, which is the
-        // direction that actually hurts.
         var found: Set<String> = []
-        for rawWord in text.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" }) {
-            // The possessive goes before anything else. "Mira's team"
-            // pinned the name as "miras", which no rewrite saying "Mira"
-            // could ever satisfy — a guaranteed false positive on a
-            // faithful rewrite.
-            var word = rawWord.trimmingCharacters(
-                in: CharacterSet(charactersIn: ",;:()[]\"'.!?"))
-            for possessive in ["'s", "\u{2019}s"] where word.lowercased().hasSuffix(possessive) {
-                word = String(word.dropLast(2))
+        let full = text.startIndex..<text.endIndex
+        let options: NLTagger.Options = [.omitPunctuation, .omitWhitespace, .joinNames]
+
+        // Signal 1 — the tagger, minus anything it also calls a verb.
+        //
+        // Measured 2026-08-14: the tagger tags "Tell" in "Tell Rohit the
+        // deploy is done" as a personal name. It is right that a name is
+        // near there and wrong about which word. Checking the lexical
+        // class separates the two cases the old heuristic could not:
+        // "Tell" is a verb at a sentence start, "Priya" in "Priya needs 15
+        // units" is not.
+        let names = NLTagger(tagSchemes: [.nameType])
+        names.string = text
+        let classes = NLTagger(tagSchemes: [.lexicalClass])
+        classes.string = text
+        names.enumerateTags(in: full, unit: .word, scheme: .nameType, options: options) { tag, range in
+            guard let tag, tag == .personalName || tag == .placeName
+                    || tag == .organizationName else { return true }
+            let lexical = classes.tag(at: range.lowerBound, unit: .word, scheme: .lexicalClass).0
+            guard lexical != .verb else { return true }
+            // A joined name arrives as one range ("Sterling Essentia"), so
+            // each word is pinned separately — a rewrite may keep the
+            // person and drop the company, and that is still a loss.
+            for word in text[range].split(whereSeparator: { !$0.isLetter && $0 != "'" && $0 != "\u{2019}" }) {
+                found.formUnion(normalizedName(String(word)))
             }
-            guard let first = word.first, first.isUppercase, word.count > 1,
-                  word.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "\u{2019}" })
-            else { continue }
-            // Normalized exactly as `tokenize` does, apostrophes and all.
-            // They disagreed once: "I'll" was extracted as the name
-            // "i'll" and then looked for as "ill", so a faithful rewrite
-            // was reported as dropping a name. Two normalizations of one
-            // truth is the failure this file's own header warns about.
-            let lower = word.lowercased()
-                .replacingOccurrences(of: "'", with: "")
-                .replacingOccurrences(of: "\u{2019}", with: "")
-            // Calendar words are pinned in their own classes, so they must
-            // not *also* be names — a dropped Friday should report one
-            // violation, not two. They left `notNames` when months became
-            // pinned facts; this is where that exclusion belongs, next to
-            // the reason for it.
-            guard !dayNames.contains(lower), !monthNames.contains(lower) else { continue }
-            guard !notNames.contains(lower), lower.count > 1 else { continue }
-            found.insert(lower)
+            return true
+        }
+
+        // Signal 2 — capitalized words that are NOT starting a sentence.
+        //
+        // The tagger misses real names with dull context: "Priya" in "Ask
+        // Nikhil and Priya" and "Essentia" in "the Sterling Essentia
+        // lease" were both dropped, while their neighbours were caught. A
+        // capital mid-sentence is a strong signal and, crucially, is the
+        // one place the old heuristic was never wrong — dictation
+        // capitalizes sentence STARTS, which is what produced "See",
+        // "Make" and "First". Restricting the rule to mid-sentence keeps
+        // its power and removes its failure mode.
+        //
+        // A missed name is the worse direction: the guard silently stops
+        // protecting it. A phantom costs a round trip, which is what this
+        // whole change is repaying.
+        for sentence in text.split(whereSeparator: { ".!?\n".contains($0) }) {
+            let words = sentence.split(whereSeparator: { $0 == " " || $0 == "\t" })
+            for word in words.dropFirst() where word.first?.isUppercase == true {
+                found.formUnion(normalizedName(String(word)))
+            }
         }
         return found
     }
+
+    /// Trims, strips the possessive, normalizes apostrophes, and applies
+    /// the exclusions. Returns empty when the word is not a name after
+    /// all.
+    ///
+    /// Normalized exactly as `tokenize` does, apostrophes and all. They
+    /// disagreed once: "I'll" was extracted as the name "i'll" and then
+    /// looked for as "ill", so a faithful rewrite was reported as dropping
+    /// a name. Two normalizations of one truth is the failure this file's
+    /// own header warns about.
+    private static func normalizedName(_ raw: String) -> Set<String> {
+        var word = raw.trimmingCharacters(in: CharacterSet(charactersIn: ",;:()[]\"'.!?"))
+        for possessive in ["'s", "\u{2019}s"] where word.lowercased().hasSuffix(possessive) {
+            word = String(word.dropLast(2))
+        }
+        guard word.count > 1,
+              word.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "\u{2019}" })
+        else { return [] }
+        let lower = word.lowercased()
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "\u{2019}", with: "")
+        // Calendar words are pinned in their own classes, so they must not
+        // *also* be names — a dropped Friday should report one violation,
+        // not two.
+        guard !dayNames.contains(lower), !monthNames.contains(lower),
+              !notNames.contains(lower), !ordinalWords.contains(lower),
+              lower.count > 1
+        else { return [] }
+        return [lower]
+    }
+
+    /// Ordinals are never names. They were evicted from number-pinning
+    /// after "first/second/third" were pinned as numbers, and landed in
+    /// name-pinning instead — the same bug wearing a different hat.
+    private static let ordinalWords: Set<String> = [
+        "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+        "eighth", "ninth", "tenth", "eleventh", "twelfth", "last", "next",
+        "final", "former", "latter",
+    ]
 
     // MARK: - Numbers, including the ones people say out loud
 

@@ -1,347 +1,11 @@
 [
   {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-1",
-    "cohort": "real",
-    "raw": "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?",
-    "rewrite": "Rohan can't make Wednesday. Let's move the design review to Friday morning, roughly 11.",
-    "ms": 303.9470830000006
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-2",
-    "cohort": "real",
-    "raw": "Hi, thanks for sending this over. So I went through the dock and honestly, I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. So let's discuss the sync tomorrow before we reply to them.",
-    "rewrite": "I don't think we should commit to the March deadline yet. The backend work is roughly 60% done. Let's discuss the sync tomorrow.",
-    "ms": 231.71345799999978
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-3",
-    "cohort": "real",
-    "raw": "okay so bug i found um when you upload a file bigger than 25 megs the progress bar just goes to like 99 and sits there forever no error nothing so it on chrome didn't check safari yet probably the timeout on the upload",
-    "rewrite": "The upload process freezes at 99% for large files, roughly 25 megs and above, without any error message. This issue is likely due to a timeout on the upload process.",
-    "ms": 273.03845900000033
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-4",
-    "cohort": "real",
-    "raw": "so quick recap from the stand up um ankit is taking the payment flow changes sneha got the dashboard redesign and the analytic migration thing someone should pick up this week because it's been sitting here since like two sprints",
-    "rewrite": "- Ankit is handling payment flow changes.\n- Sneha has the dashboard redesign.\n- The analytic migration needs to be picked up this week.",
-    "ms": 201.5452499999988
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-5",
-    "cohort": "real",
-    "raw": "Can we do the demo on Thursday? Actually, wait, no. Thursday is the all hands. Let's do Monday. Yeah, Monday afternoon works better anyways.",
-    "rewrite": "Monday afternoon.",
-    "ms": 189.0769160000012
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-6",
-    "cohort": "real",
-    "raw": "So update on the onboarding remap. We are at about 70% I'd say. The email verification piece turned out messier than we thought. So realistically end of next week not this week I know that's not ideal.",
-    "rewrite": "We're at 70% on the onboarding remap. The email verification piece is still a challenge. Realistically, we'll be done by the end of next week.",
-    "ms": 229.091833
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-7",
-    "cohort": "real",
-    "raw": "So about the price page, I looked at the new copy and I really don't want to remove the free tier mention. I get why marketing wants it gone but I don't agree. We can keep it until we are actually talk to sale.",
-    "rewrite": "I don't agree with removing the free tier mention from the price page. Marketing wants it gone, but I think we should keep it until we discuss it with sales.",
-    "ms": 263.0247499999996
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-8",
-    "cohort": "real",
-    "raw": "Hey quick one can you approve the vendor invoice when you get a chance it's the one from design well for 45,000 rupees finance needs it cleared before the 30th or it slips to the next month cycle",
-    "rewrite": "Approve the vendor invoice from Design Well for 45,000 rupees. Finance needs it cleared before the 30th to avoid slipping to the next month's cycle.",
-    "ms": 249.68945799999887
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-9",
-    "cohort": "real",
-    "raw": "so i've been going back and forth on this all morning like the user research says people want the export export feature but the numbers from the beta says barely anyone clicked it and building it properly is like three weeks of work so honestly i think we should park it this quarter that's where i have landed",
-    "rewrite": "I think we should park the export export feature this quarter. The user research suggests people want it, but the beta numbers show low engagement. Building it properly would take three weeks of work.",
-    "ms": 264.3222499999993
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "real-10",
-    "cohort": "real",
-    "raw": "okay so for the customer calls with Mira's team um they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245 can you update the invite and also add Karen this time he wasn't on the last one",
-    "rewrite": "Mira's team asked to move it from 430 to 2, but I have a conflict at 2. I told them 245. Update the invite to 245 and add Karen.",
-    "ms": 233.7753340000006
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "made-1",
-    "cohort": "made",
-    "raw": "so the migration slipped again we said March originally but realistically it's April now maybe even May if the vendor stuff isn't sorted",
-    "rewrite": "- Migration is now realistically April.\n- If vendor issues aren't resolved, it may slip to May.",
-    "ms": 212.26433300000025
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "made-2",
-    "cohort": "made",
-    "raw": "the export is coming out at like 400 megs which is way too big for email so we need to compress it or split it into two files",
-    "rewrite": "The export is 400 megs, which is too large for email. We need to compress it or split it into two files.",
-    "ms": 198.43004200000001
-  },
-  {
-    "model": "llama-3.1-8b-instant",
-    "id": "made-3",
-    "cohort": "made",
-    "raw": "can you send it by end of this week not next week because the client review is on the 15th and I don't want to be scrambling",
-    "rewrite": "Send it by end of this week. The client review is on the 15th, so I don't want to be scrambling.",
-    "ms": 210.9930829999982
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-1",
-    "cohort": "real",
-    "raw": "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?",
-    "rewrite": "Rohan can't make Wednesday. We could move the design review to Friday morning, around 11. Doesn't that work for you or is Friday bad?",
-    "ms": 528.5927919999978
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-2",
-    "cohort": "real",
-    "raw": "Hi, thanks for sending this over. So I went through the dock and honestly, I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. So let's discuss the sync tomorrow before we reply to them.",
-    "rewrite": "I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. Let's discuss the sync tomorrow.",
-    "ms": 216.85354200000262
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-3",
-    "cohort": "real",
-    "raw": "okay so bug i found um when you upload a file bigger than 25 megs the progress bar just goes to like 99 and sits there forever no error nothing so it on chrome didn't check safari yet probably the timeout on the upload",
-    "rewrite": "The progress bar gets stuck at 99 when uploading a file bigger than 25 megs, no error message. The issue is likely due to the timeout on the upload.",
-    "ms": 262.546792000002
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-4",
-    "cohort": "real",
-    "raw": "so quick recap from the stand up um ankit is taking the payment flow changes sneha got the dashboard redesign and the analytic migration thing someone should pick up this week because it's been sitting here since like two sprints",
-    "rewrite": "Ankit is taking the payment flow changes, Sneha got the dashboard redesign and the analytic migration. Someone should pick up the analytic migration this week, as it's been sitting for 2 sprints.",
-    "ms": 398.46091600000125
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-5",
-    "cohort": "real",
-    "raw": "Can we do the demo on Thursday? Actually, wait, no. Thursday is the all hands. Let's do Monday. Yeah, Monday afternoon works better anyways.",
-    "rewrite": "We can do the demo on Monday afternoon.",
-    "ms": 277.17549999999846
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-6",
-    "cohort": "real",
-    "raw": "So update on the onboarding remap. We are at about 70% I'd say. The email verification piece turned out messier than we thought. So realistically end of next week not this week I know that's not ideal.",
-    "rewrite": "We're at about 70% on the onboarding remap. The email verification piece isn't done. Realistically, it will be done by the end of next week, not this week.",
-    "ms": 290.8777909999998
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-7",
-    "cohort": "real",
-    "raw": "So about the price page, I looked at the new copy and I really don't want to remove the free tier mention. I get why marketing wants it gone but I don't agree. We can keep it until we are actually talk to sale.",
-    "rewrite": "I don't want to remove the free tier mention from the price page. I get why marketing wants it gone, but I don't agree. We can keep it until we actually talk to sales.",
-    "ms": 378.9945409999973
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-8",
-    "cohort": "real",
-    "raw": "Hey quick one can you approve the vendor invoice when you get a chance it's the one from design well for 45,000 rupees finance needs it cleared before the 30th or it slips to the next month cycle",
-    "rewrite": "Approve the vendor invoice from Design Well for 45,000 rupees. Finance needs it cleared before the 30th or it slips to next month.",
-    "ms": 343.0665420000025
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-9",
-    "cohort": "real",
-    "raw": "so i've been going back and forth on this all morning like the user research says people want the export export feature but the numbers from the beta says barely anyone clicked it and building it properly is like three weeks of work so honestly i think we should park it this quarter that's where i have landed",
-    "rewrite": "The user research says people want the export feature, but the beta numbers show barely anyone clicked it. Building it properly is roughly 3 weeks of work. Honestly, I think we should park it this quarter.",
-    "ms": 267.1052080000003
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "real-10",
-    "cohort": "real",
-    "raw": "okay so for the customer calls with Mira's team um they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245 can you update the invite and also add Karen this time he wasn't on the last one",
-    "rewrite": "I have a conflict at 2, so I told them 245. Can you update the invite and add Karen?",
-    "ms": 342.44008399999973
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-1",
-    "cohort": "made",
-    "raw": "so the migration slipped again we said March originally but realistically it's April now maybe even May if the vendor stuff isn't sorted",
-    "rewrite": "The migration slipped again. We said March originally, but realistically it's April now, maybe even May if the vendor stuff isn't sorted.",
-    "ms": 315.5460410000011
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-2",
-    "cohort": "made",
-    "raw": "the export is coming out at like 400 megs which is way too big for email so we need to compress it or split it into two files",
-    "rewrite": "The export is coming out at 400 megs, which is too big for email. We need to compress it or split it into two files.",
-    "ms": 331.4602089999994
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-3",
-    "cohort": "made",
-    "raw": "can you send it by end of this week not next week because the client review is on the 15th and I don't want to be scrambling",
-    "rewrite": "Send it by the end of this week, not next week, because the client review is on the 15th and I don't want to be scrambling.",
-    "ms": 239.94637500000238
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-4",
-    "cohort": "made",
-    "raw": "I'm not saying we shouldn't do it I'm saying we shouldn't do it now there's a difference and I think the team is conflating the two",
-    "rewrite": "I don't think we should do it now. There's a difference between not doing it and not doing it now. The team is conflating the two.",
-    "ms": 242.2474579999978
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-5",
-    "cohort": "made",
-    "raw": "Priya and Arjun are both out next week so the release has to wait unless Meera can cover the QA piece but she's already stretched",
-    "rewrite": "Priya and Arjun are out next week, so the release has to wait unless Meera can cover the QA piece, but she's already stretched.",
-    "ms": 221.62958300000213
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-6",
-    "cohort": "made",
-    "raw": "let's target the 12th no sorry the 14th the 12th is a holiday so nothing will get signed off anyway",
-    "rewrite": "We're targeting the 14th, the 12th is a holiday so nothing will get signed off anyway.",
-    "ms": 244.62679100000173
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-7",
-    "cohort": "made",
-    "raw": "someone needs to own the analytics migration it's been unassigned for two sprints now and it keeps slipping",
-    "rewrite": "Someone needs to own the analytics migration. It's been unassigned for 2 sprints and keeps slipping.",
-    "ms": 210.31583299999923
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-8",
-    "cohort": "made",
-    "raw": "the quote came in at 1,20,000 rupees which is over budget by about 20 percent so I want to push back before we sign",
-    "rewrite": "The quote is 1,20,000 rupees, over budget by about 20 percent, so I want to push back before we sign.",
-    "ms": 345.7129170000002
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-9",
-    "cohort": "made",
-    "raw": "the standup moved to 9:45 from 10 so we get the room before the sales team takes it",
-    "rewrite": "The standup moved from 10 to 9:45, so we get the room before the sales team takes it.",
-    "ms": 468.8209999999984
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-10",
-    "cohort": "made",
-    "raw": "conversion dropped from 4.2 percent to 3.1 percent after the redesign which is not what we expected at all",
-    "rewrite": "Conversion dropped from 4.2 percent to 3.1 percent after the redesign, which isn't what we expected.",
-    "ms": 234.8078340000015
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-11",
-    "cohort": "made",
-    "raw": "quick update on the pilot we're at 80 percent done, Rohan finished the backend on Tuesday, the front end is maybe two more days, so end of next week for the demo",
-    "rewrite": "We're 80 percent done with the pilot. Rohan finished the backend on Tuesday. The front end will take about 2 more days, so we're looking at the end of next week for the demo.",
-    "ms": 320.6194590000031
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-12",
-    "cohort": "made",
-    "raw": "honestly I don't love the new onboarding copy it feels condescending but I don't want to block the launch over it so let's ship and revisit",
-    "rewrite": "I don't love the new onboarding copy, it feels condescending. I don't want to block the launch, so let's ship and revisit.",
-    "ms": 248.05083300000064
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-13",
-    "cohort": "made",
-    "raw": "do we still need the Friday sync now that we have the async updates? feels like a lot of meetings for not much",
-    "rewrite": "We don't need the Friday sync now that we have async updates. It feels like a lot of meetings for not much.",
-    "ms": 217.33054199999913
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-14",
-    "cohort": "made",
-    "raw": "found something weird if you refresh during checkout the cart empties completely no warning no recovery just gone I lost my test order twice",
-    "rewrite": "If you refresh during checkout, the cart empties completely with no warning and no recovery. I lost my test order twice.",
-    "ms": 317.56112500000097
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "made-15",
-    "cohort": "made",
-    "raw": "three things blocking us first the API keys aren't provisioned second legal hasn't signed off on the terms and third we still don't have staging access",
-    "rewrite": "- API keys aren't provisioned\n- legal hasn't signed off on the terms\n- we still don't have staging access",
-    "ms": 315.8537909999985
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "style-1",
-    "cohort": "made",
-    "raw": "let us do Friday actually wait Friday is the offsite let's do it on Thursday",
-    "rewrite": "Let's do it on Thursday.",
-    "ms": 217.2753329999999
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "style-2",
-    "cohort": "made",
-    "raw": "I don't agree with the new pricing copy I get why marketing wants it but I don't want to remove the free tier mention",
-    "rewrite": "I don't agree with the new pricing copy. I get why marketing wants it, but I don't want to remove the free tier mention.",
-    "ms": 317.493209000002
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "style-3",
-    "cohort": "made",
-    "raw": "there are three reasons. first the quote. second the timeline. third nobody asked for it",
-    "rewrite": "- the quote\n- the timeline\n- nobody asked for it",
-    "ms": 176.24550000000028
-  },
-  {
-    "model": "llama-3.3-70b-versatile",
-    "id": "style-4",
-    "cohort": "made",
-    "raw": "the backend isn't done I'd say sixty percent at best so I don't think we should commit to March yet",
-    "rewrite": "The backend isn't done, I'd say 60 percent at best. I don't think we should commit to March yet.",
-    "ms": 339.1478339999985
-  },
-  {
     "model": "gpt-4o-mini",
     "id": "real-1",
     "cohort": "real",
     "raw": "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?",
     "rewrite": "Rohan can't make Wednesday anymore. Let's move the design review to Friday morning around 11. Does that work for you, or is Friday bad?",
-    "ms": 1797.3467079999991
+    "ms": 1301.5055830000008
   },
   {
     "model": "gpt-4o-mini",
@@ -349,23 +13,23 @@
     "cohort": "real",
     "raw": "Hi, thanks for sending this over. So I went through the dock and honestly, I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. So let's discuss the sync tomorrow before we reply to them.",
     "rewrite": "I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. Let's discuss the sync tomorrow before we reply to them.",
-    "ms": 1201.2782920000013
+    "ms": 1142.2415830000004
   },
   {
     "model": "gpt-4o-mini",
     "id": "real-3",
     "cohort": "real",
     "raw": "okay so bug i found um when you upload a file bigger than 25 megs the progress bar just goes to like 99 and sits there forever no error nothing so it on chrome didn't check safari yet probably the timeout on the upload",
-    "rewrite": "When you upload a file bigger than 25 megs, the progress bar goes to 99 and stays there without an error. This happens on Chrome; I haven't checked Safari yet. It's probably a timeout issue on the upload.",
-    "ms": 1227.2352919999996
+    "rewrite": "When you upload a file bigger than 25 megs, the progress bar goes to 99 and stays there without any error. This happens on Chrome; I haven't checked Safari yet. It's probably a timeout issue on the upload.",
+    "ms": 1177.2504579999995
   },
   {
     "model": "gpt-4o-mini",
     "id": "real-4",
     "cohort": "real",
     "raw": "so quick recap from the stand up um ankit is taking the payment flow changes sneha got the dashboard redesign and the analytic migration thing someone should pick up this week because it's been sitting here since like two sprints",
-    "rewrite": "- Ankit is taking the payment flow changes.  \n- Sneha got the dashboard redesign.  \n- Someone should pick up the analytic migration this week because it's been sitting here for two sprints.",
-    "ms": 1090.3729170000033
+    "rewrite": "- Ankit is taking the payment flow changes.  \n- Sneha got the dashboard redesign.  \n- Someone should pick up the analytic migration this week because it's been sitting here since two sprints.",
+    "ms": 1019.4550000000006
   },
   {
     "model": "gpt-4o-mini",
@@ -373,7 +37,7 @@
     "cohort": "real",
     "raw": "Can we do the demo on Thursday? Actually, wait, no. Thursday is the all hands. Let's do Monday. Yeah, Monday afternoon works better anyways.",
     "rewrite": "Let's do the demo on Monday afternoon.",
-    "ms": 872.3369169999984
+    "ms": 710.0605830000006
   },
   {
     "model": "gpt-4o-mini",
@@ -381,15 +45,15 @@
     "cohort": "real",
     "raw": "So update on the onboarding remap. We are at about 70% I'd say. The email verification piece turned out messier than we thought. So realistically end of next week not this week I know that's not ideal.",
     "rewrite": "We're at about 70%. The email verification piece turned out messier than we thought. Realistically, it will be done by the end of next week, not this week. I know that's not ideal.",
-    "ms": 2056.592332999998
+    "ms": 1052.4418329999996
   },
   {
     "model": "gpt-4o-mini",
     "id": "real-7",
     "cohort": "real",
     "raw": "So about the price page, I looked at the new copy and I really don't want to remove the free tier mention. I get why marketing wants it gone but I don't agree. We can keep it until we are actually talk to sale.",
-    "rewrite": "I really don't want to remove the free tier mention. I get why marketing wants it gone, but I don't agree. We can keep it until we actually talk to sales.",
-    "ms": 989.0970840000009
+    "rewrite": "I really don't want to remove the free tier mention from the price page. I get why marketing wants it gone, but I don't agree. We can keep it until we actually talk to sales.",
+    "ms": 1168.9075419999995
   },
   {
     "model": "gpt-4o-mini",
@@ -397,7 +61,7 @@
     "cohort": "real",
     "raw": "Hey quick one can you approve the vendor invoice when you get a chance it's the one from design well for 45,000 rupees finance needs it cleared before the 30th or it slips to the next month cycle",
     "rewrite": "Please approve the vendor invoice from Design Well for 45,000 rupees. Finance needs it cleared before the 30th, or it slips to the next month cycle.",
-    "ms": 1005.3845410000051
+    "ms": 913.6647920000023
   },
   {
     "model": "gpt-4o-mini",
@@ -405,7 +69,7 @@
     "cohort": "real",
     "raw": "so i've been going back and forth on this all morning like the user research says people want the export export feature but the numbers from the beta says barely anyone clicked it and building it properly is like three weeks of work so honestly i think we should park it this quarter that's where i have landed",
     "rewrite": "We should park the export feature this quarter. User research indicates demand, but beta numbers show barely anyone clicked it, and building it properly is about three weeks of work.",
-    "ms": 1126.142833000003
+    "ms": 915.7971249999974
   },
   {
     "model": "gpt-4o-mini",
@@ -413,7 +77,7 @@
     "cohort": "real",
     "raw": "okay so for the customer calls with Mira's team um they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245 can you update the invite and also add Karen this time he wasn't on the last one",
     "rewrite": "Update the invite to move the customer calls with Mira's team from 430 to 245 and add Karen, who wasn't on the last one.",
-    "ms": 5416.310624999995
+    "ms": 968.2863750000017
   },
   {
     "model": "gpt-4o-mini",
@@ -421,7 +85,7 @@
     "cohort": "made",
     "raw": "so the migration slipped again we said March originally but realistically it's April now maybe even May if the vendor stuff isn't sorted",
     "rewrite": "The migration slipped again; we said March originally, but realistically it's April now, maybe even May if the vendor stuff isn't sorted.",
-    "ms": 844.521708000002
+    "ms": 969.7241669999989
   },
   {
     "model": "gpt-4o-mini",
@@ -429,7 +93,7 @@
     "cohort": "made",
     "raw": "the export is coming out at like 400 megs which is way too big for email so we need to compress it or split it into two files",
     "rewrite": "The export is 400 megs, which is too big for email, so we need to compress it or split it into two files.",
-    "ms": 956.3802090000024
+    "ms": 1066.8687080000013
   },
   {
     "model": "gpt-4o-mini",
@@ -437,7 +101,7 @@
     "cohort": "made",
     "raw": "can you send it by end of this week not next week because the client review is on the 15th and I don't want to be scrambling",
     "rewrite": "Send it by the end of this week, not next week, because the client review is on the 15th and I don't want to be scrambling.",
-    "ms": 1107.7605420000011
+    "ms": 1129.8365419999996
   },
   {
     "model": "gpt-4o-mini",
@@ -445,15 +109,15 @@
     "cohort": "made",
     "raw": "I'm not saying we shouldn't do it I'm saying we shouldn't do it now there's a difference and I think the team is conflating the two",
     "rewrite": "I'm saying we shouldn't do it now. There's a difference, and I think the team is conflating the two.",
-    "ms": 1028.140666000006
+    "ms": 947.0514160000007
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-5",
     "cohort": "made",
     "raw": "Priya and Arjun are both out next week so the release has to wait unless Meera can cover the QA piece but she's already stretched",
-    "rewrite": "The release has to wait next week because Priya and Arjun are both out, unless Meera can cover the QA piece, but she's already stretched.",
-    "ms": 854.6391249999986
+    "rewrite": "The release has to wait next week unless Meera can cover the QA piece, but she's already stretched.",
+    "ms": 871.5547080000015
   },
   {
     "model": "gpt-4o-mini",
@@ -461,7 +125,7 @@
     "cohort": "made",
     "raw": "let's target the 12th no sorry the 14th the 12th is a holiday so nothing will get signed off anyway",
     "rewrite": "Let's target the 14th. The 12th is a holiday, so nothing will get signed off anyway.",
-    "ms": 786.4592920000035
+    "ms": 927.6788340000018
   },
   {
     "model": "gpt-4o-mini",
@@ -469,7 +133,7 @@
     "cohort": "made",
     "raw": "someone needs to own the analytics migration it's been unassigned for two sprints now and it keeps slipping",
     "rewrite": "Someone needs to own the analytics migration. It's been unassigned for two sprints and keeps slipping.",
-    "ms": 746.5995419999985
+    "ms": 862.1600419999993
   },
   {
     "model": "gpt-4o-mini",
@@ -477,7 +141,7 @@
     "cohort": "made",
     "raw": "the quote came in at 1,20,000 rupees which is over budget by about 20 percent so I want to push back before we sign",
     "rewrite": "The quote came in at 120,000 rupees, which is over budget by about 20 percent, so I want to push back before we sign.",
-    "ms": 871.0454580000046
+    "ms": 955.4539579999996
   },
   {
     "model": "gpt-4o-mini",
@@ -485,7 +149,7 @@
     "cohort": "made",
     "raw": "the standup moved to 9:45 from 10 so we get the room before the sales team takes it",
     "rewrite": "The standup moved to 9:45 from 10 so we get the room before the sales team.",
-    "ms": 1024.6839160000009
+    "ms": 958.9057919999995
   },
   {
     "model": "gpt-4o-mini",
@@ -493,15 +157,15 @@
     "cohort": "made",
     "raw": "conversion dropped from 4.2 percent to 3.1 percent after the redesign which is not what we expected at all",
     "rewrite": "Conversion dropped from 4.2 percent to 3.1 percent after the redesign, which isn't what we expected at all.",
-    "ms": 922.8544579999962
+    "ms": 871.3354169999974
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-11",
     "cohort": "made",
     "raw": "quick update on the pilot we're at 80 percent done, Rohan finished the backend on Tuesday, the front end is maybe two more days, so end of next week for the demo",
-    "rewrite": "We're at 80 percent done with the pilot. Rohan finished the backend on Tuesday, and the front end needs maybe two more days, so the demo is set for the end of next week.",
-    "ms": 921.8084170000011
+    "rewrite": "We're at 80 percent done with the pilot. Rohan finished the backend on Tuesday. The front end is maybe two more days, so the demo is set for the end of next week.",
+    "ms": 887.0575000000009
   },
   {
     "model": "gpt-4o-mini",
@@ -509,23 +173,23 @@
     "cohort": "made",
     "raw": "honestly I don't love the new onboarding copy it feels condescending but I don't want to block the launch over it so let's ship and revisit",
     "rewrite": "I don't love the new onboarding copy; it feels condescending. I don't want to block the launch over it, so let's ship and revisit.",
-    "ms": 873.8752909999973
+    "ms": 1032.9620410000048
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-13",
     "cohort": "made",
     "raw": "do we still need the Friday sync now that we have the async updates? feels like a lot of meetings for not much",
-    "rewrite": "We might not need the Friday sync now that we have the async updates. It feels like a lot of meetings for not much.",
-    "ms": 838.8657080000002
+    "rewrite": "Do we still need the Friday sync now that we have the async updates? It feels like a lot of meetings for not much.",
+    "ms": 1050.3192919999974
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-14",
     "cohort": "made",
     "raw": "found something weird if you refresh during checkout the cart empties completely no warning no recovery just gone I lost my test order twice",
-    "rewrite": "Refreshing during checkout empties the cart completely, with no warning or recovery. I lost my test order twice.",
-    "ms": 738.4863750000009
+    "rewrite": "If you refresh during checkout, the cart empties completely with no warning or recovery. I lost my test order twice.",
+    "ms": 954.9690420000019
   },
   {
     "model": "gpt-4o-mini",
@@ -533,7 +197,7 @@
     "cohort": "made",
     "raw": "three things blocking us first the API keys aren't provisioned second legal hasn't signed off on the terms and third we still don't have staging access",
     "rewrite": "- The API keys aren't provisioned.  \n- Legal hasn't signed off on the terms.  \n- We still don't have staging access.",
-    "ms": 925.0568750000027
+    "ms": 866.7845840000012
   },
   {
     "model": "gpt-4o-mini",
@@ -541,7 +205,7 @@
     "cohort": "made",
     "raw": "let us do Friday actually wait Friday is the offsite let's do it on Thursday",
     "rewrite": "Let's do it on Thursday. Friday is the offsite.",
-    "ms": 688.9097910000004
+    "ms": 662.3892500000039
   },
   {
     "model": "gpt-4o-mini",
@@ -549,7 +213,7 @@
     "cohort": "made",
     "raw": "I don't agree with the new pricing copy I get why marketing wants it but I don't want to remove the free tier mention",
     "rewrite": "I don't agree with the new pricing copy. I get why marketing wants it, but I don't want to remove the free tier mention.",
-    "ms": 870.2343749999955
+    "ms": 854.1053329999997
   },
   {
     "model": "gpt-4o-mini",
@@ -557,23 +221,23 @@
     "cohort": "made",
     "raw": "there are three reasons. first the quote. second the timeline. third nobody asked for it",
     "rewrite": "- the quote  \n- the timeline  \n- nobody asked for it",
-    "ms": 703.8691670000005
+    "ms": 757.2543329999987
   },
   {
     "model": "gpt-4o-mini",
     "id": "style-4",
     "cohort": "made",
     "raw": "the backend isn't done I'd say sixty percent at best so I don't think we should commit to March yet",
-    "rewrite": "The backend isn't done; I'd say sixty percent at best. I don't think we should commit to March yet.",
-    "ms": 800.7619579999954
+    "rewrite": "The backend isn't done; I'd say sixty percent at best, so I don't think we should commit to March yet.",
+    "ms": 931.9770000000034
   },
   {
     "model": "gpt-4o-mini",
     "id": "style-5",
     "cohort": "made",
     "raw": "hey quick one can you approve the invoice when you get a chance finance needs it before the 30th",
-    "rewrite": "Please approve the invoice when you can; finance needs it before the 30th.",
-    "ms": 697.2152920000028
+    "rewrite": "Approve the invoice when you can. Finance needs it before the 30th.",
+    "ms": 904.140875000003
   },
   {
     "model": "gpt-4o-mini",
@@ -581,254 +245,6 @@
     "cohort": "made",
     "raw": "I've been going back and forth on this all morning but honestly I think we should just park it this quarter",
     "rewrite": "We should just park it this quarter.",
-    "ms": 685.3946660000006
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-1",
-    "cohort": "real",
-    "raw": "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?",
-    "rewrite": "Rohan can't make Wednesday. Let's move the design review to Friday morning around 11. Does that work for you or is Friday bad?",
-    "ms": 3272.976374999999
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-2",
-    "cohort": "real",
-    "raw": "Hi, thanks for sending this over. So I went through the dock and honestly, I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. So let's discuss the sync tomorrow before we reply to them.",
-    "rewrite": "The backend work is maybe 60% done at best. We should not commit to the March deadline yet. Let's discuss the sync tomorrow before we reply to them.",
-    "ms": 3752.981457999994
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-3",
-    "cohort": "real",
-    "raw": "okay so bug i found um when you upload a file bigger than 25 megs the progress bar just goes to like 99 and sits there forever no error nothing so it on chrome didn't check safari yet probably the timeout on the upload",
-    "rewrite": "Bug: when uploading a file bigger than 25 megs, the progress bar goes to 99 and sits there forever with no error. Tested on Chrome, not Safari. Probably a timeout on the upload.",
-    "ms": 4492.748792
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-4",
-    "cohort": "real",
-    "raw": "so quick recap from the stand up um ankit is taking the payment flow changes sneha got the dashboard redesign and the analytic migration thing someone should pick up this week because it's been sitting here since like two sprints",
-    "rewrite": "- Ankit is taking the payment flow changes  \n- Sneha got the dashboard redesign  \n- The analytic migration needs someone to pick it up this week; it's been sitting for two sprints",
-    "ms": 4482.404583999994
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-5",
-    "cohort": "real",
-    "raw": "Can we do the demo on Thursday? Actually, wait, no. Thursday is the all hands. Let's do Monday. Yeah, Monday afternoon works better anyways.",
-    "rewrite": "Let's do the demo Monday afternoon. Thursday is the all hands.",
-    "ms": 3320.3417499999973
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-6",
-    "cohort": "real",
-    "raw": "So update on the onboarding remap. We are at about 70% I'd say. The email verification piece turned out messier than we thought. So realistically end of next week not this week I know that's not ideal.",
-    "rewrite": "Onboarding remap is about 70% done. Email verification is messier than expected. Realistically, it will be done end of next week, not this week.",
-    "ms": 4152.658208000005
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-7",
-    "cohort": "real",
-    "raw": "So about the price page, I looked at the new copy and I really don't want to remove the free tier mention. I get why marketing wants it gone but I don't agree. We can keep it until we are actually talk to sale.",
-    "rewrite": "I don't want to remove the free tier mention on the price page. I get why marketing wants it gone but I don't agree. We can keep it until we actually talk to sales.",
-    "ms": 4618.98712499999
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-8",
-    "cohort": "real",
-    "raw": "Hey quick one can you approve the vendor invoice when you get a chance it's the one from design well for 45,000 rupees finance needs it cleared before the 30th or it slips to the next month cycle",
-    "rewrite": "Approve the vendor invoice from Design Well for 45,000 rupees when you get a chance. Finance needs it cleared before the 30th or it slips to the next month cycle.",
-    "ms": 4578.13666700001
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-9",
-    "cohort": "real",
-    "raw": "so i've been going back and forth on this all morning like the user research says people want the export export feature but the numbers from the beta says barely anyone clicked it and building it properly is like three weeks of work so honestly i think we should park it this quarter that's where i have landed",
-    "rewrite": "User research says people want the export feature, but beta numbers show barely anyone clicked it. Building it properly takes three weeks, so I think we should park it this quarter.",
-    "ms": 3922.746083000007
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "real-10",
-    "cohort": "real",
-    "raw": "okay so for the customer calls with Mira's team um they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245 can you update the invite and also add Karen this time he wasn't on the last one",
-    "rewrite": "Mira's team asked to move the customer call from 4:30 to 2, but I have a conflict at 2. I told them 2:45. Update the invite and add Karen; he wasn't on the last one.",
-    "ms": 4260.840124999987
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-1",
-    "cohort": "made",
-    "raw": "so the migration slipped again we said March originally but realistically it's April now maybe even May if the vendor stuff isn't sorted",
-    "rewrite": "The migration slipped again. We said March originally, but realistically it's April now, maybe even May if the vendor stuff isn't sorted.",
-    "ms": 3224.78979200001
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-2",
-    "cohort": "made",
-    "raw": "the export is coming out at like 400 megs which is way too big for email so we need to compress it or split it into two files",
-    "rewrite": "The export is about 400 megs, too big for email. We need to compress it or split it into two files.",
-    "ms": 2796.1436669999957
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-3",
-    "cohort": "made",
-    "raw": "can you send it by end of this week not next week because the client review is on the 15th and I don't want to be scrambling",
-    "rewrite": "Send it by end of this week, not next week, because the client review is on the 15th and I don't want to be scrambling.",
-    "ms": 3258.859458999993
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-4",
-    "cohort": "made",
-    "raw": "I'm not saying we shouldn't do it I'm saying we shouldn't do it now there's a difference and I think the team is conflating the two",
-    "rewrite": "I'm not saying we shouldn't do it; I'm saying we shouldn't do it now. The team is conflating the two.",
-    "ms": 2874.3064579999923
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-5",
-    "cohort": "made",
-    "raw": "Priya and Arjun are both out next week so the release has to wait unless Meera can cover the QA piece but she's already stretched",
-    "rewrite": "Priya and Arjun are out next week, so the release has to wait unless Meera can cover QA, but she's already stretched.",
-    "ms": 2397.523291999988
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-6",
-    "cohort": "made",
-    "raw": "let's target the 12th no sorry the 14th the 12th is a holiday so nothing will get signed off anyway",
-    "rewrite": "Let's target the 14th. The 12th is a holiday, so nothing will get signed off anyway.",
-    "ms": 2244.0382909999953
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-7",
-    "cohort": "made",
-    "raw": "someone needs to own the analytics migration it's been unassigned for two sprints now and it keeps slipping",
-    "rewrite": "Someone needs to own the analytics migration. It's been unassigned for two sprints and keeps slipping.",
-    "ms": 2151.288333000011
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-8",
-    "cohort": "made",
-    "raw": "the quote came in at 1,20,000 rupees which is over budget by about 20 percent so I want to push back before we sign",
-    "rewrite": "The quote is 1,20,000 rupees, over budget by about 20 percent. I want to push back before we sign.",
-    "ms": 2202.819833000007
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-9",
-    "cohort": "made",
-    "raw": "the standup moved to 9:45 from 10 so we get the room before the sales team takes it",
-    "rewrite": "The standup moved to 9:45 from 10 so we get the room before the sales team takes it.",
-    "ms": 1911.1912909999944
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-10",
-    "cohort": "made",
-    "raw": "conversion dropped from 4.2 percent to 3.1 percent after the redesign which is not what we expected at all",
-    "rewrite": "Conversion dropped from 4.2 percent to 3.1 percent after the redesign, which is not what we expected.",
-    "ms": 2039.771916999996
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-11",
-    "cohort": "made",
-    "raw": "quick update on the pilot we're at 80 percent done, Rohan finished the backend on Tuesday, the front end is maybe two more days, so end of next week for the demo",
-    "rewrite": "Pilot is 80 percent done. Rohan finished the backend on Tuesday. Front end needs about two more days. Demo by end of next week.",
-    "ms": 2109.2602919999877
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-12",
-    "cohort": "made",
-    "raw": "honestly I don't love the new onboarding copy it feels condescending but I don't want to block the launch over it so let's ship and revisit",
-    "rewrite": "I don't love the new onboarding copy; it feels condescending. I don't want to block the launch over it, so let's ship and revisit.",
-    "ms": 2096.41208299999
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-13",
-    "cohort": "made",
-    "raw": "do we still need the Friday sync now that we have the async updates? feels like a lot of meetings for not much",
-    "rewrite": "Do we still need the Friday sync now that we have async updates? Feels like too many meetings for not much.",
-    "ms": 2032.782999999995
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-14",
-    "cohort": "made",
-    "raw": "found something weird if you refresh during checkout the cart empties completely no warning no recovery just gone I lost my test order twice",
-    "rewrite": "If you refresh during checkout, the cart empties completely with no warning or recovery. I lost my test order twice.",
-    "ms": 2206.0502919999863
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "made-15",
-    "cohort": "made",
-    "raw": "three things blocking us first the API keys aren't provisioned second legal hasn't signed off on the terms and third we still don't have staging access",
-    "rewrite": "Three things blocking us:  \n- API keys aren't provisioned  \n- Legal hasn't signed off on the terms  \n- We still don't have staging access",
-    "ms": 1173.9614159999974
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "style-1",
-    "cohort": "made",
-    "raw": "let us do Friday actually wait Friday is the offsite let's do it on Thursday",
-    "rewrite": "Let's do it on Thursday since Friday is the offsite.",
-    "ms": 1634.7647500000164
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "style-2",
-    "cohort": "made",
-    "raw": "I don't agree with the new pricing copy I get why marketing wants it but I don't want to remove the free tier mention",
-    "rewrite": "I don't agree with the new pricing copy. I get why marketing wants it, but I don't want to remove the free tier mention.",
-    "ms": 1930.5690410000125
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "style-3",
-    "cohort": "made",
-    "raw": "there are three reasons. first the quote. second the timeline. third nobody asked for it",
-    "rewrite": "There are three reasons:\n- the quote\n- the timeline\n- nobody asked for it",
-    "ms": 1927.4225000000058
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "style-4",
-    "cohort": "made",
-    "raw": "the backend isn't done I'd say sixty percent at best so I don't think we should commit to March yet",
-    "rewrite": "The backend is about 60 percent done, so we shouldn't commit to March yet.",
-    "ms": 2059.1750419999926
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "style-5",
-    "cohort": "made",
-    "raw": "hey quick one can you approve the invoice when you get a chance finance needs it before the 30th",
-    "rewrite": "Please approve the invoice when you get a chance. Finance needs it before the 30th.",
-    "ms": 2021.1123329999907
-  },
-  {
-    "model": "gpt-4.1-mini",
-    "id": "style-6",
-    "cohort": "made",
-    "raw": "I've been going back and forth on this all morning but honestly I think we should just park it this quarter",
-    "rewrite": "We should just park it this quarter.",
-    "ms": 1495.9861249999733
+    "ms": 605.7008749999966
   }
 ]

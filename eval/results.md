@@ -151,3 +151,11 @@ attempt.
 | `llama-3.3-70b-versatile` | 3/10 | 4/19 | 0 | 0% | 24% | 291 ms |
 | `gpt-4o-mini` | 3/10 | 4/21 | 1 | 43% | 13% | 922 ms |
 | `gpt-4.1-mini` | 4/10 | 4/21 | 2 | 75% | 6% | 2244 ms |
+
+### Work mode model bake-off — 2026-08-14 11:15
+
+31 transcripts, temperature 0, scored by FactGuard.
+
+| model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
+|---|---|---|---|---|---|---|
+| `gpt-4o-mini` | 3/10 | 9/21 | 0 | 83% | 6% | 947 ms |

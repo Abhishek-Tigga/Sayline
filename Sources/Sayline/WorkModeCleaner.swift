@@ -137,6 +137,20 @@ final class WorkModeCleaner {
     /// transcript, computed by the caller. Passed in rather than
     /// recomputed so a fallback costs nothing extra at the moment it is
     /// needed — the user is already waiting.
+    /// How long a rewrite may take before Clean is used instead.
+    ///
+    /// Measured 2026-08-14 over nine live work holds: median rewrite 3.05s,
+    /// but three holds took 10.6–11.1s — OpenAI's tail, unrelated to input
+    /// length (an 8s/20-word dictation took 10.8s while a 38s/67-word one
+    /// took 3.5s). Nothing in this code makes that faster, so the fix is to
+    /// stop waiting for it. Four seconds is above the p95 of the healthy
+    /// runs and far below the tail.
+    ///
+    /// This costs nothing when it fires: Clean is already in flight and
+    /// almost certainly finished, so the user gets tidied text instead of
+    /// an eleven-second stare.
+    static let timeout: Duration = .seconds(4)
+
     func rewrite(_ raw: String, context: AppContext) async throws -> Outcome {
         let facts = FactGuard.extract(from: raw)
         let pinned = FactGuard.promptBlock(for: facts)
@@ -144,8 +158,10 @@ final class WorkModeCleaner {
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
 
-        let first = try await ask(system: system, messages: [["role": "user", "content": raw]])
-        let firstViolations = FactGuard.verify(raw: raw, rewrite: first)
+        let first = try await withTimeout(Self.timeout) {
+            try await self.ask(system: system, messages: [["role": "user", "content": raw]])
+        }
+        let firstViolations = FactGuard.verify(raw: raw, rewrite: first, context: context)
         if firstViolations.isEmpty {
             return .rewritten(first)
         }
@@ -156,14 +172,16 @@ final class WorkModeCleaner {
         SaylineLog.log("[work] first attempt broke: "
             + firstViolations.map(\.kind).joined(separator: ", "))
         let why = firstViolations.map(\.explanation).joined(separator: "; ")
-        let retry = try await ask(system: system, messages: [
+        let retry = try await withTimeout(Self.timeout) {
+            try await self.ask(system: system, messages: [
             ["role": "user", "content": raw],
             ["role": "assistant", "content": first],
             ["role": "user", "content":
                 "That reply broke a fact: \(why). Rewrite it again, keeping every fact from the original."],
-        ])
+            ])
+        }
 
-        let retryViolations = FactGuard.verify(raw: raw, rewrite: retry)
+        let retryViolations = FactGuard.verify(raw: raw, rewrite: retry, context: context)
         if retryViolations.isEmpty {
             SaylineLog.log("[work] retry rescued it")
             return .rescued(retry, firstAttemptBroke: firstViolations)
@@ -204,6 +222,30 @@ final class WorkModeCleaner {
         default: return "Kept your exact words — the rewrite changed a fact"
         }
     }
+
+    /// Races the work against a sleep. Whichever finishes first wins and
+    /// the other is cancelled.
+    ///
+    /// `TaskGroup` rather than a detached timer so cancellation actually
+    /// propagates into URLSession — a timeout that leaves the request
+    /// running still holds the connection and still costs the token.
+    private func withTimeout<T: Sendable>(
+        _ duration: Duration,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: duration)
+                throw TimedOut()
+            }
+            guard let winner = try await group.next() else { throw TimedOut() }
+            group.cancelAll()
+            return winner
+        }
+    }
+
+    struct TimedOut: Error {}
 
     private func ask(system: String, messages: [[String: String]]) async throws -> String {
         guard let apiKey = APIKeyProvider.openAIAPIKey else {

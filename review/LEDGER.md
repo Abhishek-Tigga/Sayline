@@ -4300,3 +4300,292 @@ Questions:
    feature whose promise is "your words, minus the mess"?
 
 Not fixed. Recorded on the user's instruction while the evidence is fresh.
+
+---
+
+## WORK MODE · Taste round 1 — full results (user-tested, Fable recording, 2026-08-14)
+
+18 realistic long-form cases, chord-dictated live, judged at the
+send-without-editing bar. **Score: 1/18 pass (S1).** The user pasted
+their preferred version ("what I actually wanted") on 15 of 17 fails —
+those ideals are the taste spec by example and the few-shot source for
+the next prompt. Raw marks live in the checklist's localStorage and the
+user's export; the synthesis:
+
+### The five failure patterns, by weight
+1. **Decapitation (~9 cases: T1,T2,T4,E1,E3,N3,N4,S3,R2).** The rewrite
+   deletes the opener — "quick status on X", "heads up —", "hi Nikhil",
+   "just floating this back up", "quick correction on my last mail" —
+   treating context-setting as journey. N3 shows the worst case: without
+   its "correction" frame, the output reads as a self-contradiction.
+   Suspected mechanism: the hard length ceiling teaches the model to
+   make budget by chopping the head. Openers are content; every user
+   ideal keeps them.
+2. **Register: the written self is softer ("too blunt for me" ~7
+   tags).** Positions must stay (the user's ideals still decline, still
+   push back) but delivery warms: "I'd lean towards" not "I'd rather",
+   social lube kept ("sorry to ping you again", "I know you're
+   slammed"), and the user softens even their own absolutes ("that
+   never works" → "that usually doesn't end well"). Crucially the
+   ideals contain ZERO vocabulary inflation — this is a third register:
+   **plain words + social warmth + breathing room**, not formality.
+3. **No email shell.** Every ideal email has "Hi [name]," / 2–3 short
+   paragraphs / "Best, Abhishek". Decision 1 currently forbids invented
+   sign-offs — the user's own data votes to amend it for email context
+   (needs: a Settings name field, and the user's explicit sign-off on
+   the amendment, flagged below).
+4. **Monoblock output.** Ideals are 2–3 short paragraphs with air;
+   landed text is a single dense block, every time.
+5. **Silent fallbacks in the wild — S2 certain, R1 probable.** S2 (the
+   documented self-correction false positive) landed the user's raw
+   detour verbatim, "Wait no hold on" included, and the user did not
+   report any flash — E6 has now effectively been tested and failed:
+   whatever the pill showed, it did not reach the user. R1 landed
+   near-verbatim ramble ("I expected it to polish… it's more or less
+   what I spoke") — likely another unnoticed fallback. Consistency
+   verdict is therefore contaminated: R2≈E1 (consistent), R1≠T1
+   (wildly different, probably fallback vs rewrite). Check the session
+   log for `fellBack` lines at those timestamps before scoring
+   consistency at all.
+
+### Smaller defects, each with its case
+- "exceptionally" for "was really something" (N4) — a vocabulary
+  upgrade through the ban; add to list + suite.
+- "whoever" → "Whosoever" (I1) — the model went *more* archaic.
+- Trailing relocated filler: "…That's my bet, like." (T1).
+- Ordinal-phrase lists fail while number-word lists pass: E4
+  ("first thing… second thing") stayed prose — B2 remains NOT fixed
+  for that shape — while S1 ("one… two… three") rendered a clean
+  numbered list and is the round's only pass.
+- Em-dash: user names it an AI tell; banned from output.
+- Numeral style: prose numbers preferred in sentences ("four hours"
+  not "4 hours") — minor, few-shots will carry it.
+
+### What worked — credit where due
+Zero fact loss in 18 cases: every number (47,500; 11; 48 hours),
+day, and name survived or fell back safely. The question rule held
+(S3, T1 end with questions). "Prepone" survived I1. The guard side of
+work mode is solid; the taste side is the whole gap.
+
+### Transcription is a co-defendant (~6 mishears polluting taste)
+read→red path, write→right path, drill→trade, slips→flips, side→site,
+deploy→deployer. The rewrite cannot fix misheard words. Whisper
+vocabulary biasing (the parked custom-vocab item) moves up sharply —
+roughly a third of the perceived quality gap lives in that layer. R1
+also surfaces an expectation worth recording: the user wants
+non-native constructions gently corrected ("I don't think so caching
+is the problem" → "I don't think caching is the problem").
+
+### The fix plan, phased
+**Phase 1 — prompt + spec (cheap, biggest win):** amend Voice 2 —
+openers/greetings are content; 2–3 short paragraphs; warmth register as
+defined in pattern 2; email shell (gated on the two user decisions
+below); em-dash and upgrade bans extended; length ceiling relaxed per
+the earlier review (≤ input under ~20 words, ≤90% above — the current
+rule is the decapitation engine); few-shots curated from the user's 15
+pasted ideals. Then re-run the model bake-off — the 4o-mini choice was
+made under the old prompt and may not survive the new one.
+**Phase 2 — bugs:** fallback flash visibility during real dictation
+(S2/R1 — check log first); ordinal-phrase list detection; trailing
+filler artifact; retry-with-context for the self-correction false
+positive (its real-world cost is now measured: 2/18 cases).
+**Phase 3 — the other layer:** Whisper prompt biasing with a personal
+vocabulary (app names, colleagues, "read path/write path", "fire
+drill").
+**Then taste round 2**, same 18 scripts, same bar. Round 1 baseline:
+5.6% send-unedited.
+
+### Decisions needed from the user before Phase 1 builds
+1. Amend decision 1 to allow the conventional email shell (greeting +
+   sign-off with their name from Settings)?
+2. Confirm the register amendment: delivery may warm (per their own
+   ideals) while positions stay untouchable — this loosens the locked
+   "never soften" from *positions and delivery* to *positions only*.
+
+---
+
+## WORK MODE · Latency + fallback forensics (Fable, 2026-08-14)
+
+Read the live log directly. Settles the taste round's open questions and
+verifies Opus's latency diagnosis. User decisions received: email shell
+approved, register loosened to positions-only. Both recorded as
+amendments to decision 1 and the Voice 2 lock.
+
+### The log verdicts
+1. **S2 and R1 were guard fallbacks, and the flash DID fire** — "Kept
+   your exact words…" at 10:22:39 and 10:28:26. The user never saw it:
+   eyes on the text field, flash on the pill. E6's failure is
+   *salience*, not plumbing. (The user's empty grep used `fellBack`;
+   the log says "fell back" / "Kept your exact words".) Fix: fallback
+   notices move to the notice box with a longer duration — a fallback
+   changes what landed, and that must not be missable.
+2. **S2's chain confirms both prior diagnoses in one incident**: first
+   attempt broke day+name+name+negation+question-lost (the documented
+   self-correction false-positive cluster), and the RETRY was then
+   refused by the ceiling for "26 words in, 26 out" — an equal-length,
+   possibly-good rewrite rejected because the rule demands strictly
+   shorter. The ceiling is not just decapitating; it is refusing
+   rescues. Equal length is not padding; the rule must be ≤, with an
+   email-shell allowance now that the shell is approved (greeting +
+   sign-off ADD words — the current ceiling would refuse every
+   compliant email).
+3. **Opus's diagnosis: mechanism right, scope overclaimed.** The
+   phantom-name extraction is real and its examples are damning
+   ("See", "Make", "First", "Sterling Essentia **Apartment**" pinned as
+   names — sentence-initial capitalization plus ordinals evicted from
+   number-pinning landing in name-pinning: whack-a-mole confirmed).
+   But "every single retry was names" is its 9-hold window only: the
+   taste round's retries were number (N3, S1 — both RESCUED), name
+   (R2 — rescued), relative-time ×2 (R1 — fell back), plus the S2
+   cluster. The true finding: **guard false positives across classes
+   drive a ~50% retry rate**; names are the largest contributor, not
+   the only one. Retries measured at 1.0–1.8s each.
+4. Retries are not pure waste — 3 of the round's rescues produced the
+   inserted output. The fix is precision (fewer false violations), not
+   removing the retry.
+
+### The fix plan — one build, four phases, in this order
+**A · Guard precision first** (kills retries AND ceiling pressure —
+must precede the taste prompt, whose few-shots add tokens and whose
+shell adds words):
+  1. Name extraction moves to Apple's NaturalLanguage `NLTagger`
+     (.nameType) with the stopword list as belt — on-device,
+     millisecond, deterministic per input; not an LLM, but flagged for
+     the user since "dumb code" was the guard's stated virtue: this is
+     the platform's purpose-built tagger replacing a capitalization
+     heuristic that live data has convicted. Ordinals also join
+     notNames regardless.
+  2. Ceiling rework: ≤ input words (never strictly less), plus a
+     ~12-word email-shell allowance; padding is flagged only above
+     that. Kills the 26/26 refusal class.
+  3. Rewrite timeout ~4s → immediate Clean fallback (the 10.6–11.1s
+     OpenAI tail becomes invisible). Requires Clean computed in
+     parallel — verify the earlier serial→parallel recommendation
+     actually landed; if not, land it here.
+  4. Fallback salience per verdict 1.
+**B · Taste prompt** (the round-1 amendments): openers/greetings are
+content; 2–3 short paragraphs; warmth register (positions untouchable,
+delivery may warm); email shell (Settings name field); em-dash ban;
+upgrade-ban additions ("exceptionally"); 6–8 short few-shots curated
+from the user's 15 pasted ideals under a strict token budget — few-shots
+are input tokens and input tokens are latency.
+**C · Bake-off re-run on the NEW prompt + guard**, models including
+Groq llama-3.3-70b (back in play: the 0-of-7 that exiled it was
+ceiling-contaminated, and its 341ms median is the budget's best
+friend; the daily-cap caveat stands). Selection bar: mechanical taste
+score against the 15 ideals (guard + length + bans) AND total
+release→text ≤ ~1.5s median warm, p95 ≤ 4s with the timeout.
+**D · Separate build:** Whisper vocabulary biasing (six mishears
+polluted the round) and the fallback-notice polish if not done in A.
+Then **taste round 2**, same 18 scripts. Baselines to beat: 5.6%
+send-unedited, 3.37s median work latency, ~50% retry rate.
+
+## WORK MODE · Phase A built — guard precision (Opus, 2026-08-14)
+
+Answering the handoff. Four items landed; **the Phase A gate is NOT met,
+so Phase B has not started.** The reason is a newly dominant class, and it
+is the interesting part of this entry.
+
+### What landed
+
+1. **Name extraction → `NLTagger`.** Three signals, because one was not
+   enough and measuring said so: the tagger's `.nameType`, minus anything
+   `.lexicalClass` calls a verb, plus capitalized words that are NOT
+   sentence-initial, all filtered through the stopword belt with ordinals
+   and generic place nouns added.
+
+   The tagger alone both missed real names and invented new ones —
+   "Priya" dropped in "Ask Nikhil and Priya", "Essentia" dropped in "the
+   Sterling Essentia lease", and "Tell" tagged as a person in "Tell Rohit
+   the deploy is done". Seven cases from live data are now suite cases,
+   testing BOTH directions: a phantom costs a round trip, a missed name
+   silently stops protecting it, and testing only the phantoms would have
+   shipped a tagger that drops names after "and".
+
+   **The flag the handoff asked for:** `NLTagger` is a trained on-device
+   tagger, not dumb code. It is deterministic per input, runs in
+   milliseconds, needs no network and cannot invent text — but the guard's
+   stated virtue genuinely bends here. It bends because a capitalization
+   rule cannot tell "Make use of this" from "Priya needs 15 units", and
+   pretending otherwise cost a round trip on half of all work dictations.
+
+2. **Ceiling: `≤ input`, never strictly less**, plus a 12-word email-shell
+   allowance threaded through `AppContext`. The S2 26/26 refusal is a
+   suite case, as are one-word-over and the shell allowance.
+
+3. **4s rewrite timeout → Clean.** `TaskGroup` race so cancellation
+   actually reaches URLSession. Clean-in-parallel was verified as already
+   landed — `cleanTask` is created on the line before the work await.
+
+4. **Fallback notices moved to the notice box, 4.5s.** Both taste-round
+   fallbacks fired and reached the user zero times; salience, not
+   plumbing.
+
+Guard suite: **all passed**, 12 new cases.
+
+### The gate: 29%, target ≤15%
+
+`run.py --model gpt-4o-mini`, 31 transcripts, scored by the compiled
+guard. **9/31 broke a fact (29%)** — real 3/10, invented-set 6/21.
+
+Name violations fell from *the largest single driver* to **2**, and both
+remaining ones may be legitimate. The equal-length refusal class is gone.
+Both target classes are fixed. The rate did not reach the gate because
+something else now dominates.
+
+**A correction to my own measurement.** The first run read 39%. I had
+rebuilt the app and the check suite after the ceiling change and forgotten
+the eval's verifier binary, so it scored with the old strictly-shorter
+rule and reported "24 words in, 24 out" as padding. Re-scoring the same
+saved rewrites with the correct binary gave 29%. Same lesson this project
+already wrote down: a harness with a lifecycle bug lies.
+
+### The finding: self-correction is now the dominant false positive
+
+All three real-cohort failures are one class, and in all three the guard
+is wrong and the rewrite is right:
+
+```
+real-5   said : Can we do the demo on Thursday? Actually, wait, no.
+                Thursday is the all hands. Let's do Monday. Yeah,
+                Monday afternoon works better anyways.
+         wrote: Let's do the demo on Monday afternoon.
+         guard: day, negation, question-lost
+
+real-10  said : they asked to move it from 430 to 2 but I have a
+                conflict at 2 so I told them 245
+         wrote: move the customer calls from 430 to 245
+         guard: number
+
+real-9   said : i've been going back and forth on this all morning…
+         wrote: We should park the export feature this quarter.
+         guard: relative-time
+```
+
+The speaker **retracted** Thursday, the question, and the 2. The guard
+demands retracted facts survive. And real-9 deletes "all morning" —
+which the prompt explicitly orders ("Delete: fillers, repetition, false
+starts, and the journey").
+
+**The guard is now contradicting the prompt.** This is the same failure
+shape as the ordinals and the phantom names — a mechanical rule that
+cannot see intent — one level up. It is also exactly the S2 cluster Fable
+identified live, now reproduced on the eval set: it is not an occasional
+case, it is the top class.
+
+### Recommendation, not a decision
+
+Phase A cannot reach ≤15% without handling retraction, and retraction
+detection is a design change with real downside risk: wrongly treating a
+kept fact as retracted deletes something the speaker meant. Fable's plan
+put "retry-with-context for the self-correction false positive" in Phase
+2, before this evidence showed it is now the largest remaining class.
+
+Three options for the user:
+1. Extend Phase A with retraction handling, then re-gate.
+2. Lower the Phase A gate — the two named classes ARE fixed, and the
+   remaining rate is dominated by a class the handoff scheduled for later.
+3. Proceed to Phase B accepting 29%, knowing B's numbers carry this noise.
+
+Not chosen unilaterally. `claimed-fixed` on items 1–4; the gate is
+`not met` and stated as such.

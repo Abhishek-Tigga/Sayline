@@ -631,8 +631,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             finalText = try await cleanTask.value
                             producedBy = "work unavailable → clean"
                             await MainActor.run {
-                                self.indicatorWindow.flashMessage(
-                                    WorkModeCleaner.unavailableMessage, duration: 3.4)
+                                // The notice box, not the pill flash.
+                                // Taste round 1: both fallbacks DID flash
+                                // and the user saw neither — eyes on the
+                                // text field, flash on the pill. A fallback
+                                // changes what landed, so it has to be
+                                // where the change is being read.
+                                self.indicatorWindow.showNotice(
+                                    WorkModeCleaner.unavailableMessage,
+                                    pill: "Used the tidied version",
+                                    duration: 4.5)
                             }
                         }
                         switch outcome {
@@ -652,8 +660,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                             finalText = try await cleanTask.value
                             producedBy = "work → fell back to clean"
                             await MainActor.run {
-                                self.indicatorWindow.flashMessage(
-                                    WorkModeCleaner.fallbackMessage(for: reason), duration: 3.4)
+                                // Same reasoning as above: this is the one
+                                // that fired twice in taste round 1 and
+                                // reached the user zero times.
+                                self.indicatorWindow.showNotice(
+                                    WorkModeCleaner.fallbackMessage(for: reason),
+                                    pill: "Kept your exact words",
+                                    duration: 4.5)
                             }
                         }
                         SaylineLog.log("[work] \(producedBy) -> \(finalText)")

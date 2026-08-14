@@ -462,5 +462,65 @@ check("pinned block names the name", pinned.contains("priya"))
 check("nothing to pin means no block",
       FactGuard.promptBlock(for: FactGuard.extract(from: "let's ship it")).isEmpty)
 
+// MARK: - Name extraction, after NLTagger replaced the capitalization rule
+//
+// Every case here comes from live data on 2026-08-14, when phantom names
+// were measured as the largest driver of a ~50% retry rate — each phantom
+// costing a full extra API round trip. The old rule pinned any capitalized
+// word not on a stopword list; dictation capitalizes every sentence start.
+//
+// These run in both directions on purpose. A phantom costs latency; a
+// MISSED name costs protection silently, which is worse. Testing only the
+// phantoms would have shipped a tagger that drops "Priya" after "and".
+
+print("\nnames — phantoms rejected, real names still caught")
+
+func names(_ text: String) -> Set<String> {
+    FactGuard.extract(from: text).names
+}
+
+check("a sentence-initial verb is not a name",
+      names("See, the way things work here. Make use of everything.").isEmpty)
+check("ordinals and connectives are not names",
+      names("Okay, there are three things. First, ship it. After that, rest.").isEmpty)
+check("a real name starting a sentence is still caught",
+      names("Priya needs 15 units by Friday.") == ["priya"])
+check("a name after a conjunction is not dropped",
+      names("Ask Nikhil and Priya to review it.") == ["nikhil", "priya"])
+check("an imperative verb before a name is not itself a name",
+      names("Tell Rohit the deploy is done.") == ["rohit"])
+check("a multi-word place name pins its distinctive words",
+      names("Sterling Essentia Apartment") == ["sterling", "essentia"])
+check("and does so mid-sentence too",
+      names("I spoke to Meera about the Sterling Essentia lease.")
+        == ["meera", "sterling", "essentia"])
+
+// MARK: - The ceiling, after the 26/26 refusal
+//
+// S2, live on 2026-08-14: the first attempt broke a cluster of facts, the
+// corrective retry came back at 26 words for 26 spoken, and the guard
+// refused it because the rule demanded strictly fewer. A possibly-good
+// rescue was thrown away over one word, and the user got their raw detour
+// verbatim — "Wait no hold on" included.
+
+print("\nthe ceiling permits equal length, and allows for an email shell")
+
+func tooLong(_ raw: String, _ rewrite: String, _ context: AppContext = .general) -> Bool {
+    FactGuard.verify(raw: raw, rewrite: rewrite, context: context)
+        .contains { if case .longerThanSpeech = $0 { return true }; return false }
+}
+
+let twentySix = Array(repeating: "word", count: 26).joined(separator: " ")
+check("equal length is not padding — the S2 refusal",
+      !tooLong(twentySix, twentySix))
+check("one word longer still is padding",
+      tooLong(twentySix, twentySix + " extra"))
+check("an email shell may add words",
+      !tooLong(twentySix, "Hi Priya, " + twentySix + " Best, Abhishek", .email))
+check("but the shell allowance is not a blank cheque",
+      tooLong(twentySix, twentySix + " " + Array(repeating: "pad", count: 20).joined(separator: " "), .email))
+check("a short utterance may still not grow, unchanged",
+      tooLong("push it to Tuesday", "Please push it to Tuesday at some point"))
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)
