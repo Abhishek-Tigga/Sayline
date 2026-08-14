@@ -4202,3 +4202,32 @@ Settings.
 **Also still unexercised:** the work-mode fallback fix (`f2206b6`),
 committed but never run, and the work-mode announcement transition
 (`7ad777c`), built but never seen.
+
+## 2026-08-14 — the rebuild tax is dead; agent answers were never drawn (Opus)
+
+**Signing: CLOSED, both halves, user-verified.**
+
+- Accessibility: cdhash bc1a63f1 → 80255aa6, launched still trusted, no
+  re-grant.
+- Keychain: key saved 04:33, ten commits and rebuilds later dictation
+  worked at 05:34 with the item intact.
+
+Fable's kill-list #3 is retired. This was the largest tax on the project's
+own testing loop and it is gone.
+
+**Agent answers have been invisible since 2026-08-07.** The user asked for
+their storage and got nothing. The log had the complete turn — query
+executed, answer computed, panel shown for 4.7s — and the panel was empty
+apart from the pill. `flashMessage` set `viewModel.state` and nothing
+reads `state`; the view draws from `followUp`, `notice`, `transcript` and
+`setupCard`. `.message` was a state nobody rendered.
+
+Broken in `af41551` ("remove comparison scaffolding"), which deleted the
+only code that drew a text state. Checked rather than assumed:
+`viewModel.state` appears zero times in the view at that commit and at
+this branch's point. Fixed in `3c275da` by routing through `setNotice`,
+which is what `showNotice` had been doing correctly all along.
+**User-verified working.**
+
+The lesson worth keeping: a feature that logs success is not a feature
+that works. Every line of that turn said it had succeeded.
