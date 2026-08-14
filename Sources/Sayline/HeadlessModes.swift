@@ -46,6 +46,13 @@ enum HeadlessModes {
             "systemPrompt": router.systemPrompt,
             "tools": router.tools,
             "strictTools": AgentRouter.strictTools(router.tools),
+            // Work mode's prompt, so `eval/work-mode/run.py` scores the
+            // wording that ships. It kept a hand-pasted copy, which is the
+            // second-copy-of-one-truth failure this repo has already paid
+            // for twice — and it would have quietly tested the old prompt
+            // through the whole taste rebuild.
+            "workPrompt": WorkModeCleaner.promptForContext(.general, signOffName: ""),
+            "workPromptEmail": WorkModeCleaner.promptForContext(.email, signOffName: "Abhishek"),
         ]
         emit(payload)
         exit(0)

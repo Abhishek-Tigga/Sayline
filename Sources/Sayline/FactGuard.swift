@@ -159,10 +159,6 @@ enum FactGuard {
             case .timeLost: return "relative-time"
             case .unitLost: return "unit"
             case .negationAdded: return "negation-added"
-            case .longerThanSpeech(let said, let wrote):
-                return "the rewrite is longer than what was said (\(said) words in, \(wrote) out) — cut, don't pad"
-            case .formalityUpgrade(let phrase):
-                return "it used \"\(phrase)\", which the speaker did not say — keep their words"
             case .longerThanSpeech: return "longer-than-speech"
             case .formalityUpgrade: return "formality-upgrade"
             case .questionLost: return "question-lost"

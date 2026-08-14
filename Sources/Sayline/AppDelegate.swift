@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let hotkeyOptionDefaultsKey = "com.abhishektigga.sayline.hotkeyOption"
     private static let defaultModeIsWorkKey = "com.abhishektigga.sayline.defaultModeIsWork"
     private static let alwaysVerbatimKey = "com.abhishektigga.sayline.alwaysVerbatim"
+    private static let signOffNameKey = "com.abhishektigga.sayline.signOffName"
 
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
@@ -60,6 +61,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     @Published var alwaysVerbatim: Bool =
         UserDefaults.standard.bool(forKey: AppDelegate.alwaysVerbatimKey) {
         didSet { UserDefaults.standard.set(alwaysVerbatim, forKey: Self.alwaysVerbatimKey) }
+    }
+
+    /// The name work mode signs emails with.
+    ///
+    /// Decision 1 forbade invented sign-offs, and taste round 1 voted to
+    /// amend it: every one of the user's own ideal emails has "Hi [name],"
+    /// and "Best, [name]". A sign-off is only an invention if the app
+    /// guesses the name — so it asks once, here, and writes nothing when
+    /// this is empty.
+    @Published var signOffName: String =
+        UserDefaults.standard.string(forKey: AppDelegate.signOffNameKey) ?? "" {
+        didSet { UserDefaults.standard.set(signOffName, forKey: Self.signOffNameKey) }
     }
 
     @Published var useLocalTranscription: Bool = {
@@ -583,6 +596,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     self.indicatorWindow.show(state: .cleaningUp)
                 }
 
+                let signOff = await MainActor.run { self.signOffName }
                 var finalText = rawText
                 // "raw" until something better actually lands. This used to
                 // read "clean", which made the log and the history claim a
@@ -621,7 +635,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                         // left to switch on.
                         var outcome: WorkModeCleaner.Outcome?
                         do {
-                            outcome = try await workCleaner.rewrite(rawText, context: context)
+                            outcome = try await workCleaner.rewrite(rawText, context: context,
+                                                                    signOffName: signOff)
                         } catch {
                             SaylineLog.log("[work] rewrite unavailable -> \(error.localizedDescription)")
                             outcome = nil

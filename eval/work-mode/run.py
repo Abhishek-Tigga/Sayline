@@ -17,7 +17,7 @@ Metrics, per the design's decision 7:
   latency             — median wall clock, first attempt, must fit +1s
 """
 
-import argparse, json, statistics, subprocess, sys, time, urllib.request
+import argparse, json, pathlib, statistics, subprocess, sys, time, urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -39,29 +39,35 @@ CANDIDATES = [
     ("gpt-4.1-mini",            OPENAI, "openai"),
 ]
 
-# The candidate work prompt. Deliberately NOT the production prompt — that
-# is stage 3 and lands in WorkModeCleaner.swift. This exists so every
-# model is asked for the same thing, which is the only way the comparison
-# means anything.
-# Lifted from WorkModeCleaner.workPrompt at build time — see below.
-# A hand-copied prompt is a second copy of one truth, and this project
-# has paid for that twice.
-SYSTEM = """You tighten spoken dictation into clear written text. You are not  writing on the speaker's behalf — you are their words, minus the mess.
+# The system prompt, read from the BUILT BINARY rather than pasted here.
+#
+# It used to be a hand-copied string with a comment claiming it was lifted
+# at build time. It was not, and the comment made that harder to notice.
+# During the taste rebuild on 2026-08-14 that copy would have scored every
+# arm of the bake-off against the OLD wording — the exact
+# second-copy-of-one-truth failure this file's own comment warns about,
+# for the third time in this repo.
+#
+# `--dump-config` now emits it, the same way the router eval stopped
+# reimplementing the tool schema.
+def _load_prompt(context="workPrompt"):
+    apps = sorted(
+        pathlib.Path.home().glob(
+            "Library/Developer/Xcode/DerivedData/Sayline-*/Build/Products/Debug/Sayline.app"),
+        key=lambda p: p.stat().st_mtime, reverse=True)
+    if not apps:
+        sys.exit("No built Sayline.app found — build first, the prompt comes from the binary.")
+    out = subprocess.run([str(apps[0] / "Contents/MacOS/Sayline"), "--dump-config"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        sys.exit(f"--dump-config failed: {out.stderr[:300]}")
+    config = json.loads(out.stdout)
+    if context not in config:
+        sys.exit(f"binary is older than this harness — no '{context}' in --dump-config")
+    return config[context]
 
-Delete: fillers, repetition, false starts, and the journey ("I've  been going back and forth on this all morning"). Put the conclusion  first. Merge rambling sentences.
 
-Keep: their verbs, their bluntness, their meaningful hedges —  "about", "roughly", "realistically" carry information and stay.
-
-Rules you must not break:
-- NEVER upgrade a word. "Isn't done" stays "isn't done" — not  "remains incomplete". "Use" is not "utilize". "Like we said" is not  "as per".
-- NEVER soften a position. "I don't agree" stays "I don't agree" —  not "I'm not fully aligned", not "I have some reservations".  Softening what someone said is changing what they said.
-- Your reply must be SHORTER than what they said. If you cannot cut,  return their sentence tidied. Never pad.
-- Never invent facts, names, numbers, dates, or commitments.
-- Never reverse a statement, and never answer a question they asked —  if they asked something, it stays a question.
-- If they enumerated items — "three reasons: first… second…" — write  them as "- " bullets, one per line. Not for prose that merely  contains several ideas.
-- Never invent headers, greetings or sign-offs, and never comment on  your own output.
-- Output only the rewritten text. No preamble, no quotes.
-"""
+SYSTEM = _load_prompt()
 
 
 def rewrite(model, url, key, raw, pinned, correction=None):

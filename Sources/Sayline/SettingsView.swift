@@ -83,6 +83,14 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                TextField("Name for email sign-offs", text: $appDelegate.signOffName)
+                    .textFieldStyle(.roundedBorder)
+                Text("Work mode signs emails \"Best, <name>\" when this is set. Left blank, it adds no sign-off — the app never guesses your name.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Divider()
+
                 Toggle("Default to Work mode", isOn: $appDelegate.defaultModeIsWork)
                     .disabled(appDelegate.alwaysVerbatim)
                 Text(appDelegate.defaultModeIsWork

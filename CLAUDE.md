@@ -106,6 +106,14 @@ Keep the `&&`. Running the binary as a separate command after a failed
 `swiftc` executes a stale one from a previous build, which reports a
 confident pass — that happened on 2026-08-11 and nearly shipped.
 
+**Run them after changing any file they compile.** These lines rot: when a
+source file gains a dependency, its command stops compiling and the suite
+goes quiet rather than red. FactGuard needing `AppContext.swift` broke this
+block on 2026-08-14 — the third instance of the same class. The eval's own
+verifier binary rots the same way and for the same reason: after any guard
+change, rebuild it before trusting a number, or it scores with the old
+rules. That one produced a 39% that was really 29%.
+
 ```bash
 swiftc -o /tmp/chk Sources/Sayline/WebsiteCatalog.swift eval/catalog-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/FollowUp.swift eval/consent-checks/main.swift && /tmp/chk
@@ -116,7 +124,8 @@ swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCata
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
-swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift eval/factguard-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/AppContext.swift \
+  eval/factguard-checks/main.swift && /tmp/chk
 ```
 
 The fast path answers some commands without calling the model at all, so

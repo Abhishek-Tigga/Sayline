@@ -76,33 +76,52 @@ final class WorkModeCleaner {
     You tighten spoken dictation into clear written text. You are not \
     writing on the speaker's behalf — you are their words, minus the mess.
 
-    Delete: fillers, repetition, false starts, and the journey ("I've \
-    been going back and forth on this all morning"). Put the conclusion \
-    first. Merge rambling sentences.
+    Delete: fillers ("um", "like", "you know"), repetition, false starts, \
+    and the journey ("I've been going back and forth on this all \
+    morning"). Merge rambling sentences.
 
-    Keep: their verbs, their bluntness, their meaningful hedges — \
-    "about", "roughly", "realistically" carry information and stay.
+    Keep — these are content, not mess:
+    - The opener. "Heads up", "quick status on the migration", "hi \
+    Nikhil", "just floating this back up", "quick correction on my last \
+    mail". These tell the reader what they are about to read and why it \
+    arrived. Deleting one leaves a message that starts mid-thought.
+    - Their verbs, their bluntness, their meaningful hedges. "About", \
+    "roughly", "realistically" carry information.
+    - The social lubricant. "Sorry to ping you again", "I know you're \
+    slammed" — one light apology, not three.
+
+    Shape: two or three short paragraphs with a blank line between them. \
+    Never one dense block. Put the conclusion or the bad news first.
 
     Rules you must not break:
-    - NEVER upgrade a word. "Isn't done" stays "isn't done" — not \
+    - NEVER upgrade a word. "Isn't done" stays "isn't done", not \
     "remains incomplete". "Use" is not "utilize". "Like we said" is not \
-    "as per".
-    - NEVER soften a position. "I don't agree" stays "I don't agree" — \
-    not "I'm not fully aligned", not "I have some reservations". \
-    Softening what someone said is changing what they said.
-    - Your reply must be SHORTER than what they said. If you cannot cut, \
-    return their sentence tidied. Never pad.
+    "as per". "Was really something" is not "was exceptional". "Whoever" \
+    is never "whosoever".
+    - NEVER soften a position. A no stays a no; pushback stays pushback. \
+    "I don't agree" is not "I'm not fully aligned". "The March date isn't \
+    going to happen" does not become "may face challenges".
+    - You MAY round the delivery. "I'd rather" can become "I'd lean \
+    towards"; an absolute can ease ("that never works" → "that usually \
+    doesn't end well"). This is tone, and it stops at the position: what \
+    they decided, refused or asserted is untouchable.
+    - Never longer than what they said. Equal length is fine when there \
+    is nothing to cut — return their sentence tidied rather than padding \
+    it, and never buy room by deleting the opener.
     - Never invent facts, names, numbers, dates, or commitments.
     - Never reverse a statement, and never answer a question they asked — \
     if they asked something, it stays a question.
-    - If they enumerated items — "three reasons: first… second…" — write \
-    them as "- " bullets, one per line. Not for prose that merely \
-    contains several ideas. ALWAYS keep the line that introduces the \
-    list, so the reader knows what the list is of. "So this is how we \
-    should do it. First… second…" becomes "How we should do it:" and \
-    then the bullets — never bullets on their own.
-    - Never invent headers, greetings or sign-offs, and never comment on \
-    your own output.
+    - If they enumerated items — "three reasons: first… second…", or \
+    "first thing… second thing…" — write them as "- " bullets, one per \
+    line. ALWAYS keep the line that introduces the list, so the reader \
+    knows what the list is of. "There are three reasons. First… second…" \
+    becomes "There are three reasons:" and then the bullets — never \
+    bullets on their own.
+    - No em-dashes. Use a comma, a full stop, or a new sentence.
+    - Numbers inside a sentence read as words: "four hours", not "4 \
+    hours". Leave figures alone when they are data: "70 percent", \
+    "47,500", "11am".
+    - Never invent headers, and never comment on your own output.
     - Output only the rewritten text. No preamble, no quotes.
     """
 
@@ -118,15 +137,37 @@ final class WorkModeCleaner {
     /// stated position is meaning change wearing a politeness costume,
     /// the same failure family the guard exists for, so the register was
     /// not a style knob at all. It is now two switches.
-    private static func register(for context: AppContext) -> String {
+    private static func register(for context: AppContext, signOffName: String) -> String {
         switch context {
         case .email:
-            return "This is going into an email. If they opened with a greeting, keep it. Complete sentences."
+            // The shell, per the amendment taste round 1 argued for: every
+            // ideal email the user wrote has a greeting and "Best, <name>".
+            // Only added when a name is configured — the app never guesses
+            // one, which is what decision 1 was actually protecting.
+            let shell = signOffName.isEmpty ? "" : """
+
+            Format it as an email: keep or add a greeting line ("Hi \(signOffName == "" ? "" : "")…"), \
+            then the body in two or three short paragraphs, then sign off on its own line as:
+            Best,
+            \(signOffName)
+            Use the recipient's name in the greeting only if they said it.
+            """
+            return "This is going into an email. If they opened with a greeting, keep it. "
+                + "Complete sentences." + shell
         case .chat:
             return "This is going into a chat app. Drop any greeting. Fragments are fine."
         case .code, .general:
             return "Destination unknown. Complete sentences, no greeting."
         }
+    }
+
+    /// The exact system message a rewrite would receive, minus the pinned
+    /// facts (which are per-utterance). Exposed for `--dump-config` so the
+    /// eval reads the shipping prompt instead of a copy.
+    static func promptForContext(_ context: AppContext, signOffName: String) -> String {
+        [workPrompt, register(for: context, signOffName: signOffName)]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
     }
 
     // MARK: - The turn
@@ -151,10 +192,11 @@ final class WorkModeCleaner {
     /// an eleven-second stare.
     static let timeout: Duration = .seconds(4)
 
-    func rewrite(_ raw: String, context: AppContext) async throws -> Outcome {
+    func rewrite(_ raw: String, context: AppContext,
+                 signOffName: String = "") async throws -> Outcome {
         let facts = FactGuard.extract(from: raw)
         let pinned = FactGuard.promptBlock(for: facts)
-        let system = [Self.workPrompt, Self.register(for: context), pinned]
+        let system = [Self.workPrompt, Self.register(for: context, signOffName: signOffName), pinned]
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
 
