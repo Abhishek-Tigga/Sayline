@@ -5666,3 +5666,148 @@ cost before they run it.
 
 Ran: 9/9 suites green, work-mode calibration 14/15 unchanged, speed lock
 283 ms median / 411 ms p90.
+
+---
+
+## WORK MODE · Fresh-set results (user-tested, Fable recording, 2026-08-14)
+
+8 unseen cases, chord-dictated. **4/8 strict pass (50%) against round
+1's 5.6% baseline — on cases no part of the tuning ever saw.** The
+generalization question is already half-answered: this is not
+memorization.
+
+**Protocol artifact found via log, reclassifying two fails:** every
+dictation ran `context: general` — the user dictated into the Claude
+window, so the email shell correctly never fired. G2 and G5 failed
+*only* on the missing shell; their content otherwise matched the
+user's expecteds nearly line for line. Strict 50%; adjusted for the
+artifact, ~75% content-pass. The same-18 rerun must dictate email
+cases (E1–E4, N3, S3) into a REAL mail window (Apple Mail, or Gmail
+in the browser — title detection exists) or every email case eats the
+same false fail and the shell goes untested again.
+
+**The remaining fails are narrow:**
+- G1: one filler word — sentence-initial "Like" survived cleanup. A
+  one-word fail; opener, position, and question all held.
+- G3 (the generalization trap): half-caught. The ordinal-phrase list
+  DID become a list — the E4-prose failure is dead — but bullets
+  instead of the numbering the ordinals imply, and the closing line
+  ("that's the summary") was dropped: a tail-decapitation note for the
+  prompt. Refinement, not failure class.
+
+**Passes worth naming:** G6 — the self-correction resolved correctly
+with the reason kept (Kunal→Divya, "Kunal is on the launch" surviving)
+— the reader-needs-it rule working live on an unseen case. G7 —
+"someone should" stayed someone; the commitment bait refused. G4 —
+opener, both facts, no invented optimism.
+
+**One fact-column flag the user should re-read:** G8 passed, but the
+landed text reads "the extra 3000 **in** the annual support fee was in
+the original quote" where the speech was "the extra three thousand
+**is** the annual support fee, it was in the original quote" — an
+is→in shift that changes the sentence's meaning. Possibly transcription.
+Flagged per the fact-first discipline; the user's call whether it
+stands as a pass.
+
+**Transcription pile grows:** triage→"tryers", sprint→"print" (G6,
+passed leniently), calls→"call", asked→"ask" (G3). The vocabulary fix
+keeps accumulating its case.
+
+Gap analysis (same-18 vs fresh) pends the same-18 rerun, which the
+user runs next — with the email-window protocol correction above.
+
+---
+
+## WORK MODE · Blind A/B opened — bare vs few-shot, the user as referee (Fable, 2026-08-14)
+
+Phase B rejected few-shots twice on the mechanical scorer's verdict. The
+user has now judged live output rule-compliant but **below the standard
+of their ideals** — the editorial quality the scorer structurally cannot
+measure. Per the round-2 handoff's closing rule ("if the user disagrees
+with the scorer, trust the user — the scorer is wrong"), the question
+re-opens, this time with the user as referee. Nothing here re-litigates
+the scorer-refereed closures; it runs the same question in front of the
+right judge.
+
+### What is built
+- `eval/work-mode/blind_ab.py` — runs each fresh transcript through both
+  prompts (gpt-4.1-mini, temperature 0, pinned facts included, same
+  message shape as production), emits `ab-blind/blind-sheet.html` with
+  randomized Version A / Version B per pair (`SystemRandom`, so the
+  assignment is not reproducible from the script). Assignments, per-pair
+  latencies, exact API token counts, and guard verdicts go to
+  `ab-blind/assignment-key.json` — **not shown on the sheet, and not to
+  be opened before the verdicts**. Latency stays off the sheet
+  deliberately: the few-shot arm's bigger prompt could be inferable from
+  a slower pair. The sheet exports verdicts to a file (round 1's
+  localStorage lesson).
+- Few-shots: **E1, T4 (first variant), E4** from `ideals-normalized.json`
+  — the user's authored text character-for-character, the em-dash
+  normalization being the one permitted edit — paired with their round-1
+  spoken scripts as inputs. Different set from the scorer rounds' N2/N1/E1,
+  per the experiment brief.
+- Prompts frozen at today's state in `ab-blind/prompts-frozen.json`. A
+  deliberate second copy, the one exception to the no-second-copy rule,
+  with the reason in the file: the rule-gap edits below rebuild the app
+  in the same session, and a harness reading `--dump-config` live would
+  have its bare arm silently swapped mid-experiment. The frozen email
+  variant is **shell-less**, matching production with a blank Settings
+  name (see below).
+- Token counts (API-reported on the smoke case, pinned block included):
+  bare 717, few-shot 1,192 — the three examples cost **+475 input tokens**.
+  Smoke-case latency: bare 1830 ms, shots 1018 ms (n=1, noise; the real
+  medians come from the round).
+
+### The decision rule, pre-committed before any transcript runs
+- User picks the few-shot side in **≥4 of 6** pairs → few-shots ship, and
+  the ledger records that **user judgment overrules the scorer on taste
+  questions permanently**.
+- The few-shot arm must keep total release→text **≤ ~1.5 s median**. If
+  it breaches, trim to two examples and re-measure before giving up —
+  never straight to zero.
+- User picks bare in **≥4 of 6** → few-shots are closed for good, this
+  time on the right referee's verdict, and the remaining quality gap
+  becomes prompt-rule work.
+- **3–3 → latency decides.**
+Ties/"can't pick" count toward neither side.
+
+### Transcript protocol
+Six fresh rambles about real current work, any mode, any window — only
+the raw transcripts are used, pulled from the log. Roughly: two emails,
+two Slack-type, one structured update, one free choice. **Round-1 and
+fresh-set scripts are excluded**: the few-shots contain round-1 material,
+and testing on it would be the training-set mistake this project has
+already made once. Email rambles should be dictated into a real mail
+window so the round also live-tests email context detection.
+
+### Rule gaps folded in, independent of the A/B (claimed-fixed)
+1. **Counted enumerations → numbered lists.** G3's ordinals rendered as
+   bullets; the rule now says ordinals ARE numbering, bullets only for
+   uncounted listings. `FactGuard.stripListMarkers` already accepts "1."
+   markers, so no guard change.
+2. **Closing-line retention.** New Keep item: "that's the summary",
+   "let me know", spoken sign-offs — the tail is content like the opener.
+   Addresses G3's dropped closing line.
+3. **The Settings name field — closed by user decision, not a bug.** The
+   ledger's flag assumed the user had filled it in; the stored key is
+   absent, and the user, mid-session: "I haven't entered my name in the
+   settings and it's fine because in the mail I'm going to say my name
+   as a signature so that won't be required for you to fetch the name."
+   The blank field correctly disables the shell (the app never guesses a
+   name). Plumbing verified by reading: Settings field → UserDefaults →
+   `AppDelegate` → `rewrite(signOffName:)`. The spoken-sign-off path is
+   protected by rule 2 above.
+
+Measured after the two prompt edits, 31-transcript guard eval,
+gpt-4.1-mini: **13% broke / 100% rescued / 0% fallback / 999 ms median**
+against the 10% / 100% / 0% / 1071–1092 ms baseline — one extra breaking
+case, rescued, within the 3-vs-4-of-31 bounce today's identical-config
+runs already showed; no user-visible change. Reported, not spent quietly.
+
+Note for the eventual verdict reading: the rule-gap edits land in
+production but NOT in either A/B arm (both arms run the frozen pre-edit
+prompts). Whichever arm wins, the shipped prompt is that arm **plus**
+these two rules.
+
+Open: awaiting the user's six dictations. Assignment key stays sealed
+until their verdicts are exported.

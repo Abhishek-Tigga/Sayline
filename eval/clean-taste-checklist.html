@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clean mode — baseline round 1</title>
+<title>Clean mode — round 2</title>
 <style>
 :root{--bg:#faf9f6;--card:#fff;--ink:#1a1a1a;--mut:#6b6a66;--line:#e4e2dc;--pass:#e7f2e3;--passb:#5a8a4a;--fail:#fbe9e7;--failb:#b0492f;--skip:#f0efe9;--accent:#4a5568}
 @media (prefers-color-scheme:dark){:root{--bg:#191917;--card:#222220;--ink:#eceae5;--mut:#98968f;--line:#3a3934;--pass:#26331f;--passb:#8fbf7a;--fail:#3a2320;--failb:#e08b70;--skip:#2a2926;--accent:#a9b4c4}}
@@ -44,7 +44,7 @@ label{font-size:12px;font-weight:600;color:var(--mut)}
 </head>
 <body>
 <main>
-<h1>Clean mode — baseline, round 1</h1>
+<h1>Clean mode — round 2</h1>
 <p class="sub">18 cases · the bar is <b>fidelity plus polish</b>: is this exactly what you said, cleanly — nothing you'd fix by hand? Not work mode's rewrite bar. A word lost that you meant, a comma you'd add, a retraction left dangling — all fails.</p>
 <div class="note">Protocol: <b>single press-hold</b> (no chord) into any ordinary text field unless the case names one. Speak naturally, drift freely. Paste what landed, mark, tag fails, remark where tags miss. <b>Export downloads a file</b> — do it partway through, not only at the end.</div>
 <div class="note" style="border-color:#c86"><b>Group C will mostly fail today — that is the point.</b> Scoped self-correction is approved but not built; these cases record the baseline and become the feature's acceptance tests. Mark them honestly against the printed pass criteria, not against what today's app can do.</div>
@@ -52,6 +52,7 @@ label{font-size:12px;font-weight:600;color:var(--mut)}
 
 <div class="bar"><span>Pass <b id="np">0</b></span><span>Fail <b id="nf">0</b></span><span>Left <b id="nr">18</b></span><span id="save" style="color:var(--mut);font-size:12px"></span></div>
 
+<div class="note" style="border-color:#c86"><b>Watch A3 specifically.</b> Self-correction resolution shipped this round, and it makes the model drop "No rush" from that sentence. Nothing is lost — the validator puts the words back — but it lands as "no rush just checking" where round 1 gave you "No rush, just checking." Mark it on what actually landed. If the C-group (C1/C2/C3) resolving is worth that, say so in the remark; if not, say that. That trade is the one open decision.</div>
 <div id="cases"></div>
 </main>
 <button class="export" onclick="doExport()">Export results</button>
@@ -122,7 +123,7 @@ const CASES=[
 "(say A2's deploy status again from memory, in your own words — don't reread)",
 "Compare with A2's output: same punctuation choices, same splits, same quality. Pass = you couldn't tell which run was which."]
 ];
-const state=JSON.parse(localStorage.getItem('clean1')||'{}');
+const state=JSON.parse(localStorage.getItem('clean2')||'{}');
 const wrap=document.getElementById('cases');
 let html='';let lastGroup='';
 const groups={};
@@ -144,7 +145,7 @@ html+='<div class="case '+(st.v||'')+'" id="c-'+id+'"><h3>'+id+' · '+title+'<sp
 wrap.innerHTML=html;
 const ids=CASES.filter(c=>c.length===5).map(c=>c[0]);
 let dirty=false;
-function persist(){localStorage.setItem('clean1',JSON.stringify(state));dirty=true;document.getElementById('save').textContent='saved locally — export for safety';count();}
+function persist(){localStorage.setItem('clean2',JSON.stringify(state));dirty=true;document.getElementById('save').textContent='saved locally — export for safety';count();}
 window.mark=function(id,v){state[id]=state[id]||{};state[id].v=v;const el=document.getElementById('c-'+id);el.className='case '+v;
 el.querySelectorAll('.btns button').forEach((b,i)=>b.className=(v==='p'&&i===0)?'on-p':(v==='f'&&i===1)?'on-f':(v==='s'&&i===2)?'on-s':'');persist();}
 window.tag=function(id,el){state[id]=state[id]||{};state[id].tags=state[id].tags||[];const t=el.textContent;
@@ -155,7 +156,7 @@ document.getElementById('np').textContent=p;document.getElementById('nf').textCo
 document.getElementById('nr').textContent=ids.length-d;}
 count();
 window.doExport=function(){
-let out='CLEAN MODE BASELINE ROUND 1 — results\n';
+let out='CLEAN MODE ROUND 2 — results\n';
 for(const c of CASES.filter(c=>c.length===5)){const[id,room,title]=c;const s=state[id]||{};
 out+='\n'+id+' ('+title+'): '+(s.v==='p'?'PASS':s.v==='f'?'FAIL':s.v==='s'?'skip':'unmarked');
 if(s.tags&&s.tags.length)out+=' ['+s.tags.join(', ')+']';
@@ -163,7 +164,7 @@ if(s.landed)out+='\n  landed: '+s.landed.replace(/\n/g,' / ');
 if(s.remark)out+='\n  remark: '+s.remark.replace(/\n/g,' / ');}
 const blob=new Blob([out],{type:'text/plain'});
 const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-a.download='clean-round1-results.txt';a.click();dirty=false;
+a.download='clean-round2-results.txt';a.click();dirty=false;
 navigator.clipboard&&navigator.clipboard.writeText(out);
 }
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});

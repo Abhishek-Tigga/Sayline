@@ -114,6 +114,10 @@ final class WorkModeCleaner {
     "roughly", "realistically" carry information.
     - The social lubricant. "Sorry to ping you again", "I know you're \
     slammed" — one light apology, not three.
+    - The closing line. "That's the summary", "that's where we are", \
+    "let me know", a spoken sign-off ("thanks", "best, <their name>"). \
+    The tail is content like the opener: never make the text shorter by \
+    deleting how they ended it.
 
     Shape: two or three short paragraphs with a blank line between them. \
     Never one dense block. Put the conclusion or the bad news first.
@@ -136,12 +140,14 @@ final class WorkModeCleaner {
     - Never invent facts, names, numbers, dates, or commitments.
     - Never reverse a statement, and never answer a question they asked — \
     if they asked something, it stays a question.
-    - If they enumerated items — "three reasons: first… second…", or \
-    "first thing… second thing…" — write them as "- " bullets, one per \
-    line. ALWAYS keep the line that introduces the list, so the reader \
-    knows what the list is of. "There are three reasons. First… second…" \
-    becomes "There are three reasons:" and then the bullets — never \
-    bullets on their own.
+    - If they counted their items — "three reasons: first… second…", \
+    "first thing… second thing…", "one… two… three…" — write them as a \
+    numbered list: "1. ", "2. ", one per line. Their ordinals ARE \
+    numbering; bullets would throw it away. Use "- " bullets only for \
+    items listed without counting. ALWAYS keep the line that introduces \
+    the list, so the reader knows what the list is of. "There are three \
+    reasons. First… second…" becomes "There are three reasons:" and then \
+    the numbered lines — never a list on its own.
     - No em-dashes. Use a comma, a full stop, or a new sentence.
     - Numbers inside a sentence read as words: "four hours", not "4 \
     hours". Leave figures alone when they are data: "70 percent", \
