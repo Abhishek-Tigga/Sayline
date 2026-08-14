@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Work mode — taste round 1</title>
+<title>Work mode — taste round 2</title>
 <style>
 :root{--bg:#faf9f6;--card:#fff;--ink:#1a1a1a;--mut:#6b6a66;--line:#e4e2dc;--pass:#e7f2e3;--passb:#5a8a4a;--fail:#fbe9e7;--failb:#b0492f;--skip:#f0efe9;--accent:#4a5568}
 @media (prefers-color-scheme:dark){:root{--bg:#191917;--card:#222220;--ink:#eceae5;--mut:#98968f;--line:#3a3934;--pass:#26331f;--passb:#8fbf7a;--fail:#3a2320;--failb:#e08b70;--skip:#2a2926;--accent:#a9b4c4}}
@@ -44,9 +44,10 @@ label{font-size:12px;font-weight:600;color:var(--mut)}
 </head>
 <body>
 <main>
-<h1>Work mode — taste, round 1</h1>
+<h1>Work mode — taste, round 2</h1>
 <p class="sub">18 cases · the bar for <b>pass</b> is one question only: <b>would you press send without editing a single word?</b> Not "is it good" — would you ship it as-is. If you'd touch it, it's a fail, and the tags say why.</p>
-<div class="note">Protocol: chord-dictate each script into the named room (or a stand-in text field), speaking naturally — the script is a prompt, not scripture; your own ums and detours make the test better. Paste what landed, mark it, tag fails, add a remark where the tags don't cover it. Marks save in this browser automatically. Hit <b>Export results</b> when done (partial is fine) and paste the summary back to Fable.</div>
+<div class="note">Protocol: chord-dictate each script into the named room (or a stand-in text field), speaking naturally — the script is a prompt, not scripture; your own ums and detours make the test better. Paste what landed, mark it, tag fails, add a remark where the tags don't cover it. Marks save in this browser only, which is how round 1's answers were lost. <b>Export downloads a file</b> — do it partway through, not just at the end. Send the file to Fable.</div>
+<div class="note" style="border-color:#c86"><b>Check the facts, not just the tone.</b> The guard was made more permissive on 2026-08-14 — six rules relaxed, none tightened. So for every case, verify each number, name, day and time against what you actually said, and tag <b>fact wrong</b> if any drifted. That is the half the machine is now weakest at, and a wrong number is invisible in a sentence that reads well.</div>
 
 <div class="bar"><span>Pass <b id="np">0</b></span><span>Fail <b id="nf">0</b></span><span>Left <b id="nr">18</b></span><span id="save" style="color:var(--mut);font-size:12px"></span></div>
 
@@ -111,7 +112,7 @@ const CASES=[
 "(speak E1's bad-news mail again, from memory, in your own words)",
 "Same bar: equivalent output. The date, the two-weeks reason, and the call offer all land again; the tone doesn't wobble between runs."]
 ];
-const state=JSON.parse(localStorage.getItem('taste1')||'{}');
+const state=JSON.parse(localStorage.getItem('taste2')||'{}');
 const wrap=document.getElementById('cases');
 let html='';let lastGroup='';
 const groups={T:"Tone in the room",E:"Email replies",N:"The rephraser-killers — where AI usually ruins it",S:"Structure and mechanics",I:"Idiom",R:"Consistency — same thought, second run"};
@@ -131,7 +132,7 @@ html+='<div class="case '+(st.v||'')+'" id="c-'+id+'"><h3>'+id+' · '+title+'<sp
 +'</div>';
 }
 wrap.innerHTML=html;
-function persist(){localStorage.setItem('taste1',JSON.stringify(state));document.getElementById('save').textContent='saved';setTimeout(()=>document.getElementById('save').textContent='',900);count();}
+function persist(){localStorage.setItem('taste2',JSON.stringify(state));document.getElementById('save').textContent='saved';setTimeout(()=>document.getElementById('save').textContent='',900);count();}
 function mark(id,v){state[id]=state[id]||{};state[id].v=v;const el=document.getElementById('c-'+id);el.className='case '+v;
 el.querySelectorAll('.btns button').forEach((b,i)=>b.className=(v==='p'&&i===0)?'on-p':(v==='f'&&i===1)?'on-f':(v==='s'&&i===2)?'on-s':'');persist();}
 function tag(id,el){state[id]=state[id]||{};state[id].tags=state[id].tags||[];const t=el.textContent;
@@ -141,15 +142,35 @@ function count(){let p=0,f=0,d=0;for(const[id]of CASES){const v=(state[id]||{}).
 document.getElementById('np').textContent=p;document.getElementById('nf').textContent=f;document.getElementById('nr').textContent=CASES.length-d;}
 count();
 function doExport(){
-let out='WORK MODE TASTE ROUND 1 — results\n';
+let out='WORK MODE TASTE ROUND 2 — results\n';
 for(const[id,room,title]of CASES){const s=state[id]||{};
 out+='\n'+id+' ('+title+'): '+(s.v==='p'?'PASS':s.v==='f'?'FAIL':s.v==='s'?'skip':'unmarked');
 if(s.tags&&s.tags.length)out+=' ['+s.tags.join(', ')+']';
 if(s.landed)out+='\n  landed: '+s.landed.replace(/\n/g,' / ');
 if(s.remark)out+='\n  remark: '+s.remark.replace(/\n/g,' / ');}
-navigator.clipboard.writeText(out).then(()=>alert('Copied to clipboard — paste it back to Fable.'),()=>{
-const w=window.open('','_blank');w.document.write('<pre>'+out.replace(/</g,'&lt;')+'</pre>');});
+// A file, not just the clipboard. Round 1's results existed only in
+// localStorage and one clipboard copy, and both were gone by the next day —
+// which cost a full session reconstructing the ideals from Fable's memory.
+const stamp=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+const blob=new Blob([out],{type:'text/plain'});
+const a=document.createElement('a');
+a.href=URL.createObjectURL(blob);a.download='taste-round-2-'+stamp+'.txt';
+document.body.appendChild(a);a.click();a.remove();
+exported=JSON.stringify(state);
+// The clipboard is a bonus and must never take the download with it:
+// on a file:// page `navigator.clipboard` is often undefined outright,
+// which throws rather than rejecting. The download has already happened
+// by this line, and that is the copy that matters.
+let copied=false;
+try{ navigator.clipboard.writeText(out); copied=true; }catch(e){}
+document.getElementById('save').textContent=copied?'downloaded + copied':'downloaded';
 }
+// Nothing is lost silently: the browser asks before a close that would
+// take unexported answers with it.
+let exported=JSON.stringify(state);
+window.addEventListener('beforeunload',e=>{
+if(JSON.stringify(state)!==exported&&Object.keys(state).length){e.preventDefault();e.returnValue='';}
+});
 </script>
 </body>
 </html>
