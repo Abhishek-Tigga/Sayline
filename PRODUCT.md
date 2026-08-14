@@ -419,3 +419,31 @@ expected behavior, both worth remembering:
 - Windows/Linux support — macOS only, native, no cross-platform ambitions.
 - Real-time streaming transcription — current pipeline is record-then-send,
   not live streaming; revisit only if latency becomes a real complaint.
+
+## Brand (2026-08-14)
+
+- **Working name: Butterscotch** (decided over "Brisk" — Brisk Teaching is
+  an established AI-assistant brand with $15M funding and a million
+  users; disambiguating from them would eat the marketing budget.
+  Butterscotch is ownable, phonetically unmistakable to transcribers —
+  which matters for a voice product — and warm, matching the Voice 2
+  ethos). Domain: **getbutterscotch.app** primary (.ai as defensive
+  redirect if acquired). Trademark search against Butterscotch
+  Shenanigans (game studio) still owed before money is spent on the mark.
+  Rename is user-visible-surfaces-first; bundle IDs migrate after launch,
+  never during launch week.
+
+- **Tagline, the user's own wording, keep verbatim:**
+
+  > **"It sounds like you, not like AI, not like anyone else."**
+
+  Why it works and why it is defensible: every competitor's rewrite
+  converges on a house style; work mode's Voice 2 contract (never soften
+  a position, never upgrade vocabulary, keep the speaker's verbs and
+  meaningful hedges) rewrites toward the *speaker*. Fidelity is the
+  personalization. The claim is testable — the taste checklist's
+  "rephraser-killer" group (pushback, apology, saying no, praise) is the
+  proof instrument: if those pass at the send-without-editing bar, the
+  tagline is true and provable, not aspirational. Target user story it
+  speaks to: people who currently draft in ChatGPT/Claude and ask it to
+  rephrase for work — the effort this product deletes.

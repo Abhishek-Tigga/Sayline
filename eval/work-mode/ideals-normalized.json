@@ -1,0 +1,51 @@
+{
+ "T1": [
+  "Hey, saw your comment on the ticket. I get the reasoning, but I don't think caching is the fix here. The numbers are already wrong before they hit the cache. I checked yesterday.\n\nI think we should look at the aggregation query first. That's where I'd bet the issue is."
+ ],
+ "T2": [
+  "Quick status on the payments migration: we're basically done with the read path. The write path is a bit trickier than we thought because of the retry logic.\n\nI'd say we're around 70% done overall. I don't want to promise Friday. Monday feels more realistic.",
+  "Quick status update on the payments migration: we're about 70% done overall. The read path is basically complete, but the write path is taking a bit longer than expected because of the retry logic.\n\nI don't want to commit to Friday. Monday feels like a more realistic timeline."
+ ],
+ "T3": [
+  "Hey, sorry to ping you on this again. I'm blocked on the API keys, and I know you're slammed. Whenever you get 10 minutes today, could you approve the request? It's the last thing we need before the staging deploy."
+ ],
+ "T4": [
+  "Heads up, the vendor sandbox went down this morning, and their support says it could take ~48 hours. That pretty much kills our Thursday demo.\n\nI think we have two options: mock the vendor responses for the demo or push it. I'd lean towards mocking them so we can still do the demo.\n\nWanted to flag it now rather than Wednesday night.",
+  "Heads up, the vendor sandbox went down this morning, and support says ~48 hours to fix it. That puts Thursday's demo at risk.\n\nWe can either mock the vendor responses or push the demo. I'd lean towards mocking it. Wanted to flag this now rather than Wednesday night."
+ ],
+ "E1": [
+  "Hi Nikhil,\n\nI wanted to be upfront about the integration timeline, the March date is no longer realistic. We found a data issue on our side that will likely take another two weeks to resolve.\n\nThe new realistic target is mid-April. I know that's not what you were hoping to hear, and I'm happy to get on a call this week to discuss it if helpful.\n\nBest,\nAbhishek"
+ ],
+ "E2": [
+  "Hi,\n\nThanks for thinking of us for the webinar. We'd love to be considered, but this quarter is a bit tough for us as we're heads down on a launch.\n\nI don't want to half-commit and then have to drop out later, so it's probably best for us to pass this time. Feel free to reach out again in the summer, happy to revisit it then.\n\nBest,\nAbhishek",
+  "Hi,\n\nThanks for thinking of us for the webinar. Unfortunately, this quarter won't be possible, we're heads down on a launch and I don't want to commit and then not be able to give it the time it deserves.\n\nMaybe reach out again in the summer and we can revisit.\n\nBest,\nAbhishek"
+ ],
+ "E3": [
+  "Hi,\n\nJust following up on the invoice details I shared two weeks ago. I know things can get buried, but we'd really like to get this closed out before month-end.\n\nLet me know if you need anything else from our side.\n\nBest,\nAbhishek"
+ ],
+ "E4": [
+  "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates. I'll send the debrief separately.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work. This one needs your help."
+ ],
+ "N1": [
+  "Hey, on adding the export feature to this sprint. I'd push back on that. The sprint is genuinely full, so something would need to drop.\n\nIf we want to add export, I'd suggest dropping the settings redesign. I don't think we should just absorb the extra work, that usually doesn't end well."
+ ],
+ "N2": [
+  "Hey, my bad on the confusion this morning. I misread the calendar. The demo is actually tomorrow, not today. Sorry for the fire drill.\n\nTomorrow at the same time should work for everyone, I hope."
+ ],
+ "N3": [
+  "Hi,\n\nQuick correction to my last email. I mentioned the invoice amount as ₹45,000, but it's actually ₹47,500. My mistake.\n\nThe PO number remains the same, and nothing else changes.\n\nBest,\nAbhishek"
+ ],
+ "N4": [
+  "Just wanted to call out how well Sneha handled the outage yesterday. She kept everyone calm and had the rollback ready before anyone asked.\n\nHonestly, we were lucky to have her on call. I think she deserves a shoutout in the all-hands."
+ ],
+ "S2": [
+  "Can we move the retro to Friday afternoon? After 3 works best. Thursday is the town hall, so Friday works better."
+ ],
+ "S3": [
+  "Hi,\n\nI went through the proposal and most of it works for us. The only sticking point is the support SLA, four hours feels a bit tight for our team size.\n\nWould an eight-hour SLA work on your side? That's really the only open item from our end.\n\nBest,\nAbhishek"
+ ],
+ "I1": [
+  "Hey, can we move the client call up to 11? The afternoon slot clashes with the town hall.\n\nAlso, can someone share the latest version of the deck beforehand?",
+  "Hey, can we prepone the client call to 11? The afternoon slot clashes with the town hall.\n\nAlso, whoever has the latest version of the deck, could you share it before the call?"
+ ]
+}

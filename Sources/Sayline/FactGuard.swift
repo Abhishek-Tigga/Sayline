@@ -663,13 +663,25 @@ enum FactGuard {
         // so turning a dictated list into bullets dropped it and the guard
         // fell back on exactly the output the user had asked for. A unit
         // with no quantity beside it is an ordinary word.
+        //
+        // A scale word is never a unit, even when it is also in
+        // `unitWords`. "Three lakh" is the number 300,000, and the value
+        // already carries it — pinning "lakh" as well demands the rewrite
+        // keep a word whose whole meaning has moved into the digits, so
+        // "300,000" read as a dropped unit.
         var found: Set<String> = []
-        for (index, word) in words.enumerated() where unitWords.contains(word) {
+        for (index, word) in words.enumerated()
+        where unitWords.contains(word) && scaleWords[word] == nil {
             let before = index > 0 ? words[index - 1] : ""
             let after = index + 1 < words.count ? words[index + 1] : ""
             let isQuantified = [before, after].contains { token in
                 Int(token) != nil || spokenUnits[token] != nil
                     || spokenTens[token] != nil || quantityWords[token] != nil
+                    // "two hundred megs" — the token touching "megs" is the
+                    // scale, not the digit, so without this the spoken form
+                    // pinned no unit and the written "200 megs" looked like
+                    // an invented one.
+                    || scaleWords[token] != nil
             }
             if isQuantified { found.insert(word) }
         }
@@ -963,7 +975,7 @@ enum FactGuard {
         // saying "Mira" then reads as an invented name. This file has now
         // produced that same two-normalizations bug twice; both paths run
         // through `normalizeWords` for exactly that reason.
-        normalizeWords(stripThousandsSeparators(text))
+        normalizeWords(stripThousandsSeparators(stripListMarkers(text)))
             // A time separator splits rather than fuses: "11:00" must not
             // become the number 1100, which is what removing the colon
             // produced. It yields 11 and 0, and 0 is excluded from the
@@ -972,6 +984,32 @@ enum FactGuard {
             .replacingOccurrences(of: ":", with: " ")
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
             .flatMap { splitDigitsFromLetters(String($0)) }
+    }
+
+    /// Drops "1." / "2)" where it opens a line — a list marker, not a
+    /// quantity.
+    ///
+    /// The written twin of the "first, second, third" that
+    /// `enumerationMarkers` already skips, and missing for the same
+    /// reason it was: the guard was written before the prompt asked for
+    /// lists. The prompt now *requires* enumerated speech to come back as
+    /// a list, so the numbered form arrived as three invented numbers —
+    /// on the accepted rewrite of E4, which is to say on the output we
+    /// were aiming at.
+    ///
+    /// Anchored to the line start and capped at two digits so it cannot
+    /// eat a real figure mid-sentence.
+    private static func stripListMarkers(_ text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
+                let digits = trimmed.prefix(while: \.isNumber)
+                guard !digits.isEmpty, digits.count <= 2,
+                      let delimiter = trimmed.dropFirst(digits.count).first,
+                      delimiter == "." || delimiter == ")" else { return String(line) }
+                return String(trimmed.dropFirst(digits.count + 1))
+            }
+            .joined(separator: "\n")
     }
 
     /// The one normalization. Everything that compares words uses it, so
@@ -1163,6 +1201,29 @@ enum FactGuard {
         "seventy": 70, "eighty": 80, "ninety": 90,
     ]
 
+    /// Words that multiply the number before them.
+    ///
+    /// "Forty five thousand" is 45,000, not 45. Without this the tens+units
+    /// path stopped at 45, so a rewrite writing the figure the way anyone
+    /// writes it — "45,000" — was scored as *both* losing 45 and inventing
+    /// 45,000. Two violations for being correct.
+    ///
+    /// Found by pointing the stated rules at the fifteen rewrites the user
+    /// accepted: it fires on N3, and on every rupee amount in real
+    /// dictation. `lakh` and `crore` are here because this app's user
+    /// dictates them, not for completeness.
+    ///
+    /// "k" earns its place the same way — "forty five k" is how the figure
+    /// is spoken, and `splitDigitsFromLetters` already turns "45k" into
+    /// "45" "k". It only ever multiplies a number that immediately
+    /// precedes it, so a stray "K" cannot manufacture one.
+    private static let scaleWords: [String: Int] = [
+        "hundred": 100, "thousand": 1_000, "k": 1_000,
+        "lakh": 100_000, "lakhs": 100_000,
+        "million": 1_000_000, "crore": 10_000_000, "crores": 10_000_000,
+        "billion": 1_000_000_000,
+    ]
+
     /// Words that carry a quantity without being numbers.
     ///
     /// Without these the subset rule storms: a faithful rewrite of "both
@@ -1205,77 +1266,95 @@ enum FactGuard {
         var found: Set<Int> = []
         var index = 0
         while index < words.count {
-            let word = words[index]
-
-            if let digits = Int(word) {
-                found.insert(digits)
+            guard let (value, next) = numberPhrase(in: words, at: index) else {
                 index += 1
                 continue
             }
-            // "30th", "1st", "22nd" — a deadline is a number even when it
-            // wears a suffix, and "cleared before the 30th" was previously
-            // invisible to the guard entirely.
-            if let ordinal = ordinalValue(word) {
-                found.insert(ordinal)
-                index += 1
-                continue
-            }
-            // "one" is usually prose, not a quantity. "quick one", "the
-            // last one", "no one", "one more thing" — all pinned the
-            // number 1 and then reported it lost when a faithful rewrite
-            // dropped the phrase. It counts only when a unit follows.
-            //
-            // The apparent hole this leaves — "one bug" rewritten as "two
-            // bugs" — is closed from the other side: the subset rule flags
-            // the invented 2. Compound spoken numbers reach the tens+units
-            // path above and never consult this.
-            if word == "one" {
-                let next = index + 1 < words.count ? words[index + 1] : ""
-                if unitWords.contains(next) { found.insert(1) }
-                index += 1
-                continue
-            }
-            if let quantity = quantityWords[word] {
-                found.insert(quantity)
-                index += 1
-                continue
-            }
-            // A bare small ordinal is an enumeration marker, not a fact.
-            //
-            // "three reasons: first the cost, second the timeline" pinned
-            // 1 and 2, so turning that into the bullet list the user asked
-            // for dropped them and the guard fell back — on exactly the
-            // output that was wanted. The prompt was fighting the guard.
-            //
-            // Digit ordinals ("the 30th") and compounds ("twenty first")
-            // stay facts, because that is how a real date is spoken. The
-            // cost is "the first of March" losing its 1; March is still
-            // pinned, so the date is not wholly unprotected.
-            if enumerationMarkers.contains(word) {
-                index += 1
-                continue
-            }
-            if let unit = spokenUnits[word] ?? spokenOrdinals[word] {
-                found.insert(unit)
-                index += 1
-                continue
-            }
-            if let tens = spokenTens[word] {
-                // "twenty five" is one number, not two.
-                // "twenty five" and "twenty first" are both one number.
-                if index + 1 < words.count,
-                   let unit = spokenUnits[words[index + 1]] ?? spokenOrdinals[words[index + 1]],
-                   unit < 10 {
-                    found.insert(tens + unit)
-                    index += 2
-                } else {
-                    found.insert(tens)
-                    index += 1
-                }
-                continue
-            }
-            index += 1
+            found.insert(value)
+            index = next
         }
         return found
+    }
+
+    /// One number and the index just past it, or nil where a token looks
+    /// numeric but is not a fact.
+    ///
+    /// Split out of `numbers(in:)` so that scale words ("thousand",
+    /// "lakh") can multiply whatever form the number arrived in, without
+    /// repeating the absorption in each of the six branches below.
+    private static func numberPhrase(in words: [String], at start: Int) -> (Int, Int)? {
+        let word = words[start]
+        var value: Int
+        var index = start
+
+        if let digits = Int(word) {
+            value = digits
+            index += 1
+        }
+        // "30th", "1st", "22nd" — a deadline is a number even when it
+        // wears a suffix, and "cleared before the 30th" was previously
+        // invisible to the guard entirely. Returns early: no one says
+        // "the 30th thousand".
+        else if let ordinal = ordinalValue(word) {
+            return (ordinal, start + 1)
+        }
+        // "one" is usually prose, not a quantity. "quick one", "the
+        // last one", "no one", "one more thing" — all pinned the
+        // number 1 and then reported it lost when a faithful rewrite
+        // dropped the phrase. It counts only when a unit follows, or
+        // when a scale word makes it a figure in its own right ("one
+        // lakh").
+        else if word == "one" {
+            let next = start + 1 < words.count ? words[start + 1] : ""
+            guard unitWords.contains(next) || scaleWords[next] != nil else { return nil }
+            value = 1
+            index += 1
+        }
+        else if let quantity = quantityWords[word] {
+            value = quantity
+            index += 1
+        }
+        // A bare small ordinal is an enumeration marker, not a fact.
+        //
+        // "three reasons: first the cost, second the timeline" pinned
+        // 1 and 2, so turning that into the bullet list the user asked
+        // for dropped them and the guard fell back — on exactly the
+        // output that was wanted. The prompt was fighting the guard.
+        //
+        // Digit ordinals ("the 30th") and compounds ("twenty first")
+        // stay facts, because that is how a real date is spoken. The
+        // cost is "the first of March" losing its 1; March is still
+        // pinned, so the date is not wholly unprotected.
+        else if enumerationMarkers.contains(word) {
+            return nil
+        }
+        else if let unit = spokenUnits[word] ?? spokenOrdinals[word] {
+            value = unit
+            index += 1
+        }
+        else if let tens = spokenTens[word] {
+            // "twenty five" is one number, not two.
+            // "twenty five" and "twenty first" are both one number.
+            value = tens
+            index += 1
+            if index < words.count,
+               let unit = spokenUnits[words[index]] ?? spokenOrdinals[words[index]],
+               unit < 10 {
+                value += unit
+                index += 1
+            }
+        }
+        else {
+            return nil
+        }
+
+        // Scale words multiply what came before, and chain: "two hundred
+        // thousand" is 200,000. See `scaleWords` for why this was missing
+        // and what it cost.
+        while index < words.count, let scale = scaleWords[words[index]] {
+            value *= scale
+            index += 1
+        }
+        return (value, index)
     }
 }

@@ -1,0 +1,146 @@
+[
+ {
+  "id": "T1",
+  "channel": "Slack",
+  "title": "Disagreeing with a teammate",
+  "raw": "so I saw your comment on the ticket and um, look, I get the reasoning but I don't think caching is the fix here, like the numbers are wrong BEFORE they hit the cache, I checked yesterday, so caching would just make wrong numbers faster, um can we look at the aggregation query first, that's my bet",
+  "bar": "Your disagreement stays plain (\"I don't think caching is the fix\"), your bet stays yours, and it reads like a teammate â not a review committee.",
+  "humanOnly": false
+ },
+ {
+  "id": "T2",
+  "channel": "Slack",
+  "title": "Status with honest caveats",
+  "raw": "quick status on the payments migration, so we're basically done with the read path, um the write path is trickier than we thought because of the retry logic, honestly I'd say seventy percent overall, and I don't want to promise Friday, Monday is realistic",
+  "bar": "70% and the refusal to promise Friday both survive. \"Trickier than we thought\" doesn't become \"presented unforeseen complexities.\"",
+  "humanOnly": false
+ },
+ {
+  "id": "T3",
+  "channel": "Slack",
+  "title": "Asking a favor without groveling",
+  "raw": "hey um sorry to ping you on this again but I'm blocked on the API keys thing, I know you're slammed, whenever you get like ten minutes today could you approve the request, it's the last thing between us and the staging deploy",
+  "bar": "One light apology max â not amplified into three. The ask is direct, the deadline pressure stays gentle but real.",
+  "humanOnly": false
+ },
+ {
+  "id": "T4",
+  "channel": "Slack",
+  "title": "Delivering blocker news upward",
+  "raw": "so heads up, um the vendor sandbox went down this morning and their support says forty eight hours, which honestly kills our Thursday demo, I think we either fake the vendor responses for the demo or we push it, I'd rather fake it, wanted you to know now not Wednesday night",
+  "bar": "Bad news first, not buried. \"Kills our Thursday demo\" keeps its bluntness. Your preference (fake it) stays stated as yours.",
+  "humanOnly": false
+ },
+ {
+  "id": "E1",
+  "channel": "Email",
+  "title": "Bad news to a client",
+  "raw": "hi Nikhil, so um about the integration timeline, look I have to be straight with you, the March date isn't going to happen, we found a data issue on our side that needs maybe two more weeks, um the new realistic date is mid April, I know that's not what you wanted to hear, happy to get on a call this week if that helps",
+  "bar": "\"I have to be straight with you\" energy survives in email form. No \"we regret to inform\", no burying mid-April under paragraph three.",
+  "humanOnly": false
+ },
+ {
+  "id": "E2",
+  "channel": "Email",
+  "title": "Declining firmly but warmly",
+  "raw": "hi thanks for thinking of us for the webinar, um honestly this quarter is just not possible, we're heads down on a launch, I don't want to half commit and then flake, maybe ping us again in the summer",
+  "bar": "The no is an actual no, early and clear. \"Don't want to half commit and then flake\" keeps its humanity â not \"unable to allocate bandwidth.\"",
+  "humanOnly": false
+ },
+ {
+  "id": "E3",
+  "channel": "Email",
+  "title": "The nudge on a dead thread",
+  "raw": "hi just floating this back up, um I sent the invoice details two weeks back and I know things get buried, we'd really like to close this out before month end, let me know if anything's missing from our side",
+  "bar": "Polite without being servile. No \"gentle reminder\" boilerplate unless you said it. Short â a nudge, not a letter.",
+  "humanOnly": false
+ },
+ {
+  "id": "E4",
+  "channel": "Email",
+  "title": "Long update to your manager",
+  "raw": "hi so the weekly update, um three things really, the launch prep is on track, QA finishes Wednesday and we're go for Tuesday, second thing the hiring loop, we did four onsites, two strong yes candidates, I'll send the debrief separately, and third, the thing I'm worried about, the vendor contract renewal is stuck with legal and if it slips past Friday it starts blocking the roadmap work, that one needs your help",
+  "bar": "The dictated three-part structure lands as three clear parts. The worry stays flagged as a worry, and the ask for help survives at the end.",
+  "humanOnly": false
+ },
+ {
+  "id": "N1",
+  "channel": "Slack",
+  "title": "Saying no to someone senior",
+  "raw": "hey so about adding the export feature to this sprint, um I have to push back on this one, the sprint is genuinely full and something would have to drop, if export goes in I'd suggest we drop the settings redesign, but I don't think we should just absorb it, that never works",
+  "bar": "\"I have to push back\" stays. \"That never works\" â your earned opinion â is not sanded into \"may present challenges.\"",
+  "humanOnly": false
+ },
+ {
+  "id": "N2",
+  "channel": "Slack",
+  "title": "Apologizing exactly once",
+  "raw": "hey um my bad on the standup confusion this morning, I misread the calendar, the demo is actually tomorrow not today, sorry about the fire drill, tomorrow same time works for everyone I hope",
+  "bar": "One \"my bad\" plus one \"sorry\" â as spoken â and no invented extra remorse. Light, quick, done.",
+  "humanOnly": false
+ },
+ {
+  "id": "N3",
+  "channel": "Email",
+  "title": "Correcting your own earlier email",
+  "raw": "hi quick correction on my last mail, um I said the invoice was forty five thousand, it's actually forty seven five, my mistake, the PO number stays the same, nothing else changes",
+  "bar": "47,500 lands correctly (say it naturally!). The correction is matter-of-fact â no drama, no over-apology.",
+  "humanOnly": false
+ },
+ {
+  "id": "N4",
+  "channel": "Slack",
+  "title": "Praise without corporate gloss",
+  "raw": "just want to say um the way Sneha handled that outage call yesterday was really something, she kept everyone calm, had the rollback ready before anyone asked, honestly we got lucky she was on call, worth a shoutout in the all hands I think",
+  "bar": "Warm and specific, in your words. Not inflated into \"exemplary incident management demonstrating outstanding leadership.\"",
+  "humanOnly": false
+ },
+ {
+  "id": "S1",
+  "channel": "Slack",
+  "title": "A dictated list stays a list",
+  "raw": "okay decisions from the design review, three things, one we're going with the tabbed layout, two dark mode ships in the same release not after, three the settings page moves to v2, that's it",
+  "bar": "Three items land as three scannable items (bullets or clean lines). No invented header, no fourth item, no meta-sentence about the list.",
+  "humanOnly": false
+ },
+ {
+  "id": "S2",
+  "channel": "Slack",
+  "title": "Self-correction mid-ramble",
+  "raw": "can we move the retro to Thursday, wait no hold on, Thursday is the town hall, okay Friday, let's do Friday afternoon, um after three works best",
+  "bar": "Lands as Friday afternoon after 3 â one clean ask. Thursday and the detour are gone, OR your exact words fall back with a visible flash. Wrong day = fail + fact-wrong tag.",
+  "humanOnly": false
+ },
+ {
+  "id": "S3",
+  "channel": "Email",
+  "title": "Ends on a real question",
+  "raw": "hi so I looked at the proposal, um most of it works for us, the only sticking point is the support SLA, four hours feels tight for our team size, would eight hours be acceptable on your side, that's really the only open thing",
+  "bar": "The email still ENDS with the question, as a question. Not converted into \"we would prefer eight hours.\"",
+  "humanOnly": false
+ },
+ {
+  "id": "I1",
+  "channel": "Slack",
+  "title": "Indian workplace idiom, one",
+  "raw": "hey um can we prepone the client call to eleven, the afternoon slot clashes with the town hall, and also please do share the deck before, whoever has the latest version kindly do the needful",
+  "bar": "\"Prepone\" survives or resolves to \"move up\" â either is fine, but the meaning holds. \"Do the needful\" may smooth into a plain ask; the TIME (11) must survive.",
+  "humanOnly": false
+ },
+ {
+  "id": "R1",
+  "channel": "Slack",
+  "title": "REPEAT of T2 — consistency check",
+  "raw": "(speak T2's status update again, from memory, in your own words â don't reread the script)",
+  "bar": "Compare against what T2 produced: same facts, same register, same shape. Pass = you couldn't tell which run was which. Different structure/tone for the same thought = fail, tag robotic or wrong register.",
+  "humanOnly": true
+ },
+ {
+  "id": "R2",
+  "channel": "Email",
+  "title": "REPEAT of E1 — consistency check",
+  "raw": "(speak E1's bad-news mail again, from memory, in your own words)",
+  "bar": "Same bar: equivalent output. The date, the two-weeks reason, and the call offer all land again; the tone doesn't wobble between runs.",
+  "humanOnly": true
+ }
+]

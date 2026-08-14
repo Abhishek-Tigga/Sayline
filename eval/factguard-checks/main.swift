@@ -580,5 +580,41 @@ check("but an invented relative time is still caught",
       kinds("we should park the export feature", "We should park the export feature next week.")
         .contains("invented-relative-time"))
 
+// Scale words. Found 2026-08-14 by scoring the fifteen rewrites the user
+// accepted against our own rules: the tens+units path stopped at 45, so
+// writing the figure the way a person writes it was two violations at
+// once — the number lost AND the number invented. It also cost
+// gpt-4.1-mini the Phase C bake-off, at 19% that was really 10%.
+print("\nspoken numbers survive being written as figures")
+check("a thousands scale word multiplies rather than being ignored",
+      kinds("I said the invoice was forty five thousand", "The invoice was 45,000.").isEmpty)
+check("so does hundred",
+      kinds("we need two hundred users", "We need 200 users.").isEmpty)
+check("and lakh, which is how this app's user says it",
+      kinds("the budget is about three lakh", "The budget is about 300,000.").isEmpty)
+check("scales chain",
+      kinds("that's two hundred thousand", "That's 200,000.").isEmpty)
+check("a unit beside a scale word is still pinned",
+      kinds("we need two hundred megs", "We need 200 GB.").contains("unit"))
+check("the scale word itself is not a unit to preserve",
+      !kinds("the budget is about three lakh", "The budget is about 300,000.").contains("unit"))
+// The boundary: dropping the scale changes the figure a thousandfold.
+check("dropping the scale is still caught",
+      kinds("budget is fifty thousand", "Budget is fifty.").contains("number"))
+check("and a genuinely invented number still is",
+      kinds("we need two servers", "We need 200 servers.").contains("invented-number"))
+
+// Digit list markers — the written twin of the "first, second" that
+// `enumerationMarkers` already skipped. The prompt *requires* enumerated
+// speech to come back as a list, so this fired on exactly the shape we
+// asked for.
+print("\na numbered list is a shape, not three new facts")
+check("line-leading digit markers are not invented numbers",
+      kinds("three things really, the launch is on track, hiring is done, legal is stuck",
+            "Three things:\n1. Launch on track\n2. Hiring done\n3. Legal stuck")
+        .isEmpty)
+check("but a digit mid-sentence is still a fact",
+      kinds("we have three things", "We have 7 things.").contains("invented-number"))
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

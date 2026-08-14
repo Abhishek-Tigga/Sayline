@@ -4900,3 +4900,101 @@ fragments were transcribed into the ledger. So:
 
 `gpt-4o-mini` stays the incumbent by default, not by merit. Recorded
 `claimed-fixed` for Phase B; Phase C is `measured, bar not closed`.
+
+---
+
+### WORK MODE · Phase B closed, Phase C decided, and two guard bugs the ideals found
+2026-08-14 · Opus · `claimed-fixed`, with one item `disputed`
+
+The fifteen accepted rewrites arrived, so the taste scorer and the
+few-shots were finally buildable. Building the scorer first turned out to
+matter more than what it was built for.
+
+**The ideals are now in the repo** — `eval/work-mode/ideals.json`, plus
+`ideals-normalized.json` with the em-dashes removed. Fable's caution was
+right and worth the check: 14 em-dashes across 10 of the 15, in a set whose
+own round-1 condition bans them. Normalizing keeps every word.
+
+**Pointing our stated rules at the ideals rejected 12 of 15.** That is the
+whole finding; everything below is what it turned out to mean.
+
+**1. `FactGuard` could not carry a spoken number across a scale word.**
+"Forty five thousand" pinned 45, so a rewrite writing "45,000" scored as
+the number lost *and* the number invented. Two violations for being
+correct. Fixed: `scaleWords` (hundred/thousand/lakh/crore/million/k),
+multiplying and chaining, with the scale excluded from unit pinning. Eight
+new suite cases including the boundaries that must still fire.
+
+This one had already cost a decision. Phase C measured gpt-4.1-mini at 19%
+and rejected it. The real number was 10% — the difference was this bug.
+
+**2. Digit list markers counted as invented numbers.** "1. / 2. / 3." at
+line start, on exactly the numbered list the prompt *requires*. The written
+twin of the "first, second" that `enumerationMarkers` already skipped.
+Fixed in `stripListMarkers`, anchored to line start, two digits max.
+
+**3. Few-shots make it worse. Not shipping them.** Three examples (N2, N1,
+E1) chosen for coverage per token, punctuation normalized:
+
+```
+gpt-4o-mini      sendable   no ceiling   soft   median   prompt
+bare              9/13 69%   11/13 84%     2    1317ms   ~686 tok
++3 few-shots      4/13 30%   10/13 76%     0    1337ms  ~1093 tok
+```
+
+Worse on the number that matters, no latency saved, +59% input tokens.
+The mechanism is not subtle: every extra failure is `longer-than-speech`.
+The ideals exceed the ceiling, so examples drawn from them teach a model
+to exceed it. Phase B's fourth criterion is answered, negatively.
+`taste_run.py --shots` keeps the arm reproducible.
+
+**4. Model switched to `gpt-4.1-mini`.** Re-measured on the fixed guard:
+
+```
+model          broke  rescued  fallback  median   taste  no ceiling
+gpt-4o-mini     10%      67%       3%    1087ms    69%       84%
+gpt-4.1-mini    10%     100%       0%    1092ms    84%      100%
+```
+
+Ties on violations and latency, never falls back where 4o-mini silently
+delivers Clean on 3% of work dictations, and is better on taste.
+
+**DISPUTED · the length ceiling.** Four of the fifteen accepted rewrites
+exceed it — N1 +1, T2 +2, E2 +2, N2 +2, all Slack, taking the shorter
+variant each time. And after the guard fixes, *every* remaining violation
+across the 31 transcripts, for both models, is `longer-than-speech`. Two
+independent lines of evidence say the ceiling is roughly two words too
+tight on Slack.
+
+Not changed, deliberately. It is Fable's Phase A decision, and
+`factguard-checks` pins it with a case that asserts one word longer *is*
+padding. Loosening it is a decision, not a bug fix, and it is coupled to
+item 3: if the ceiling moves, the few-shot result should be re-run before
+it is treated as settled.
+
+**Known limits, not fixed.** N3's "forty seven five" → "47,500" is Indian
+spoken shorthand; a heuristic for it would mangle real number sequences.
+The "₹" in the same rewrite is genuinely invented. S2 remains the
+self-correction cluster.
+
+Ran:
+- 7/7 deterministic suites green, `factguard-checks` +10 cases
+- `run.py --model gpt-4o-mini` → 10%, 67% rescued, 3% fallback, 1087ms
+- `run.py --model gpt-4.1-mini` → 10%, 100% rescued, 0% fallback, 1092ms
+- `taste_run.py` × 3 arms, scored by `taste_score.py`
+- calibration: the ideals themselves score 11/15 ignoring the ceiling, so
+  84–100% is at the target's own level and 100% is not the scale's top
+
+Two harness bugs fixed while measuring, both of which had produced numbers:
+`taste_run.py` sent `workPrompt` for email cases instead of
+`workPromptEmail`, so all six were scored against a prompt production never
+uses; and R1/R2 are stage directions to the human tester ("speak E1's mail
+again, from memory"), which the runner fed to the model — R2's invented
+month and name were it rewriting an instruction. Both now excluded.
+
+`fastroute-checks` had rotted again — `MediaControl.swift` and
+`NowPlaying.swift`. Fourth instance of that class; CLAUDE.md now says so
+and `BACKLOG.md` carries the generated-target fix.
+
+Not verified by me and cannot be: the taste scorer checks stated rules, not
+whether the user would send the text. Round 2 is still the arbiter.

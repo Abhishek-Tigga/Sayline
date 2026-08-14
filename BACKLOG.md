@@ -847,3 +847,33 @@ of another theory.
 These would likely need MCP-style integrations or dedicated APIs per
 service — real work, deliberately not started until the current small
 action set is solid.
+
+## Deterministic suites: replace the hand-maintained compile lines
+
+**Parked because it is a build-system change, not a fix.**
+
+The seven `swiftc` lines in `CLAUDE.md` are a hand-copied dependency graph
+the compiler already knows. It has rotted four times: `AgentRouter` twice,
+`FactGuard` needing `AppContext.swift`, and `fastroute` needing
+`MediaControl.swift` + `NowPlaying.swift` on 2026-08-14. Each time the
+suite went quiet rather than red, which is the dangerous direction.
+
+Unparks when: a test target exists in `project.yml`, so the suites compile
+against the real module and a missing dependency is a build error rather
+than a silently skipped check.
+
+## Work mode: the length ceiling may be ~2 words too tight
+
+**Parked because it is Fable's Phase A decision, not ours to reverse.**
+
+Two independent lines of evidence, 2026-08-14. Four of the fifteen accepted
+rewrites exceed the ceiling (N1 +1, T2 +2, E2 +2, N2 +2, all Slack), and
+every remaining guard violation across the 31 transcripts on both models is
+`longer-than-speech`.
+
+`factguard-checks` pins the current rule with a case asserting one word
+longer is padding, so changing it means changing that case deliberately.
+
+Unparks when: Fable rules. If it moves, re-run the few-shot arm
+(`taste_run.py --shots`) before treating that result as settled — the
+few-shots were rejected *for* teaching length.

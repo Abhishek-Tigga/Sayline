@@ -37,9 +37,34 @@ import Foundation
 /// Incidentally this leaves Groq's free tier, the standing operational
 /// risk — the 8B baseline aborted that very run at 13 of 31 calls.
 ///
+/// **Superseded 2026-08-14: the model is now `gpt-4.1-mini`.** The 2.2 s
+/// above was real and is no longer, so the reason it lost has gone:
+///
+/// ```
+///                broke  rescued  fallback  median   taste  taste, no ceiling
+/// gpt-4o-mini     10%      67%       3%    1087ms    69%          84%
+/// gpt-4.1-mini    10%     100%       0%    1092ms    84%         100%
+/// ```
+///
+/// Same violation rate, same latency to within noise, and it never falls
+/// back — 4o-mini silently delivers Clean on 3% of work dictations, which
+/// is the failure the user actually notices. `taste` is `taste_score.py`
+/// over the 13 auto-runnable scripts from round 1.
+///
+/// It read 19% here in the Phase C bake-off two days earlier, and lost on
+/// that. That number was the guard's, not the model's: `FactGuard` could
+/// not carry a spoken number across a scale word, so "forty five
+/// thousand" rewritten as "45,000" scored as a number both lost and
+/// invented. Fixing the guard moved 4.1-mini from 19% to 10% and left
+/// 4o-mini where it was.
+///
+/// Every violation now left in the 31 — for both models — is
+/// `longer-than-speech`, which is the one rule the fifteen rewrites the
+/// user accepted also break. See `review/LEDGER.md`.
+///
 final class WorkModeCleaner {
     private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
-    private let model = "gpt-4o-mini"
+    private let model = "gpt-4.1-mini"
 
     /// What happened, so the caller can flash the right thing and the log
     /// can answer "does the guard fire too often" as a lookup.

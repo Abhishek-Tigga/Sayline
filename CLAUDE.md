@@ -109,7 +109,11 @@ confident pass — that happened on 2026-08-11 and nearly shipped.
 **Run them after changing any file they compile.** These lines rot: when a
 source file gains a dependency, its command stops compiling and the suite
 goes quiet rather than red. FactGuard needing `AppContext.swift` broke this
-block on 2026-08-14 — the third instance of the same class. The eval's own
+block on 2026-08-14 — the third instance of the same class, and
+`fastroute` needing `MediaControl.swift` and `NowPlaying.swift` was the
+fourth, the same afternoon. Four instances is a pattern, not bad luck:
+this block is a hand-maintained copy of a dependency graph the compiler
+already knows. Replacing it with a generated target is in `BACKLOG.md`. The eval's own
 verifier binary rots the same way and for the same reason: after any guard
 change, rebuild it before trusting a number, or it scores with the old
 rules. That one produced a 39% that was really 29%.
@@ -120,6 +124,7 @@ swiftc -o /tmp/chk Sources/Sayline/FollowUp.swift eval/consent-checks/main.swift
 swiftc -o /tmp/chk Sources/Sayline/LocalTimestamp.swift eval/timestamp-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCatalog.swift \
   Sources/Sayline/InstalledAppCatalog.swift Sources/Sayline/FastRoute.swift \
+  Sources/Sayline/MediaControl.swift Sources/Sayline/NowPlaying.swift \
   Sources/Sayline/SaylineLog.swift eval/fastroute-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
