@@ -55,6 +55,14 @@ enum WhisperHallucination {
     /// True when this looks like something Whisper made up rather than
     /// something the user said.
     static func isLikelyHallucinated(_ transcript: String, audioPeak: Float) -> Bool {
+        // Checked before the loudness gate, deliberately: the repetition
+        // loop ("Tate Seri Bajol, Tate Seri Bajol, Tate Seri Bajol" —
+        // live, 2026-08-14, routed to a YouTube search) arrives from
+        // audio of any loudness, and even if the hold contained real
+        // speech, a looping transcript is certainly not what was said.
+        // Discarding it visibly beats typing or executing it.
+        if hasRepetitionLoop(transcript) { return true }
+
         // Loud enough to be real speech — believe the transcript whatever
         // it says. This is what protects a genuine "thank you".
         guard audioPeak < spokenPeakThreshold else { return false }
@@ -71,5 +79,38 @@ enum WhisperHallucination {
 
         return phrases.contains(normalized)
             || phrases.contains(transcript.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
+    /// The decoder stuck in a loop: one multi-word phrase, immediately
+    /// repeated three or more times. A known Whisper failure shape.
+    ///
+    /// Multi-word only, on purpose. Single-word runs are real speech —
+    /// "no no no", "very very good" — and stay untouched however long.
+    /// A person *can* deliberately dictate "I said no. I said no. I said
+    /// no." and would lose it here; that residual risk is accepted
+    /// because the discard is visible ("Didn't catch that"), while a
+    /// looping transcript typed into a document — or executed as an
+    /// agent command — is not.
+    static func hasRepetitionLoop(_ transcript: String) -> Bool {
+        let words = transcript.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+        guard words.count >= 6 else { return false }
+
+        for size in 2...5 where size * 3 <= words.count {
+            for start in 0...(words.count - size * 3) {
+                let phrase = Array(words[start..<start + size])
+                // A phrase of one repeated word ("no no") would make any
+                // long single-word run count as a multi-word loop — the
+                // exact false positive the multi-word rule exists to
+                // avoid. Caught by the suite before it shipped.
+                guard Set(phrase).count > 1 else { continue }
+                if Array(words[start + size..<start + size * 2]) == phrase,
+                   Array(words[start + size * 2..<start + size * 3]) == phrase {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }

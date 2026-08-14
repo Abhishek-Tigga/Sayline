@@ -136,6 +136,8 @@ swiftc -o /tmp/chk Sources/Sayline/ShareLink.swift Sources/Sayline/VocabularyBia
   eval/whatsapp-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/VocabularyBias.swift \
   eval/bias-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/WhisperHallucination.swift \
+  eval/hallucination-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/SpokenNumbers.swift \
   Sources/Sayline/AppContext.swift eval/factguard-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/SpeechPatterns.swift \

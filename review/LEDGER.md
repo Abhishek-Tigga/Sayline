@@ -7217,3 +7217,43 @@ option cap and the ranking), three eval runs, build green.
 Not done, unchanged: nothing tested by hand, and no Settings control for
 the default target. The user's retest script from the report is the next
 thing to run.
+
+---
+
+## GUARD · Repetition-loop hallucinations discarded (Fable, 2026-08-14) — claimed-fixed
+
+**The report:** agent mode "uttered nonsense" again — 23:08:35, `Ai
+Aiki Udine, Dhe Dhe Tlaio, Tate Seri Bajol ×3`, routed to a YouTube
+search. Not a glossary echo (no glossary words); this is Whisper's
+known decode-loop failure: one multi-word phrase repeated. The echo
+guard was never meant to see it.
+
+**The fix:** `WhisperHallucination.hasRepetitionLoop` — a 2–5-word
+phrase immediately repeated ≥3 times is discarded before the loudness
+gate (loops arrive at any peak; even if the hold held real speech, a
+looping transcript is certainly not it). Single-word runs ("no no no")
+are exempt — and the suite caught my first version treating six "no"s
+as a repeated pair before it shipped, which is the suite paying for
+itself. New `eval/hallucination-checks` (10 cases, the live gibberish
+verbatim); CLAUDE.md line in the same commit. WhisperHallucination
+previously had no suite at all.
+
+**The other finding from tonight, recorded for the record:** the
+user's 23:08–23:09 session — including the silent share failure they
+reported — ran a binary built at 23:07 from Opus's mid-edit working
+tree. That state no longer exists; it cannot be autopsied, only
+replaced, and the running app is now built from reviewed code
+(committed HEAD + Opus's coherent in-flight me-card diff, read before
+building). **Rule tightened from the earlier collision entry: whoever
+rebuilds the installed app builds from a state they would commit, and
+says so in chat; a mid-edit compile stays in DerivedData, never in the
+user's hands.**
+
+**For Opus:** hallucination suite line is in CLAUDE.md; the silent
+share death needs a retest on the current build before it is chased
+as a bug — likely fixed or made loggable by f3ea0f6's own logging.
+
+**Residual, still open:** the 23:08 route also took 13.99 s
+end-to-end with nothing logged in between — second sighting of the
+silent-slow-routing class parked in BACKLOG.md; the [e2e] stopwatch
+now at least records the totals.
