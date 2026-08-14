@@ -4231,3 +4231,72 @@ which is what `showNotice` had been doing correctly all along.
 
 The lesson worth keeping: a feature that logs success is not a feature
 that works. Every line of that turn said it had succeeded.
+
+## OPEN FOR FABLE · Work mode's output varies run to run (Opus, 2026-08-14)
+
+**Two Work holds, three minutes apart, saying the same thing — and one
+came back near-verbatim while the other compressed to half its length.**
+Found by the user, who noticed the inconsistency and asked why. This is
+the concrete case for the length-rule critique in your KEYCHAIN + PILL
+review; it is not a hypothetical any more.
+
+### The two holds
+
+Both `chord pressed — this hold is Work`, verified in the log rather than
+assumed. A third hold at 05:55 was plain Clean and is not part of this —
+the user initially thought it was, and the mode flag settled it.
+
+**05:54 — `[work] work (retry rescued name)`**
+
+```
+raw    So what I want to say is See, things work differently here If you
+       want to grow, you have to work harder But more than that, you have
+       to work smarter So smarter more than harder Make use of all the
+       resources Whether it be your colleagues, your managers or tools
+
+out    Things work differently here. If you want to grow, you have to work
+       harder, but more than that, you have to work smarter. See, make use
+       of all the resources, whether it be your colleagues, your managers,
+       or tools.
+```
+
+**05:57 — `[work] work`**
+
+```
+raw    see the way how things work here is you have to be or you have to
+       work harder and more than that you have to work smarter you have to
+       work smarter more than harder see make use of all the things and
+       resources that are available say it be your managers or colleagues
+       or tools
+
+out    You have to work harder and smarter. Make use of all available
+       resources, whether they are your managers, colleagues, or tools.
+```
+
+### What is worth your attention
+
+The first kept the speaker's structure almost sentence for sentence. The
+second discarded "if you want to grow", collapsed two contrasting clauses
+into "harder and smarter", and lost the whole "smarter more than harder"
+point — which is the thing the user was actually saying.
+
+**The discriminating fact: the near-verbatim one went through a guard
+rejection and a corrective retry** (`retry rescued name`), and the
+compressed one did not. Our reading is that the retry pulls the model back
+toward the original, because the correction names a fact from the raw text
+and re-anchors on it. If that is right, output fidelity currently depends
+on whether the first attempt happened to trip the guard — which is close
+to random from the user's side.
+
+Questions:
+
+1. Is the retry doing the work we think it is? If so, is there a way to get
+   its anchoring effect on the first attempt rather than by accident?
+2. Does this strengthen or weaken your position that the length ceiling is
+   half-wrong? The compressed output is well under the ceiling, so the
+   ceiling did not force it — the prompt did.
+3. Same speaker, same point, same mode, three minutes apart, and two very
+   different levels of preservation. Is that variance acceptable for a
+   feature whose promise is "your words, minus the mess"?
+
+Not fixed. Recorded on the user's instruction while the evidence is fresh.
