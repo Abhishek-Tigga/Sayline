@@ -6414,3 +6414,71 @@ by reading the landed code.
    equivalence.
 Opus verifies the batch per the role swap. Nothing here touches
 routing, guard logic, prompts, or any measured behavior.
+
+---
+
+### EXPERIMENT · Apple on-device Foundation Model — plumbing built, measurement blocked
+2026-08-14 · Opus · `claimed-fixed` (plumbing only; no numbers yet)
+
+**This experiment ran on the user's call to measure work mode too, over
+the reviewer's expectation that a small on-device model would fail that
+bar. Whichever way it lands, asking for the measurement was right — the
+Clean punctuation diagnosis and gpt-4.1-mini's 19% were both assumptions
+that measurement overturned this week.**
+
+**Blocked, one toggle:** `--fm-check` reports
+`{"available": false, "reason": "appleIntelligenceNotEnabled"}`. The Mac
+qualifies otherwise — macOS 26.3, arm64, `FoundationModels.framework`
+present in both the system and the SDK, Xcode 26.5. Apple Intelligence
+has to be switched on in System Settings, and the first enable downloads
+the model. Nothing else stands in the way.
+
+**Built and verified, additive only.** Touched `HeadlessModes.swift` and
+new files under `eval/foundation-model/` — nothing named in Fable's
+pending fix batch, so the batch can land without collision.
+
+- `--fm-check` prints availability and, when unavailable, **which**
+  condition failed (`deviceNotEligible` / `appleIntelligenceNotEnabled` /
+  `modelNotReady`). Verified live: it is the reason above.
+- `--fm-clean` and `--fm-work` are stdin/stdout batch modes. Verified
+  they refuse cleanly with exit 3 and a classified reason rather than
+  crashing or emitting a partial arm.
+- The API was read from the SDK's own `.swiftinterface`, not recalled:
+  `SystemLanguageModel.default.availability`,
+  `LanguageModelSession(instructions:)`, `respond(to:options:)`,
+  `GenerationOptions(temperature:)`, `prewarm()`, and the
+  `GenerationError` cases that make a refusal distinguishable from a
+  context-window failure.
+- **Refusals are a counted class, never a silent retry.**
+  `guardrailViolation`, `refusal` and empty output are logged as
+  `fm-refusal`, a context overflow as `fm-error:context-window`, and both
+  count as fallbacks. A model that declines to process ordinary work text
+  has failed in a way an accuracy average would hide.
+- Work arm runs the full pipeline **inside the binary** — pinned facts,
+  `FactGuard.verify`, one corrective retry naming the broken fact,
+  fallback — because those semantics ship there and a Python
+  reimplementation is the copy-drift class this project has paid for
+  twice.
+- Warm-up is timed separately from the per-call distribution, because a
+  cold first dictation is what a user would actually feel.
+
+**One deviation, declared in advance rather than discovered later.** Work
+mode sends its three worked examples as alternating user/assistant chat
+messages; `LanguageModelSession.respond(to:)` takes instructions plus a
+single prompt and has no assistant-turn equivalent. The examples are
+folded into the instructions as labelled text. If the work arm loses on
+taste, this is a candidate cause and must be named before the loss is
+attributed to the model.
+
+**Bars, unchanged and pre-committed.** Clean ships only on score ≥ the
+8B's 25/26 on the same set, p90 ≤ 500 ms, and zero refusals across the
+19. Work ships only on fact-break ≤ 10%, ideals within 3 points of
+13/13, and latency within budget. Mixed outcomes are expected and fine.
+
+Ran: build clean, `--fm-check` live, batch modes' unavailable path
+verified, factguard/speech-pattern/cleanup suites green, work-mode
+calibration 14/15 unchanged.
+
+Next: the user enables Apple Intelligence, then
+`eval/foundation-model/run.py --arm clean` and `--arm work`. No numbers
+are claimed here, and none should be quoted from this entry.

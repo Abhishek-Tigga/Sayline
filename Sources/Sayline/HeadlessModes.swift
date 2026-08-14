@@ -1,5 +1,8 @@
 import Foundation
 import AVFoundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 /// Command-line modes the app answers before it becomes an app.
 ///
@@ -30,6 +33,19 @@ enum HeadlessModes {
             parseActions()
         case "--work-rewrite":
             workRewrite(arguments: arguments)
+        case "--fm-check", "--fm-clean", "--fm-work":
+            // Measurement modes for the on-device model experiment. Gated
+            // at runtime as well as compile time: the binary must still
+            // launch on a Mac that has neither.
+            if #available(macOS 26.0, *) {
+                switch arguments[1] {
+                case "--fm-check": emit(foundationModelAvailability()); exit(0)
+                case "--fm-clean": foundationModelBatch(work: false)
+                default:           foundationModelBatch(work: true)
+                }
+            } else {
+                emit(["available": false, "reason": "macOSBelow26"]); exit(3)
+            }
         case "--selftest-capture":
             let seconds = arguments.count > 2 ? Double(arguments[2]) ?? 3 : 3
             let holds = arguments.count > 3 ? Int(arguments[3]) ?? 1 : 1
@@ -383,5 +399,184 @@ extension HeadlessModes {
               ? "PASS — every hold met the contract (first-of-session < 900ms, warm < 150ms)"
               : "FAIL — \(failures) hold(s) broke the contract")
         exit(failures == 0 ? 0 : 1)
+    }
+}
+
+// MARK: - Apple on-device Foundation Model, measurement only
+
+/// Batch modes for the FoundationModels experiment (2026-08-14).
+///
+/// **Measurement only. Nothing here is wired into a production path.**
+/// The question is whether macOS 26's built-in on-device model — free,
+/// private, no download — can replace the cloud 8B for Clean and/or
+/// `gpt-4.1-mini` for Work. The harnesses shell to these modes for the
+/// same reason every other harness reads `--dump-config`: the prompt and
+/// the guard under test must be the ones that ship, not a copy.
+///
+/// One deviation from production is unavoidable and is measured as such.
+/// Work mode sends its three worked examples as alternating user and
+/// assistant chat messages; `LanguageModelSession.respond(to:)` takes
+/// instructions and a single prompt, with no assistant-turn equivalent in
+/// that path. The examples are therefore folded into the instructions as
+/// labelled text. If the Work arm loses on taste, that is one of the
+/// candidate reasons and the ledger says so.
+@available(macOS 26.0, *)
+extension HeadlessModes {
+
+    /// Availability, and *which* condition failed when it is not.
+    static func foundationModelAvailability() -> [String: Any] {
+        let model = SystemLanguageModel.default
+        switch model.availability {
+        case .available:
+            return ["available": true]
+        case .unavailable(let reason):
+            let name: String
+            switch reason {
+            case .deviceNotEligible: name = "deviceNotEligible"
+            case .appleIntelligenceNotEnabled: name = "appleIntelligenceNotEnabled"
+            case .modelNotReady: name = "modelNotReady"
+            @unknown default: name = "unknown"
+            }
+            return ["available": false, "reason": name]
+        @unknown default:
+            return ["available": false, "reason": "unknown"]
+        }
+    }
+
+    /// One transcript through the on-device model.
+    ///
+    /// Returns the text, or a classified failure. A refusal is never
+    /// retried into the score — it is a fallback, counted as its own
+    /// class, because a model that declines to process ordinary work text
+    /// has failed in a way an accuracy number would hide.
+    private static func fmRespond(session: LanguageModelSession,
+                                  prompt: String) async -> (text: String?, failure: String?) {
+        do {
+            let options = GenerationOptions(temperature: 0)
+            let response = try await session.respond(to: prompt, options: options)
+            let text = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? (nil, "fm-refusal:empty") : (text, nil)
+        } catch let error as LanguageModelSession.GenerationError {
+            switch error {
+            case .guardrailViolation:        return (nil, "fm-refusal:guardrail")
+            case .refusal:                   return (nil, "fm-refusal:refusal")
+            case .exceededContextWindowSize: return (nil, "fm-error:context-window")
+            case .unsupportedLanguageOrLocale: return (nil, "fm-error:locale")
+            case .assetsUnavailable:         return (nil, "fm-error:assets")
+            default:                         return (nil, "fm-error:\(error)")
+            }
+        } catch {
+            return (nil, "fm-error:\(error)")
+        }
+    }
+
+    /// stdin: one `{"id","raw"}` per line. stdout: one result per line.
+    ///
+    /// `--fm-clean` runs Clean's shipping prompt and leaves validation to
+    /// the harness, which applies `TranscriptCleanupValidator` exactly as
+    /// production does. `--fm-work` runs the whole work pipeline in here —
+    /// prompt, `FactGuard.verify`, one corrective retry, fallback —
+    /// because those semantics live in the binary and reproducing them in
+    /// Python is the copy-drift failure this project has paid for twice.
+    static func foundationModelBatch(work: Bool) {
+        let availability = foundationModelAvailability()
+        guard availability["available"] as? Bool == true else {
+            emit(["fatal": "foundation model unavailable", "availability": availability])
+            exit(3)
+        }
+
+        let instructions: String
+        if work {
+            let examples = WorkModeCleaner.examples.map {
+                "Spoken:\n\($0.spoken)\n\nWritten:\n\($0.written.trimmingCharacters(in: .whitespacesAndNewlines))"
+            }.joined(separator: "\n\n---\n\n")
+            instructions = WorkModeCleaner.promptForContext(.general, signOffName: "")
+                + "\n\nWorked examples:\n\n" + examples
+        } else {
+            instructions = TranscriptCleaner.cleanPrompt
+        }
+
+        let session = LanguageModelSession(instructions: instructions)
+
+        // On-device models pay a load cost on first use. Measured
+        // separately so it does not smear across the per-call
+        // distribution, and reported, because a cold first dictation is
+        // what a user would actually feel.
+        let warmStart = Date()
+        session.prewarm()
+        let warmup = Date().timeIntervalSince(warmStart) * 1000
+
+        var lines: [(id: String, raw: String)] = []
+        while let line = readLine(strippingNewline: true), !line.isEmpty {
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let id = obj["id"] as? String, let raw = obj["raw"] as? String else { continue }
+            lines.append((id, raw))
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        Task {
+            var first = true
+            for entry in lines {
+                let started = Date()
+                var payload: [String: Any] = ["id": entry.id]
+
+                if work {
+                    let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: entry.raw))
+                    let prompt = pinned.isEmpty ? entry.raw
+                        : "\(entry.raw)\n\n[facts that must survive]\n\(pinned)"
+                    let attempt = await fmRespond(session: session, prompt: prompt)
+
+                    if let failure = attempt.failure {
+                        payload["outcome"] = "fellBack"
+                        payload["failure"] = failure
+                    } else if let text = attempt.text {
+                        let violations = FactGuard.verify(raw: entry.raw, rewrite: text,
+                                                          context: .general)
+                        if violations.isEmpty {
+                            payload["outcome"] = "rewritten"
+                            payload["out"] = text
+                        } else {
+                            // One corrective retry, naming the broken
+                            // fact — the same shape production uses.
+                            let why = violations.map(\.explanation).joined(separator: "; ")
+                            let retry = await fmRespond(
+                                session: session,
+                                prompt: "\(entry.raw)\n\nYour previous answer broke a fact: "
+                                    + "\(why). Rewrite it again, keeping every fact.")
+                            if let retryText = retry.text {
+                                let retryViolations = FactGuard.verify(
+                                    raw: entry.raw, rewrite: retryText, context: .general)
+                                payload["outcome"] = retryViolations.isEmpty ? "rescued" : "fellBack"
+                                payload["out"] = retryText
+                                payload["firstBroke"] = violations.map(\.kind)
+                                if !retryViolations.isEmpty {
+                                    payload["violations"] = retryViolations.map(\.kind)
+                                }
+                            } else {
+                                payload["outcome"] = "fellBack"
+                                payload["failure"] = retry.failure ?? "unknown"
+                                payload["firstBroke"] = violations.map(\.kind)
+                            }
+                        }
+                    }
+                } else {
+                    let attempt = await fmRespond(session: session, prompt: entry.raw)
+                    if let text = attempt.text {
+                        payload["out"] = text
+                    } else {
+                        payload["failure"] = attempt.failure ?? "unknown"
+                    }
+                }
+
+                payload["ms"] = Date().timeIntervalSince(started) * 1000
+                if first { payload["firstCall"] = true; first = false }
+                emit(payload)
+            }
+            emit(["summary": true, "warmupMs": warmup, "count": lines.count])
+            semaphore.signal()
+        }
+        semaphore.wait()
+        exit(0)
     }
 }
