@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clean mode — baseline round 1</title>
+<style>
+:root{--bg:#faf9f6;--card:#fff;--ink:#1a1a1a;--mut:#6b6a66;--line:#e4e2dc;--pass:#e7f2e3;--passb:#5a8a4a;--fail:#fbe9e7;--failb:#b0492f;--skip:#f0efe9;--accent:#4a5568}
+@media (prefers-color-scheme:dark){:root{--bg:#191917;--card:#222220;--ink:#eceae5;--mut:#98968f;--line:#3a3934;--pass:#26331f;--passb:#8fbf7a;--fail:#3a2320;--failb:#e08b70;--skip:#2a2926;--accent:#a9b4c4}}
+*{box-sizing:border-box}
+body{font:16px/1.6 -apple-system,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 20px 80px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+h2{font-size:17px;font-weight:600;margin:36px 0 4px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 12px}
+.bar{position:sticky;top:0;background:var(--bg);padding:10px 0;display:flex;gap:16px;align-items:center;font-size:14px;border-bottom:1px solid var(--line);z-index:5}
+.bar b{font-size:18px}
+.case{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0}
+.case.p{border-color:var(--passb)}
+.case.f{border-color:var(--failb)}
+.case.s{opacity:.55}
+.case h3{font-size:15px;font-weight:600;margin:0 0 2px}
+.room{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;background:var(--skip);color:var(--mut);margin-left:6px;vertical-align:1px}
+.say{background:var(--skip);border-radius:8px;padding:10px 12px;font-size:14.5px;margin:8px 0;font-style:italic}
+.say::before{content:"Speak (single press-hold, drift freely): ";font-style:normal;font-weight:600;font-size:12px;color:var(--mut);display:block;margin-bottom:2px}
+.good{font-size:13.5px;color:var(--mut);margin:6px 0 10px}
+.good b{color:var(--ink)}
+.btns{display:flex;gap:8px;margin:8px 0}
+.btns button{font-size:13px;padding:5px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.btns button.on-p{background:var(--pass);border-color:var(--passb);font-weight:600}
+.btns button.on-f{background:var(--fail);border-color:var(--failb);font-weight:600}
+.btns button.on-s{background:var(--skip);font-weight:600}
+.tags{display:none;flex-wrap:wrap;gap:6px;margin:8px 0}
+.case.f .tags{display:flex}
+.tags span{font-size:12px;padding:3px 10px;border-radius:12px;border:1px solid var(--line);cursor:pointer;color:var(--mut)}
+.tags span.on{background:var(--fail);border-color:var(--failb);color:var(--ink)}
+textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:13.5px/1.5 ui-monospace,Menlo,monospace;padding:8px 10px;margin:4px 0;resize:vertical}
+textarea.landed{min-height:54px}
+textarea.remark{min-height:36px;font-family:inherit}
+label{font-size:12px;font-weight:600;color:var(--mut)}
+.export{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.note{font-size:13.5px;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<main>
+<h1>Clean mode — baseline, round 1</h1>
+<p class="sub">18 cases · the bar is <b>fidelity plus polish</b>: is this exactly what you said, cleanly — nothing you'd fix by hand? Not work mode's rewrite bar. A word lost that you meant, a comma you'd add, a retraction left dangling — all fails.</p>
+<div class="note">Protocol: <b>single press-hold</b> (no chord) into any ordinary text field unless the case names one. Speak naturally, drift freely. Paste what landed, mark, tag fails, remark where tags miss. <b>Export downloads a file</b> — do it partway through, not only at the end.</div>
+<div class="note" style="border-color:#c86"><b>Group C will mostly fail today — that is the point.</b> Scoped self-correction is approved but not built; these cases record the baseline and become the feature's acceptance tests. Mark them honestly against the printed pass criteria, not against what today's app can do.</div>
+<div class="note"><b>Group B is you writing policy.</b> For each grammar pattern: if Clean corrected it, say in the remark whether you WANTED that correction; if it kept it, say whether you wanted it fixed. Your remarks become the per-pattern rules — "prepone stays, revert-back gets fixed" is a decision only you can make.</div>
+
+<div class="bar"><span>Pass <b id="np">0</b></span><span>Fail <b id="nf">0</b></span><span>Left <b id="nr">18</b></span><span id="save" style="color:var(--mut);font-size:12px"></span></div>
+
+<div id="cases"></div>
+</main>
+<button class="export" onclick="doExport()">Export results</button>
+<script>
+const TAGS=["punctuation wrong","grammar missed","overcorrected","word lost","word changed","correction not resolved","no paragraphs","too clean","number-time format","transcription mishear"];
+const CASES=[
+["A","Punctuation","Your complaint #1. Judge commas, periods, question marks — would you touch any of them?"],
+["A1","any field","Greeting comma and a question",
+"hey Priya quick question um is the staging environment back up because I need to test the reminder flow before the demo",
+"Comma after the greeting, a real question mark, sensible sentence split. \"Hey Priya, quick question — is the staging environment back up? I need to test…\" or equivalent."],
+["A2","any field","Run-on that needs periods",
+"so the deploy went fine no errors the only weird thing is the dashboard takes like five seconds to load the first time after that it's instant",
+"Split into 2–3 sentences at the right joints. No comma splices, no one giant sentence."],
+["A3","any field","Question buried mid-flow",
+"did you get a chance to look at the PR I pushed last night no rush just checking",
+"Question mark on the question, period on the tail: \"…last night? No rush, just checking.\""],
+["A4","any field","A spoken list, punctuated — not bulleted",
+"we need three things from the vendor the sandbox access the API docs and a support contact",
+"Clean punctuation — colon or commas. NOT bullets; Clean never invents structure. \"We need three things from the vendor: sandbox access, the API docs, and a support contact.\""],
+["B","Grammar policy","You rule per pattern — the remark is the decision."],
+["B1","any field","The 'don't think so' construction",
+"I don't think so caching is the issue here it's probably the query",
+"Your call: corrected to \"I don't think caching is the issue\" — or kept? Mark pass only if it did what YOU want done every time."],
+["B2","any field","Revert back, discuss about",
+"please revert back to me by evening once you have discussed about the pricing with the team",
+"Two patterns in one: \"revert back\" and \"discussed about\". Rule on each in the remark — fix, or keep as your natural register?"],
+["B3","any field","Prepone and 'the both'",
+"do one thing just prepone the standup to nine thirty and inform the both teams",
+"Precedent: prepone SURVIVES (your I1 ruling). \"the both teams\" → \"both teams\"? \"do one thing\" — keep or drop? Rule on each."],
+["B4","any field","Topic-fronted 'myself/you please'",
+"myself I will handle the client call you please take care of the demo setup",
+"Your call on both: \"Myself, I will handle\" → \"I'll handle\"? \"you please take care\" → \"please take care\"? Mark against your own wanted outcome."],
+["C","Self-correction","Approved, not yet built. Baseline these honestly — printed criteria are the FUTURE behavior."],
+["C1","any field","Day retraction with a reason (your example)",
+"let's go there on Tuesday wait no Tuesday I am busy maybe let's try Thursday",
+"Target: \"Tuesday I am busy — maybe let's try Thursday.\" The retracted plan and the marker die; the reason and the hedge survive. Today it will keep everything — mark fail with 'correction not resolved'."],
+["C2","any field","Number correction",
+"tell finance to release forty thousand uh sorry forty five thousand for the vendor invoice",
+"Target: only 45,000 lands. A reader must never see the wrong 40,000."],
+["C3","any field","Name correction, reason kept",
+"ask Rohan to review it no wait I mean Rohit Rohan's on leave",
+"Target: \"Ask Rohit to review it — Rohan's on leave.\" Second Rohan survives (it's the reason)."],
+["C4","any field","CONTROL — two real days, no marker: must NOT resolve",
+"move Tuesday's meeting to Thursday",
+"Both days are real. Pass = untouched (this should pass TODAY and forever). If anything ever drops Tuesday here, that is a serious fail."],
+["C5","any field","CONTROL — abandoned idea, no replacement: must NOT resolve",
+"we could also loop in the design team actually no forget it let's keep this small",
+"No same-kind replacement, so nothing may be dropped. Pass = kept verbatim (cleaned), today and after the build."],
+["D","Long-form and prompts","Your Claude-dictation use case."],
+["D1","Claude/ChatGPT","A prompt with a mid-stream correction and technical terms",
+"okay write me a function that takes the user list and filters by signup date use the created field no wait use the activated field created has nulls and return them sorted newest first also add a limit parameter default fifty",
+"Technical terms survive exactly (created, activated, nulls, limit, fifty/50). Baseline the correction handling: today both fields will appear — note how confusing the result reads."],
+["D2","any field","Sixty-second ramble — does it become a wall?",
+"speak ~60 seconds across two topics: first the status of anything real you're working on, then a separate ask for tomorrow. Your real words, two clearly different subjects.",
+"Baseline for paragraph breaks: did it land as one wall of text? Would a break between the two topics have helped? Say so in the remark — this decides whether the paragraph-breaks feature gets built."],
+["D3","any field","Exact identifiers must survive",
+"rename the function handle hotkey up to handle hotkey release in agent router dot swift and update the call sites",
+"The identifiers land usably (handleHotkeyUp / AgentRouter.swift or a faithful spoken form). Tag 'transcription mishear' if Whisper mangled them — that's the vocab fix's evidence, not Clean's fault."],
+["E","Fidelity traps",""],
+["E1","any field","Numbers and times, formatted",
+"the call moved from four thirty to two forty five and the budget is forty seven and a half thousand",
+"4:30, 2:45, and 47,500 land as numbers you'd write. Tag 'number-time format' if any came out weird."],
+["E2","Terminal","CONTROL — code window forces verbatim",
+"single press in Terminal: um so this is a test of verbatim mode you know with all the fillers kept",
+"Pass = raw words untouched, fillers and all. Code context must override Clean entirely, as always."],
+["F","Consistency",""],
+["F1","any field","REPEAT of A2, from memory",
+"(say A2's deploy status again from memory, in your own words — don't reread)",
+"Compare with A2's output: same punctuation choices, same splits, same quality. Pass = you couldn't tell which run was which."]
+];
+const state=JSON.parse(localStorage.getItem('clean1')||'{}');
+const wrap=document.getElementById('cases');
+let html='';let lastGroup='';
+const groups={};
+for(const c of CASES){
+if(c.length===3){html+='<h2>'+c[0]+' · '+c[1]+'</h2>';if(c[2])html+='<p class="sub">'+c[2]+'</p>';continue;}
+const[id,room,title,say,good]=c;
+const st=state[id]||{};
+html+='<div class="case '+(st.v||'')+'" id="c-'+id+'"><h3>'+id+' · '+title+'<span class="room">'+room+'</span></h3>'
++'<div class="say">'+say+'</div><div class="good">Pass = <b>'+good+'</b></div>'
++'<div class="btns">'
++'<button class="'+(st.v==='p'?'on-p':'')+'" onclick="mark(\''+id+'\',\'p\')">Pass — nothing to fix</button>'
++'<button class="'+(st.v==='f'?'on-f':'')+'" onclick="mark(\''+id+'\',\'f\')">Fail — I\'d touch it</button>'
++'<button class="'+(st.v==='s'?'on-s':'')+'" onclick="mark(\''+id+'\',\'s\')">Skip</button></div>'
++'<div class="tags">'+TAGS.map(t=>'<span class="'+((st.tags||[]).includes(t)?'on':'')+'" onclick="tag(\''+id+'\',this)">'+t+'</span>').join('')+'</div>'
++'<label>What landed (paste the output)</label><textarea class="landed" oninput="txt(\''+id+'\',\'landed\',this.value)">'+(st.landed||'')+'</textarea>'
++'<label>Remark — and for group B, your ruling on the pattern</label><textarea class="remark" oninput="txt(\''+id+'\',\'remark\',this.value)">'+(st.remark||'')+'</textarea>'
++'</div>';
+}
+wrap.innerHTML=html;
+const ids=CASES.filter(c=>c.length===5).map(c=>c[0]);
+let dirty=false;
+function persist(){localStorage.setItem('clean1',JSON.stringify(state));dirty=true;document.getElementById('save').textContent='saved locally — export for safety';count();}
+window.mark=function(id,v){state[id]=state[id]||{};state[id].v=v;const el=document.getElementById('c-'+id);el.className='case '+v;
+el.querySelectorAll('.btns button').forEach((b,i)=>b.className=(v==='p'&&i===0)?'on-p':(v==='f'&&i===1)?'on-f':(v==='s'&&i===2)?'on-s':'');persist();}
+window.tag=function(id,el){state[id]=state[id]||{};state[id].tags=state[id].tags||[];const t=el.textContent;
+const i=state[id].tags.indexOf(t);if(i<0){state[id].tags.push(t);el.classList.add('on')}else{state[id].tags.splice(i,1);el.classList.remove('on')}persist();}
+window.txt=function(id,k,v){state[id]=state[id]||{};state[id][k]=v;persist();}
+function count(){let p=0,f=0,d=0;for(const id of ids){const v=(state[id]||{}).v;if(v==='p')p++;if(v==='f')f++;if(v)d++;}
+document.getElementById('np').textContent=p;document.getElementById('nf').textContent=f;
+document.getElementById('nr').textContent=ids.length-d;}
+count();
+window.doExport=function(){
+let out='CLEAN MODE BASELINE ROUND 1 — results\n';
+for(const c of CASES.filter(c=>c.length===5)){const[id,room,title]=c;const s=state[id]||{};
+out+='\n'+id+' ('+title+'): '+(s.v==='p'?'PASS':s.v==='f'?'FAIL':s.v==='s'?'skip':'unmarked');
+if(s.tags&&s.tags.length)out+=' ['+s.tags.join(', ')+']';
+if(s.landed)out+='\n  landed: '+s.landed.replace(/\n/g,' / ');
+if(s.remark)out+='\n  remark: '+s.remark.replace(/\n/g,' / ');}
+const blob=new Blob([out],{type:'text/plain'});
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+a.download='clean-round1-results.txt';a.click();dirty=false;
+navigator.clipboard&&navigator.clipboard.writeText(out);
+}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+</script>
+</body>
+</html>

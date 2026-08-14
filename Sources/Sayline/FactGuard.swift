@@ -384,6 +384,98 @@ enum FactGuard {
         return found
     }
 
+    /// Raw-token indices Clean may drop because the speaker corrected
+    /// themselves, or empty when no retraction is present.
+    ///
+    /// **The same gate as the waivers below, deliberately shared.** A
+    /// phrase marker, and a same-class value after it that survived into
+    /// the cleaned text. Clean asked for retraction handling and the
+    /// obvious move was a second detector in the cleanup layer; two
+    /// implementations of "did they take it back" would drift, and the
+    /// one in this file is the one with the boundary cases already in a
+    /// suite.
+    ///
+    /// The span is three things and nothing else:
+    ///   1. the retracted value, whole — a number phrase is "forty
+    ///      thousand", not "forty"
+    ///   2. the marker itself
+    ///   3. the tokens between the marker and the surviving successor —
+    ///      the reason zone, which is where "Tuesday I am busy" lives
+    ///
+    /// Deliberately NOT the tokens between the retracted value and the
+    /// marker: in C3 that region is "to review it", which the corrected
+    /// sentence still needs. C1's reason sits after the marker and C3's
+    /// sits after the successor, which is exactly why one is droppable
+    /// and the other is not — the shape of the sentence, not a judgement.
+    ///
+    /// Whether a droppable reason SHOULD be dropped is the model's call,
+    /// on two prompt lines. This only decides what the validator will
+    /// permit. See `review/LEDGER.md`, C-group intensity.
+    static func retractionDropSpan(raw: String, cleaned: String) -> Set<Int> {
+        let words = tokenize(raw)
+        let markers = retractionMarkerIndices(in: words)
+        guard !markers.isEmpty else { return [] }
+
+        let survived = Set(tokenize(cleaned))
+        let rawNames = properNouns(in: raw)
+        let dayPositions = words.indices.filter { dayNames.contains(words[$0]) }
+        let namePositions = words.indices.filter { rawNames.contains(words[$0]) }
+        let numberPositions = words.indices.filter { numberPhrase(in: words, at: $0) != nil }
+
+        var span: Set<Int> = []
+        for marker in markers {
+            let length = retractionPhrases
+                .filter { marker + $0.count <= words.count
+                          && Array(words[marker..<(marker + $0.count)]) == $0 }
+                .map(\.count).max() ?? 1
+            let markerEnd = marker + length
+
+            for positions in [dayPositions, namePositions, numberPositions] {
+                guard let retracted = positions.last(where: { $0 < marker }),
+                      let successor = positions.first(where: {
+                          $0 >= markerEnd && survived.contains(words[$0])
+                      })
+                else { continue }
+
+                // The retracted value, whole.
+                var end = retracted + 1
+                if let (_, next) = numberPhrase(in: words, at: retracted) { end = next }
+                span.formUnion(retracted..<end)
+                // The marker.
+                span.formUnion(marker..<markerEnd)
+                // The reason zone, between marker and successor.
+                if markerEnd < successor { span.formUnion(markerEnd..<successor) }
+                // And the successor's own slot. A corrected sentence
+                // usually moves the replacement to where the retracted
+                // value stood — "ask Rohan… I mean Rohit" becomes "Ask
+                // Rohit…" — which reads to a positional diff as the
+                // successor being deleted from the end. It is not lost:
+                // `successor` is by definition a word that survived into
+                // the cleaned text, so permitting its old position costs
+                // nothing the contract protects.
+                span.insert(successor)
+            }
+        }
+        return span
+    }
+
+    /// The droppable span as words, for callers that tokenize differently.
+    ///
+    /// `TranscriptCleanupValidator` splits on whitespace and keeps
+    /// punctuation on the token; this file strips punctuation and splits
+    /// digits from letters. Handing the validator raw indices from here
+    /// would line up until the first "9:30" and then silently point at the
+    /// wrong word, so it gets words and consumes them as a multiset —
+    /// which also bounds over-deletion to exactly the count the span
+    /// permits.
+    static func retractionDroppableWords(raw: String, cleaned: String) -> [String] {
+        let words = tokenize(raw)
+        return retractionDropSpan(raw: raw, cleaned: cleaned)
+            .sorted()
+            .filter { $0 < words.count }
+            .map { words[$0] }
+    }
+
     /// Drops violations the speaker's own correction explains.
     ///
     /// Works on positions, which is why it lives here rather than in the

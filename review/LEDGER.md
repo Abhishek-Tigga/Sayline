@@ -5297,3 +5297,243 @@ For round 2 this raises the stakes on one column specifically: a reversed
 position will not be caught by the guard, so the `fact wrong` tag is the
 only thing standing between this and an inbox. Worth telling the user
 before they run, and it is now in the checklist note.
+
+---
+
+## CLEAN MODE · Scoped self-correction approved; baseline round opens (user decision, Fable recording, 2026-08-14)
+
+**The user approves scoped self-correction in Clean mode at minimal
+intensity**, amending PRODUCT.md's 2026-08-04 rejection of mid-sentence
+self-correction. The old rejection's reason — "doing it safely needs
+much more carefully scoped prompting than we have" — is stale: Phase A
+built deterministic marker-gated retraction detection, and Clean reuses
+exactly that machinery. The approved shape, settled over seven worked
+examples: a span may be dropped ONLY when a spoken take-back marker
+("no wait", "sorry", "I mean", "actually no", "scratch that") is
+present AND a same-class replacement survives; only the retracted thing
+and its marker die; reasons, hedges, and everything else survive
+("Tuesday I am busy — maybe let's try Thursday", never "Let's try
+Thursday"). No marker or no successor → verbatim, as today. The
+validator gains the same waiver the fact guard got; over-deletion
+reverts to verbatim.
+
+A Clean baseline test round now runs (`eval/clean-taste-checklist.html`,
+18 cases): punctuation, grammar-policy patterns (the user rules
+correct-vs-preserve per Indian-English pattern as they mark),
+self-correction cases (expected to FAIL at baseline — the feature is
+approved, not built; they become its acceptance cases), long-form
+paragraph behavior (baselined to decide the paragraph-breaks
+suggestion), fidelity traps, and a forced-verbatim code-window control.
+The bar is fidelity-plus-polish, not work mode's send-unedited: "is
+this what I said, cleanly — nothing to fix by hand." Results will
+sequence the Clean improvement work alongside whatever taste round 2
+decides for work mode.
+
+---
+
+## CLEAN MODE · Baseline round 1 results (user-tested, Fable recording, 2026-08-14)
+
+17 of 18 marked (D2's long-ramble case not yet run — the
+paragraph-breaks decision stays open until it is). **4/17 pass at the
+fidelity-plus-polish bar.** The user supplied expected outputs on
+nearly every fail — those become Clean's calibration set, same
+methodology as work mode's fifteen.
+
+### The verdict shape
+1. **Punctuation is the dominant failure, exactly as the user
+   suspected** — 7 tags, every A-group case. The 8B cleaner places
+   sentence-final periods acceptably but misses: greeting commas ("Hey
+   Priya,"), list punctuation (colon + serial commas — A4 landed "The
+   sandbox access the API dock and a support contact."), commas after
+   connectives ("So,"), and the "No rush, just checking" pattern (A3
+   failed by exactly one comma). This is small-model behavior; the
+   parked 8B-vs-bigger cleanup A/B (BACKLOG, 2026-08-08) is now the
+   headline Clean workstream, with these 17 cases as its frozen test
+   set. Constraint unchanged: Clean's speed is locked, so candidates
+   must fit ~sub-0.5s — which points at Groq-hosted models, with the
+   rate-cap caveat.
+2. **The grammar policy table, legislated by the user in-round:**
+   FIX — "I don't think so X" → "I don't think X"; "revert back" →
+   "revert" (keep their verb, don't substitute "get back to me");
+   "discussed about" → "discussed"; "the both teams" → "both teams";
+   "Myself, I will" → "I'll". KEEP — "prepone" (I1 precedent,
+   reconfirmed), "do one thing" (their expected retains it), "you
+   please take care" (retained verbatim). PREFER — contractions
+   ("you've", "I'll", "it's"). Several FIX patterns are deterministic
+   substitutions; the rest are prompt rules. The KEEP list is identity,
+   not error — it goes in the prompt as protected phrasing.
+3. **Controls held.** C4 (two real days, no marker) passed untouched;
+   C5 dropped nothing (failed only on punctuation). The self-correction
+   fences work before the feature exists.
+4. **Number normalization gap:** "47 and a half thousand" landed
+   verbatim (expected 47,500); "40 000" spacing artifact; user
+   capitalizes "Finance" as a team name. Small deterministic wins.
+5. **Transcription co-defendant again:** docs→"dock",
+   Swift→"shift", and D1's correction landed as "use the activated
+   field. No wait, use the activated field" — either a mishear of the
+   first "created" or a cleanup mangle; the log's raw line will say
+   which. The vocabulary fix's evidence pile keeps growing.
+6. **Consistency (F1): pass** — the one bright spot beyond the
+   controls.
+
+### Open item: the C1/C3 intensity contradiction
+The user approved *minimal* intensity hours before this round
+("Tuesday I am busy — maybe let's try Thursday": reasons and hedges
+survive). Their C1 expected output is **"Let's go there on
+Thursday."** — reason and hedge dropped, beyond even the aggressive
+variant shown. Yet their C3 expected KEEPS the reason ("Ask Rohit to
+review it. Rohan is on leave."). Both reasons explain the retracted
+item, so the distinction is not mechanical yet. Question put to the
+user before the feature builds; the C-group acceptance criteria are
+frozen only after their answer.
+
+### CLEAN · C-group intensity resolved (user decision, 2026-08-14)
+Reader-needs-it (option 2), conditional on overhead — and the overhead
+assessment lands it as buildable: zero latency (judgment rides the
+existing cleanup call as two prompt lines), mild complexity (the
+validator's retraction waiver widens to permit an adjacent reason
+clause, tightly scoped to the retraction's neighborhood). The honest
+cost is that reason-clauses near a retraction move from guarded to
+model-judged. Pre-agreed tripwire, so the retreat needs no debate:
+C1 and C3 enter the eval demanding opposite outcomes (drop "Tuesday
+I'm busy", keep "Rohan is on leave"); if the model wobbles on them at
+temperature 0, or any live round produces one wrongly-dropped reason,
+the two prompt lines are deleted and the feature collapses to minimal
+intensity as originally approved — one-line retreat, nothing else
+changes. C-group acceptance criteria are now frozen: C1 aggressive-
+resolve, C2 minimal-resolve, C3 resolve-keeping-reason, C4/C5 never
+fire.
+
+---
+
+## WORK MODE · Round 2 protocol amended — fresh unseen set added (user-raised, Fable agreeing, 2026-08-14)
+
+The user caught a methodological hole in round 2 as planned: the same
+18 scripts are the set the tuning was built FROM — the prompt was
+rebuilt from their ideals, the guard relaxed until they passed, the
+scorer calibrated on them. A same-set score measures progress on known
+failures but cannot detect overfitting. Protocol now: **both sets run.**
+The same 18 give the before/after against the 5.6% baseline; a fresh
+8-case set (`eval/workmode-fresh-set.html`) — authored by Fable
+post-tuning, never seen by prompt, guard, or scorer, including two
+deliberate generalization traps (the ordinal-phrase list shape that
+failed in E4 while S1's number-word shape passed, and a fresh
+commitment bait) — measures generalization. **The reading: the gap
+between the two scores is the overfitting number.** Same-18 high with
+fresh low = the tuning memorized; both comparable = it generalized.
+Fresh-set results enter the rolling held-out protocol on arrival.
+
+---
+
+### CLEAN MODE · Improvement round built; the punctuation diagnosis was wrong
+2026-08-14 · Opus · `claimed-fixed`
+
+Measuring before fixing changed what got fixed. The headline workstream
+was a cleanup-model A/B, on the round's finding that punctuation failure
+is small-model behaviour. **It is not the model. It is our validator.**
+
+**`smooth()` deleted every comma and semicolon that preceded a lowercase
+word.** The set was `".,;"`, applied whenever the next token started
+lowercase — which in English is where commas live. Fed the user's own
+expected output verbatim, the validator stripped the commas back out:
+
+```
+in  : Hey Priya, quick question. Is the staging environment back up?
+out : Hey Priya quick question. Is the staging environment back up?
+in  : ...the sandbox access, the API docs, and a support contact.
+out : ...the sandbox access the API docs and a support contact.
+in  : ...last night? No rush, just checking.        <- A3's one comma
+out : ...last night? No rush just checking.
+```
+
+Colons and question marks survived only by not being in the set. The rule
+exists to repair a real seam — a stranded full stop before a lowercase
+continuation — and that intent is right; the character class was not. Now
+`"."` only. The seam case is still repaired and is in the suite.
+
+**The A/B ran anyway, and inverts.** 19 transcripts, punctuation scored
+mechanically, Groq TPM paced at 6 s:
+
+```
+model                     punctuation   median   p90
+llama-3.1-8b-instant          7/8       203 ms   338 ms
+llama-3.3-70b-versatile       6/8       327 ms   552 ms
+```
+
+The 70B is worse on punctuation *and* breaches the speed lock at p90.
+**8B stays.** The parked BACKLOG A/B closes: not on latency, on merit.
+
+**Before/after, same saved 8B outputs, old pipeline vs new.** All eight
+A- and B-group cases improved. A3 and A4 now match the user's expected
+output exactly. B3 keeps "prepone" and "do one thing"; B4 keeps "you
+please".
+
+**The grammar policy is code, and had to be.** Every FIX deletes a word,
+so the validator reverted them — observed live before any of this:
+`llm: "inform both teams"` → `validated: "inform the both teams"`. That is
+not a bug in either piece; it is a deletion policy expressed as a request
+to a model forbidden from deleting. `SpeechPatterns` runs **after**
+validation, so the contract is untouched and the substitutions apply
+whether the model cooperated or not. The KEEP list is named in the prompt
+as protected phrasing.
+
+**Numbers.** "forty seven and a half thousand" → 47,500, "40 000" →
+40,000, mirroring `FactGuard`'s scale lexicon. Two findings on the way:
+the spoken-number capture had to be built from the lexicon rather than
+`\w+`, or the engine grabs "budget is forty seven" and the rule silently
+never fires; and `NumberFormatter` follows the machine locale, so
+"two and a half lakh" formatted as `2,50,000` here and `250,000`
+elsewhere. Pinned to `en_US_POSIX`. Whether Indian grouping should be
+offered is in `BACKLOG.md` — a product question, not a system setting.
+
+**Scoped self-correction is built, and all five frozen C-outcomes land.**
+Detection is `FactGuard.retractionDropSpan`, the existing marker gate, not
+a second implementation. The span is the retracted value (whole — a number
+phrase is "forty thousand", not "forty"), the marker, the reason zone
+between marker and successor, and the successor's own slot. Deliberately
+*not* the tokens between the retracted value and the marker: in C3 that
+region is "to review it", which the corrected sentence still needs. C1's
+reason sits after the marker and C3's sits after the successor — the
+shape of the sentence, not a judgement, is what makes one droppable.
+
+Two integration defects found and fixed by running them:
+- the successor is *moved*, not deleted, so its old slot read as a loss
+- `core` keeps interior apostrophes while `FactGuard.normalizeWords` folds
+  possessives, turning "let's go" into "let go" — so the same token was
+  "let's" on one side and "let" on the other, and C1 restored a stray
+  "let's" mid-sentence
+
+**The prompt contradicted itself and was reconciled.** The existing
+guardrail names "scratch that" as something to never act on, for a
+data-loss reason, and the new instruction uses it as a retraction marker.
+Both now state the distinction: as a command it means "throw away what I
+dictated" and is never obeyed; immediately before a same-class
+replacement it is a correction. Leaving the contradiction would have
+produced exactly the wobble the tripwire watches for.
+
+**D1's mystery: Whisper, not cleanup.** The raw line settles it —
+`raw transcript (cloud) -> ... Use the activated field. No wait, use the
+activated field.` The mishear is upstream. Routes to the vocabulary build,
+whose evidence pile is now docs→"dock", Swift→"shift", created→"activated".
+The same log line shows the 8B cleaner answering a code-shaped transcript
+with Python; the validator caught it.
+
+Ran:
+- 9/9 suites green (`speech-pattern-checks` and `cleanup-checks` are new)
+- work-mode calibration 14/15, unchanged — its fallback inserts Clean's
+  output, so this had to be checked and was
+- speed lock held: 244 ms median, 356 ms p90 after the prompt grew by four
+  lines, against 203/338 before
+
+**Not done, and why.** The 17 expected outputs are not in the repo or on
+this machine — `clean1` lives in a browser this machine cannot read and no
+export file exists. So the before/after here is mechanical (punctuation
+marks, policy substitutions, number forms) and per workstream, not scored
+against the user's expecteds, and the 4/17 baseline has no successor
+number yet. Requested from the user. Also: the checklist holds 19 cases,
+the round recorded 18 — worth reconciling when the export arrives. D2 and
+F1 are stage directions to the tester, not transcripts, same class as work
+mode's R1/R2; the harness must not score them.
+
+Explicitly out of scope and untouched: paragraph breaks (D2 unrun), emoji,
+Whisper vocabulary biasing.

@@ -77,10 +77,27 @@ enum TranscriptCleanupValidator {
         let cleanedCores = cleanedTokens.map(core)
         let ops = diff(rawCores, cleanedCores)
         let falseStarts = falseStartIndices(ops: ops, rawCores: rawCores)
+
+        // The one scoped waiver: a span the speaker themselves took back.
+        //
+        // Detection is `FactGuard`'s, not a second implementation — same
+        // phrase markers, same same-class-successor rule, same boundary
+        // cases already in a suite. This file only decides what may be
+        // deleted; whether a droppable reason SHOULD go is the model's
+        // call on two prompt lines.
+        //
+        // Consumed as a multiset so over-deletion is bounded to exactly
+        // the words the span permits. Everything outside it is as
+        // protected as it was before this feature existed.
+        var retractionBudget: [String: Int] = [:]
+        for word in FactGuard.retractionDroppableWords(raw: raw, cleaned: cleaned) {
+            retractionBudget[budgetKey(word), default: 0] += 1
+        }
+
         let decisions = buildDecisions(
             ops: ops, rawTokens: rawTokens, rawCores: rawCores,
             cleanedTokens: cleanedTokens, cleanedCores: cleanedCores,
-            falseStartIndices: falseStarts
+            falseStartIndices: falseStarts, retractionBudget: &retractionBudget
         )
 
         let disallowed = decisions.reduce(0) { count, d in
@@ -120,7 +137,7 @@ enum TranscriptCleanupValidator {
     private static func buildDecisions(
         ops: [DiffOp], rawTokens: [String], rawCores: [String],
         cleanedTokens: [String], cleanedCores: [String],
-        falseStartIndices: Set<Int>
+        falseStartIndices: Set<Int>, retractionBudget: inout [String: Int]
     ) -> [Decision] {
         var decisions: [Decision] = []
         var insertionsUsed = 0
@@ -138,7 +155,9 @@ enum TranscriptCleanupValidator {
                     i += 2
                     continue
                 }
-                if isAllowedDeletion(rawTokens: rawTokens, rawCores: rawCores, index: ri, falseStartIndices: falseStartIndices) {
+                if isAllowedDeletion(rawTokens: rawTokens, rawCores: rawCores, index: ri,
+                                     falseStartIndices: falseStartIndices,
+                                     retractionBudget: &retractionBudget) {
                     decisions.append(.dropRaw)
                 } else {
                     decisions.append(.restore(rawIndex: ri))
@@ -164,7 +183,9 @@ enum TranscriptCleanupValidator {
         return decisions
     }
 
-    private static func isAllowedDeletion(rawTokens: [String], rawCores: [String], index: Int, falseStartIndices: Set<Int>) -> Bool {
+    private static func isAllowedDeletion(rawTokens: [String], rawCores: [String], index: Int,
+                                          falseStartIndices: Set<Int>,
+                                          retractionBudget: inout [String: Int]) -> Bool {
         let c = rawCores[index]
         if fillerWords.contains(c) { return true }
         if !c.isEmpty, index > 0, rawCores[index - 1] == c { return true } // repeat of previous word
@@ -173,6 +194,20 @@ enum TranscriptCleanupValidator {
         if discourseStarters.contains(c), index == 0 || endsSentence(rawTokens[index - 1]) { return true }
         if index + 1 < rawCores.count, bigramFillers.contains("\(c) \(rawCores[index + 1])") { return true }
         if index > 0, bigramFillers.contains("\(rawCores[index - 1]) \(c)") { return true }
+
+        // Last, and only last: the scoped self-correction waiver. Every
+        // rule above is unchanged, so a word outside a retraction is
+        // exactly as protected as it was before this feature shipped.
+        //
+        // The budget is consumed, not merely consulted. "Ask Rohan… no
+        // wait I mean Rohit, Rohan's on leave" makes ONE "Rohan"
+        // droppable, and the second one — the reason the reader needs —
+        // finds the budget empty and is restored.
+        let key = budgetKey(c)
+        if let remaining = retractionBudget[key], remaining > 0 {
+            retractionBudget[key] = remaining - 1
+            return true
+        }
         return false
     }
 
@@ -219,9 +254,29 @@ enum TranscriptCleanupValidator {
         var toks = tokens
         guard !toks.isEmpty else { return toks }
 
+        // Seam repair: a sentence-ender left stranded before a lowercase
+        // continuation ("commit now. or wait until tomorrow") is an
+        // artifact of stitching cleaned and raw tokens together, so it
+        // goes.
+        //
+        // **Only the full stop.** This set was ".,;" until 2026-08-14, and
+        // that made it delete every comma and semicolon that preceded a
+        // lowercase word — which is to say nearly every correct one in
+        // English. "Hey Priya, quick question" lost its comma. "the
+        // sandbox access, the API docs, and a support contact" lost both.
+        // "No rush, just checking" lost the one comma that failed A3.
+        //
+        // Clean's baseline round read this as small-model behaviour and
+        // made a model upgrade the headline workstream. It was not: fed
+        // the user's own expected output verbatim, this loop stripped the
+        // commas back out. Colons and question marks survived only by
+        // being absent from the set. See `review/LEDGER.md`.
+        //
+        // A comma before a lowercase word is ordinary English. A full stop
+        // before one is a seam. Only the second is ours to remove.
         for k in 0..<(toks.count - 1) {
             guard let nextFirst = toks[k + 1].first, nextFirst.isLowercase else { continue }
-            while let last = toks[k].last, ".,;".contains(last) {
+            while let last = toks[k].last, last == "." {
                 toks[k].removeLast()
             }
         }
@@ -290,6 +345,30 @@ enum TranscriptCleanupValidator {
 
     /// Lowercased, punctuation-stripped form used for alignment so that
     /// e.g. "Store," and "store" line up as the same word.
+    /// One spelling for budget lookups, because the two files normalize
+    /// differently and neither is wrong for its own job.
+    ///
+    /// `core` keeps interior apostrophes ("let's"). `FactGuard`
+    /// deliberately folds possessives — its `normalizeWords` maps "'s "
+    /// to " " so that "Mira's" and "Mira" compare equal, which also turns
+    /// "let's go" into "let go". So the same token arrives here as
+    /// "let's" and as "let", and C1 restored a stray "let's" into the
+    /// middle of an otherwise correct sentence.
+    ///
+    /// Folding to a common form — apostrophes out, one trailing "s" out —
+    /// reconciles them. It conflates "team" with "teams", which is
+    /// tolerable precisely because this key is only ever consulted inside
+    /// a retraction span and is bounded by an exact count: the worst case
+    /// is one extra droppable word in a region the speaker already took
+    /// back, never anywhere else in the sentence.
+    private static func budgetKey(_ token: String) -> String {
+        var k = core(token)
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "\u{2019}", with: "")
+        if k.count > 1, k.hasSuffix("s") { k.removeLast() }
+        return k
+    }
+
     private static func core(_ token: String) -> String {
         token.lowercased().trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
     }

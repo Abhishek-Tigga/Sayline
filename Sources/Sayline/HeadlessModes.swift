@@ -53,6 +53,10 @@ enum HeadlessModes {
             // through the whole taste rebuild.
             "workPrompt": WorkModeCleaner.promptForContext(.general, signOffName: ""),
             "workPromptEmail": WorkModeCleaner.promptForContext(.email, signOffName: "Abhishek"),
+            // Clean's prompt, for `eval/clean-mode/run.py`. Same reason as
+            // the two above: Clean now has a frozen test set and a model
+            // A/B, and both would otherwise score a pasted copy.
+            "cleanPrompt": TranscriptCleaner.cleanPrompt,
         ]
         emit(payload)
         exit(0)

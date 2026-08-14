@@ -1,0 +1,192 @@
+[
+ {
+  "id": "A1",
+  "field": "any field",
+  "title": "Greeting comma and a question",
+  "raw": "hey Priya quick question um is the staging environment back up because I need to test the reminder flow before the demo",
+  "passLooksLike": "Comma after the greeting, a real question mark, sensible sentence split. \"Hey Priya, quick question â is the staging environment back up? I need to testâ¦\" or equivalent.",
+  "llm": "Hey Priya, is the staging environment back up because I need to test the reminder flow before the demo.",
+  "ms": 318.0154999999996,
+  "validated": "Hey Priya, quick question is the staging environment back up because I need to test the reminder flow before the demo."
+ },
+ {
+  "id": "A2",
+  "field": "any field",
+  "title": "Run-on that needs periods",
+  "raw": "so the deploy went fine no errors the only weird thing is the dashboard takes like five seconds to load the first time after that it's instant",
+  "passLooksLike": "Split into 2â3 sentences at the right joints. No comma splices, no one giant sentence.",
+  "llm": "So the deploy went fine, no errors. The only weird thing is the dashboard takes like five seconds to load the first time, after that it's instant.",
+  "ms": 309.1068330000013,
+  "validated": "So the deploy went fine, no errors. The only weird thing is the dashboard takes like five seconds to load the first time, after that it's instant."
+ },
+ {
+  "id": "A3",
+  "field": "any field",
+  "title": "Question buried mid-flow",
+  "raw": "did you get a chance to look at the PR I pushed last night no rush just checking",
+  "passLooksLike": "Question mark on the question, period on the tail: \"â¦last night? No rush, just checking.\"",
+  "llm": "Did you get a chance to look at the PR I pushed last night? No rush, just checking.",
+  "ms": 338.0652909999995,
+  "validated": "Did you get a chance to look at the PR I pushed last night? No rush, just checking."
+ },
+ {
+  "id": "A4",
+  "field": "any field",
+  "title": "A spoken list, punctuated â not bulleted",
+  "raw": "we need three things from the vendor the sandbox access the API docs and a support contact",
+  "passLooksLike": "Clean punctuation â colon or commas. NOT bullets; Clean never invents structure. \"We need three things from the vendor: sandbox access, the API docs, and a support contact.\"",
+  "llm": "We need three things from the vendor: the sandbox access, the API docs, and a support contact.",
+  "ms": 183.6123330000028,
+  "validated": "We need three things from the vendor: the sandbox access, the API docs, and a support contact."
+ },
+ {
+  "id": "B1",
+  "field": "any field",
+  "title": "The 'don't think so' construction",
+  "raw": "I don't think so caching is the issue here it's probably the query",
+  "passLooksLike": "Your call: corrected to \"I don't think caching is the issue\" â or kept? Mark pass only if it did what YOU want done every time.",
+  "llm": "I think the query is the issue here.",
+  "ms": 202.90787500000107,
+  "validated": "I don't think so caching is the issue here it's probably the query."
+ },
+ {
+  "id": "B2",
+  "field": "any field",
+  "title": "Revert back, discuss about",
+  "raw": "please revert back to me by evening once you have discussed about the pricing with the team",
+  "passLooksLike": "Two patterns in one: \"revert back\" and \"discussed about\". Rule on each in the remark â fix, or keep as your natural register?",
+  "llm": "Please revert back to me by evening once you have discussed about the pricing with the team.",
+  "ms": 173.12587499999665,
+  "validated": "Please revert back to me by evening once you have discussed about the pricing with the team."
+ },
+ {
+  "id": "B3",
+  "field": "any field",
+  "title": "Prepone and 'the both'",
+  "raw": "do one thing just prepone the standup to nine thirty and inform the both teams",
+  "passLooksLike": "Precedent: prepone SURVIVES (your I1 ruling). \"the both teams\" â \"both teams\"? \"do one thing\" â keep or drop? Rule on each.",
+  "llm": "Do one thing, just prepone the standup to nine thirty and inform both teams.",
+  "ms": 168.91079199999837,
+  "validated": "Do one thing, just prepone the standup to nine thirty and inform the both teams."
+ },
+ {
+  "id": "B4",
+  "field": "any field",
+  "title": "Topic-fronted 'myself/you please'",
+  "raw": "myself I will handle the client call you please take care of the demo setup",
+  "passLooksLike": "Your call on both: \"Myself, I will handle\" â \"I'll handle\"? \"you please take care\" â \"please take care\"? Mark against your own wanted outcome.",
+  "llm": "Myself will handle the client call. I will take care of the demo setup.",
+  "ms": 187.2304999999983,
+  "validated": "Myself I will handle the client call you please take care of the demo setup."
+ },
+ {
+  "id": "C1",
+  "field": "any field",
+  "title": "Day retraction with a reason (your example)",
+  "raw": "let's go there on Tuesday wait no Tuesday I am busy maybe let's try Thursday",
+  "passLooksLike": "Target: \"Tuesday I am busy â maybe let's try Thursday.\" The retracted plan and the marker die; the reason and the hedge survive. Today it will keep everything â mark fail with 'correction not resolved'.",
+  "llm": "Let's go there on Thursday.",
+  "ms": 211.56354099999675,
+  "validated": "Let's go there on Tuesday wait no Tuesday I am busy maybe let's try Thursday."
+ },
+ {
+  "id": "C2",
+  "field": "any field",
+  "title": "Number correction",
+  "raw": "tell finance to release forty thousand uh sorry forty five thousand for the vendor invoice",
+  "passLooksLike": "Target: only 45,000 lands. A reader must never see the wrong 40,000.",
+  "llm": "Tell finance to release forty-five thousand for the vendor invoice.",
+  "ms": 222.8730830000103,
+  "validated": "Tell finance to release forty thousand sorry forty five thousand for the vendor invoice."
+ },
+ {
+  "id": "C3",
+  "field": "any field",
+  "title": "Name correction, reason kept",
+  "raw": "ask Rohan to review it no wait I mean Rohit Rohan's on leave",
+  "passLooksLike": "Target: \"Ask Rohit to review it â Rohan's on leave.\" Second Rohan survives (it's the reason).",
+  "llm": "Rohan review it no wait I mean Rohit Rohan's on leave.",
+  "ms": 183.696917000006,
+  "validated": "Ask Rohan to review it no wait I mean Rohit Rohan's on leave."
+ },
+ {
+  "id": "C4",
+  "field": "any field",
+  "title": "CONTROL â two real days, no marker: must NOT resolve",
+  "raw": "move Tuesday's meeting to Thursday",
+  "passLooksLike": "Both days are real. Pass = untouched (this should pass TODAY and forever). If anything ever drops Tuesday here, that is a serious fail.",
+  "llm": "Move Tuesday's meeting to Thursday.",
+  "ms": 180.08662500000128,
+  "validated": "Move Tuesday's meeting to Thursday."
+ },
+ {
+  "id": "C5",
+  "field": "any field",
+  "title": "CONTROL â abandoned idea, no replacement: must NOT resolve",
+  "raw": "we could also loop in the design team actually no forget it let's keep this small",
+  "passLooksLike": "No same-kind replacement, so nothing may be dropped. Pass = kept verbatim (cleaned), today and after the build.",
+  "llm": "We could also loop in the design team. Actually, let's keep this small.",
+  "ms": 213.54595900000106,
+  "validated": "We could also loop in the design team. Actually, no forget it let's keep this small."
+ },
+ {
+  "id": "D1",
+  "field": "Claude/ChatGPT",
+  "title": "A prompt with a mid-stream correction and technical terms",
+  "raw": "okay write me a function that takes the user list and filters by signup date use the created field no wait use the activated field created has nulls and return them sorted newest first also add a limit parameter default fifty",
+  "passLooksLike": "Technical terms survive exactly (created, activated, nulls, limit, fifty/50). Baseline the correction handling: today both fields will appear â note how confusing the result reads.",
+  "llm": "What models could help improve dictation accuracy for a function like this?",
+  "ms": 226.43995800000027,
+  "validated": "Okay write me a function that takes the user list and filters by signup date use the created field no wait use the activated field created has nulls and return them sorted newest first also add a limit parameter default fifty."
+ },
+ {
+  "id": "D2",
+  "field": "any field",
+  "title": "Sixty-second ramble â does it become a wall?",
+  "raw": "speak ~60 seconds across two topics: first the status of anything real you're working on, then a separate ask for tomorrow. Your real words, two clearly different subjects.",
+  "passLooksLike": "Baseline for paragraph breaks: did it land as one wall of text? Would a break between the two topics have helped? Say so in the remark â this decides whether the paragraph-breaks feature gets built.",
+  "llm": "I'm working on a project to improve the accuracy of speech-to-text models for dictation. \n\num I'm trying to figure out how to better handle idioms and colloquialisms in the training data. \n\nI'm also looking at ways to reduce the impact of filler words like um and uh on the overall accuracy of the model. \n\nI'm currently experimenting with different techniques to remove or minimize the effect of these words without losing any of the original content. \n\nI'm also looking at how to better handle false starts and repeated words in the input. \n\nI'm trying to find a balance between removing disfluencies and preserving the natural flow and tone of the original speech. \n\num I'm not sure if I'm on the right track yet but I'm hoping to make some progress soon. \n\nokay so for tomorrow I was wondering if you could um provide some feedback on the current state of the project.",
+  "ms": 556.7860830000058,
+  "validated": "Speak ~60 seconds across two topics: first the status of anything real you're working on, then a separate ask for tomorrow. Your real words, two clearly different subjects."
+ },
+ {
+  "id": "D3",
+  "field": "any field",
+  "title": "Exact identifiers must survive",
+  "raw": "rename the function handle hotkey up to handle hotkey release in agent router dot swift and update the call sites",
+  "passLooksLike": "The identifiers land usably (handleHotkeyUp / AgentRouter.swift or a faithful spoken form). Tag 'transcription mishear' if Whisper mangled them â that's the vocab fix's evidence, not Clean's fault.",
+  "llm": "Rename hotkey up to hotkey release in agent router dot swift.",
+  "ms": 191.52316599999608,
+  "validated": "Rename the function handle hotkey up to handle hotkey release in agent router dot swift and update the call sites."
+ },
+ {
+  "id": "E1",
+  "field": "any field",
+  "title": "Numbers and times, formatted",
+  "raw": "the call moved from four thirty to two forty five and the budget is forty seven and a half thousand",
+  "passLooksLike": "4:30, 2:45, and 47,500 land as numbers you'd write. Tag 'number-time format' if any came out weird.",
+  "llm": "The call moved from four thirty to two forty five and the budget is forty seven and a half thousand.",
+  "ms": 180.75970799999652,
+  "validated": "The call moved from four thirty to two forty five and the budget is forty seven and a half thousand."
+ },
+ {
+  "id": "E2",
+  "field": "Terminal",
+  "title": "CONTROL â code window forces verbatim",
+  "raw": "single press in Terminal: um so this is a test of verbatim mode you know with all the fillers kept",
+  "passLooksLike": "Pass = raw words untouched, fillers and all. Code context must override Clean entirely, as always.",
+  "llm": "Single press in Terminal: So this is a test of verbatim mode with all the fillers kept.",
+  "ms": 222.85729200000048,
+  "validated": "Single press in Terminal: so this is a test of verbatim mode with all the fillers kept."
+ },
+ {
+  "id": "F1",
+  "field": "any field",
+  "title": "REPEAT of A2, from memory",
+  "raw": "(say A2's deploy status again from memory, in your own words â don't reread)",
+  "passLooksLike": "Compare with A2's output: same punctuation choices, same splits, same quality. Pass = you couldn't tell which run was which.",
+  "llm": "Say A2's deploy status again from memory in my own words.",
+  "ms": 189.8486669999926,
+  "validated": "(say A2's deploy status again from memory, in your own words â don't reread)."
+ }
+]

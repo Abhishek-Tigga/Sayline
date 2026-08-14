@@ -1,0 +1,151 @@
+{
+  "round": "clean-baseline-1",
+  "date": "2026-08-14",
+  "source": "User-run live round, eval/clean-taste-checklist.html. Extracted verbatim from the checklist's saved state by Fable. The 'expected' fields are the user's own written targets and are Clean mode's calibration set — the rolling held-out protocol from review/LEDGER.md applies.",
+  "bar": "fidelity plus polish: exactly what was said, cleanly — nothing the user would fix by hand",
+  "score": "4/17 pass (D2 unrun)",
+  "policy_table": {
+    "fix_always": [
+      {"pattern": "I don't think so X", "to": "I don't think X"},
+      {"pattern": "revert back", "to": "revert", "note": "keep the user's verb — never substitute 'get back to me'"},
+      {"pattern": "discussed about", "to": "discussed"},
+      {"pattern": "the both X", "to": "both X"},
+      {"pattern": "Myself, I will", "to": "I'll"}
+    ],
+    "keep_protected": ["prepone", "do one thing", "you please ..."],
+    "prefer": ["contractions: you've, I'll, it's"]
+  },
+  "c_group_frozen_criteria": "C1 aggressive-resolve, C2 minimal-resolve, C3 resolve-keeping-reason, C4/C5 never fire. Reader-needs-it reason rule with pre-agreed tripwire to minimal — see ledger entry 'CLEAN · C-group intensity resolved'.",
+  "cases": [
+    {
+      "id": "A1", "group": "punctuation", "verdict": "fail", "tags": ["punctuation wrong"],
+      "script": "hey Priya quick question um is the staging environment back up because I need to test the reminder flow before the demo",
+      "landed": "Hey Priya quick question. Is the staging environment back up because I need to test the reminder flow before the demo?",
+      "expected": "Hey Priya, quick question. Is the staging environment back up? I need to test the reminder flow before the demo."
+    },
+    {
+      "id": "A2", "group": "punctuation", "verdict": "fail", "tags": ["punctuation wrong"],
+      "script": "so the deploy went fine no errors the only weird thing is the dashboard takes like five seconds to load the first time after that it's instant",
+      "landed": "So the deploy went fine no errors. The only weird thing is the dashboard takes like 5 seconds to load the first time after that it's instant.",
+      "expected": "So, the deploy went fine with no errors. The only weird thing is that the dashboard takes about 5 seconds to load the first time. After that, it's instant."
+    },
+    {
+      "id": "A3", "group": "punctuation", "verdict": "fail", "tags": ["punctuation wrong"],
+      "script": "did you get a chance to look at the PR I pushed last night no rush just checking",
+      "landed": "Did you get a chance to look at the PR I pushed last night? No rush just checking.",
+      "expected": "Did you get a chance to look at the PR I pushed last night? No rush, just checking.",
+      "note": "failed by exactly one comma"
+    },
+    {
+      "id": "A4", "group": "punctuation", "verdict": "fail", "tags": ["punctuation wrong"],
+      "script": "we need three things from the vendor the sandbox access the API docs and a support contact",
+      "landed": "We need three things from the vendor. The sandbox access the API dock and a support contact.",
+      "expected": "We need three things from the vendor: sandbox access, the API docs, and a support contact.",
+      "note": "also a transcription mishear: docs -> dock (vocabulary-fix evidence, not a cleanup fault)"
+    },
+    {
+      "id": "B1", "group": "grammar-policy", "verdict": "fail", "tags": ["punctuation wrong", "grammar missed"],
+      "script": "I don't think so caching is the issue here it's probably the query",
+      "landed": "I don't think so caching is the issue here it's probably the query.",
+      "expected": "I don't think caching is the issue here. It's probably the query.",
+      "ruling": "FIX 'don't think so' always"
+    },
+    {
+      "id": "B2", "group": "grammar-policy", "verdict": "fail", "tags": ["punctuation wrong", "grammar missed"],
+      "script": "please revert back to me by evening once you have discussed about the pricing with the team",
+      "landed": "Please revert back to me by evening once you have discussed about the pricing with the team.",
+      "expected": "Please revert to me by this evening once you've discussed the pricing with the team.",
+      "ruling": "FIX 'revert back' and 'discussed about'; note contraction preference (you've)"
+    },
+    {
+      "id": "B3", "group": "grammar-policy", "verdict": "fail", "tags": [],
+      "script": "do one thing just prepone the standup to nine thirty and inform the both teams",
+      "landed": "Do one thing just prepone the standup to 9:30 and inform the both teams.",
+      "expected": "Do one thing. Just prepone the standup to 9:30 and inform both teams.",
+      "ruling": "KEEP 'do one thing' and 'prepone'; FIX 'the both'"
+    },
+    {
+      "id": "B4", "group": "grammar-policy", "verdict": "fail", "tags": [],
+      "script": "myself I will handle the client call you please take care of the demo setup",
+      "landed": "Myself, I will handle the client call. You please take care of the demo setup.",
+      "expected": "I'll handle the client call. You please take care of the demo setup.",
+      "ruling": "FIX 'Myself, I will' -> I'll; KEEP 'you please'"
+    },
+    {
+      "id": "C1", "group": "self-correction", "verdict": "fail", "tags": [],
+      "script": "let's go there on Tuesday wait no Tuesday I am busy maybe let's try Thursday",
+      "landed": "Let's go there on Tuesday. Wait no. Tuesday I'm busy. Maybe let's try Thursday?",
+      "expected": "Let's go there on Thursday.",
+      "note": "acceptance case: aggressive resolve (reader does not need the speaker's availability reason)"
+    },
+    {
+      "id": "C2", "group": "self-correction", "verdict": "fail", "tags": [],
+      "script": "tell finance to release forty thousand uh sorry forty five thousand for the vendor invoice",
+      "landed": "Tell finance to release 40 000 sorry 45 000 for the vendor invoice.",
+      "expected": "Tell Finance to release 45,000 for the vendor invoice.",
+      "note": "acceptance case: minimal resolve — the reader must never see 40,000. Also number formatting (40 000 -> 40,000 class) and 'Finance' capitalized as a team name."
+    },
+    {
+      "id": "C3", "group": "self-correction", "verdict": "fail", "tags": [],
+      "script": "ask Rohan to review it no wait I mean Rohit Rohan's on leave",
+      "landed": "Ask Rohan to review it. No wait, Rohit. Rohan's on leave.",
+      "expected": "Ask Rohit to review it. Rohan is on leave.",
+      "note": "acceptance case: resolve keeping the reason (the reader benefits from why the task moved)"
+    },
+    {
+      "id": "C4", "group": "self-correction-control", "verdict": "pass", "tags": [],
+      "script": "move Tuesday's meeting to Thursday",
+      "landed": "Move Tuesday's meeting to Thursday.",
+      "expected": "Move Tuesday's meeting to Thursday.",
+      "note": "CONTROL: two real days, no marker — must never resolve, today and forever"
+    },
+    {
+      "id": "C5", "group": "self-correction-control", "verdict": "fail", "tags": ["punctuation wrong"],
+      "script": "we could also loop in the design team actually no forget it let's keep this small",
+      "landed": "We could also loop in the design team actually no forget it let's keep this small.",
+      "expected": "We could also loop in the design team. Actually, no, forget it. Let's keep this small.",
+      "note": "CONTROL: abandoned idea, no successor — nothing may be dropped (held ✓); failed only on punctuation"
+    },
+    {
+      "id": "D1", "group": "long-form", "verdict": "fail", "tags": [],
+      "script": "okay write me a function that takes the user list and filters by signup date use the created field no wait use the activated field created has nulls and return them sorted newest first also add a limit parameter default fifty",
+      "landed": "Okay, write me a function that takes the user list and filters by signup dates. Use the activated field. No wait, use the activated field. Created has null and return them sorted. Newest first. Also add a limit parameter default 50.",
+      "expected": "Write me a function that takes the user list and filters by signup date. Use the activated field instead of created, since created has nulls. Return the results sorted by newest first, and add a limit parameter with a default value of 50.",
+      "note": "landed shows 'activated ... no wait ... activated' — check the raw log line: transcription mishear of the first 'created' vs cleanup mangle. Route accordingly."
+    },
+    {
+      "id": "D2", "group": "long-form", "verdict": "unrun", "tags": [],
+      "script": "(60-second real ramble across two topics — decides the paragraph-breaks feature)",
+      "landed": "", "expected": "",
+      "note": "still owed by the user; paragraph-breaks decision blocked on it"
+    },
+    {
+      "id": "D3", "group": "long-form", "verdict": "pass", "tags": [],
+      "script": "rename the function handle hotkey up to handle hotkey release in agent router dot swift and update the call sites",
+      "landed": "Rename the function handleHotkey up to handleHotkeyRelease in agentRouter.shift and update the call sites.",
+      "expected": "",
+      "note": "user: 'hit or miss sometimes' — passed this run; .shift for .swift is vocabulary-fix evidence"
+    },
+    {
+      "id": "E1", "group": "fidelity", "verdict": "fail", "tags": ["number-time format"],
+      "script": "the call moved from four thirty to two forty five and the budget is forty seven and a half thousand",
+      "landed": "The call moved from 4:30 to 2:45 and the budget is 47 and a half thousand.",
+      "expected": "The call moved from 4:30 to 2:45, and the budget is 47,500.",
+      "note": "'X and a half thousand' normalization gap"
+    },
+    {
+      "id": "E2", "group": "fidelity-control", "verdict": "pass", "tags": [],
+      "script": "(single press in Terminal) um so this is a test of verbatim mode you know with all the fillers kept",
+      "landed": "Single press in terminal this is a test of verbatim mode with all the fillers kept.",
+      "expected": "",
+      "note": "CONTROL: code context forces verbatim — passed. (Landed text suggests some filler loss; user passed it regardless.)"
+    },
+    {
+      "id": "F1", "group": "consistency", "verdict": "pass", "tags": [],
+      "script": "(repeat of A2 from memory)",
+      "landed": "The deployment went fine with no errors. The only weird thing is that the dashboard takes 5 seconds to load on the first time. After that it's instant.",
+      "expected": "",
+      "note": "consistent with A2's output quality — pass. User remark ambiguous about E2; noted."
+    }
+  ]
+}

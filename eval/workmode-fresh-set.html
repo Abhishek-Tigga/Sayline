@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work mode — fresh set (unseen)</title>
+<style>
+:root{--bg:#faf9f6;--card:#fff;--ink:#1a1a1a;--mut:#6b6a66;--line:#e4e2dc;--pass:#e7f2e3;--passb:#5a8a4a;--fail:#fbe9e7;--failb:#b0492f;--skip:#f0efe9;--accent:#4a5568}
+@media (prefers-color-scheme:dark){:root{--bg:#191917;--card:#222220;--ink:#eceae5;--mut:#98968f;--line:#3a3934;--pass:#26331f;--passb:#8fbf7a;--fail:#3a2320;--failb:#e08b70;--skip:#2a2926;--accent:#a9b4c4}}
+*{box-sizing:border-box}
+body{font:16px/1.6 -apple-system,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 20px 80px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 12px}
+.bar{position:sticky;top:0;background:var(--bg);padding:10px 0;display:flex;gap:16px;align-items:center;font-size:14px;border-bottom:1px solid var(--line);z-index:5}
+.bar b{font-size:18px}
+.case{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0}
+.case.p{border-color:var(--passb)}
+.case.f{border-color:var(--failb)}
+.case.s{opacity:.55}
+.case h3{font-size:15px;font-weight:600;margin:0 0 2px}
+.room{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;background:var(--skip);color:var(--mut);margin-left:6px;vertical-align:1px}
+.say{background:var(--skip);border-radius:8px;padding:10px 12px;font-size:14.5px;margin:8px 0;font-style:italic}
+.say::before{content:"Chord-dictate (Option-hold + Command), drift freely: ";font-style:normal;font-weight:600;font-size:12px;color:var(--mut);display:block;margin-bottom:2px}
+.good{font-size:13.5px;color:var(--mut);margin:6px 0 10px}
+.good b{color:var(--ink)}
+.btns{display:flex;gap:8px;margin:8px 0}
+.btns button{font-size:13px;padding:5px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.btns button.on-p{background:var(--pass);border-color:var(--passb);font-weight:600}
+.btns button.on-f{background:var(--fail);border-color:var(--failb);font-weight:600}
+.btns button.on-s{background:var(--skip);font-weight:600}
+.tags{display:none;flex-wrap:wrap;gap:6px;margin:8px 0}
+.case.f .tags{display:flex}
+.tags span{font-size:12px;padding:3px 10px;border-radius:12px;border:1px solid var(--line);cursor:pointer;color:var(--mut)}
+.tags span.on{background:var(--fail);border-color:var(--failb);color:var(--ink)}
+textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:13.5px/1.5 ui-monospace,Menlo,monospace;padding:8px 10px;margin:4px 0;resize:vertical}
+textarea.landed{min-height:54px}
+textarea.remark{min-height:36px;font-family:inherit}
+label{font-size:12px;font-weight:600;color:var(--mut)}
+.export{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.note{font-size:13.5px;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<main>
+<h1>Work mode — fresh set, unseen by the tuning</h1>
+<p class="sub">8 cases the prompt, guard, and scorer have never met. Same bar: <b>send without editing a single word?</b> The gap between this score and the same-18 rerun is the overfitting detector.</p>
+<div class="note">Run this <b>alongside</b> round 2, not instead of it. Same protocol: chord-dictate, paste, mark, tag, remark. Check every number, name, day and time — fact column first. <b>Export downloads a file</b>; do it partway through.</div>
+
+<div class="bar"><span>Pass <b id="np">0</b></span><span>Fail <b id="nf">0</b></span><span>Left <b id="nr">8</b></span><span id="save" style="color:var(--mut);font-size:12px"></span></div>
+
+<div id="cases"></div>
+</main>
+<button class="export" onclick="doExport()">Export results</button>
+<script>
+const TAGS=["too formal","too long","lost my edge","too blunt for me","meaning changed","robotic","padding added","wrong register","structure wrong","fact wrong","fell back"];
+const CASES=[
+["G1","Slack","Disagreeing, fresh content",
+"so quick thought on the pricing doc, I read it twice and honestly I don't buy the enterprise tier argument, like we have zero enterprise leads today, feels like we're building for a customer we don't have, can we revisit this after the launch",
+"Opener survives, \"I don't buy\" stays yours, ends as a real ask. No softening into \"I have some reservations about the enterprise tier.\""],
+["G2","Email","Declining a partnership, warm but final",
+"hi thanks for the partnership offer, honestly I'm flattered but we're a one person team right now and I can't take on an integration project this quarter, would love to revisit once we've shipped, maybe October",
+"Email shell (greeting + sign-off), the no lands early and clearly, \"one person team\" and October survive, warmth without groveling."],
+["G3","Slack","Ordinal-phrase list — the shape that failed in round 1",
+"okay takeaways from the user calls, first thing people love the speed, second thing nobody understands the work mode toggle, third thing two people asked for windows, that's the summary",
+"Three items land as a clear list or clean lines — this is the \"first thing / second thing\" shape that stayed prose in E4 while \"one two three\" worked. Generalization test."],
+["G4","Slack","Bad news with numbers and days",
+"heads up the app store review got rejected again, second time, they want the microphone usage string clarified, I'm resubmitting today, realistically approval lands Monday not this week",
+"\"Heads up\" survives, \"second time\" and Monday-not-this-week exact, no invented optimism or apology."],
+["G5","Email","Nudge with dates and a real stake",
+"hi checking in on the contract, legal said they'd revert by the ninth and it's the twelfth now, we can't start the pilot without it, is there anything I can do to unblock this",
+"Both dates (9th, 12th) exact, the dependency stated plainly, ends as the question you asked. Shell present."],
+["G6","Slack","Self-correction with a name",
+"assign the beta feedback triage to Kunal, wait no Kunal's on the launch, give it to Divya, she's got bandwidth this sprint",
+"Lands as Divya's task with the reason — Kunal-on-launch may survive as the why. Either a clean resolve or your exact words with a visible flash; wrong assignee = fail + fact wrong."],
+["G7","Slack","Commitment bait, fresh",
+"the analytics dashboard numbers look off again, someone should check the pipeline before the investor update on Friday",
+"\"Someone should\" stays someone — the rewrite must NOT volunteer you (\"I'll check\"). Friday exact."],
+["G8","Email","Explaining a number, ending on a question",
+"hi about the invoice you flagged, I checked with finance and the extra three thousand is the annual support fee, it was in the original quote, does that clear it up or should we get on a call",
+"3,000 exact, the explanation plain, and it still ENDS with your question, as a question."]
+];
+const state=JSON.parse(localStorage.getItem('tasteFresh')||'{}');
+const wrap=document.getElementById('cases');
+let html='';
+for(const[id,room,title,say,good]of CASES){
+const st=state[id]||{};
+html+='<div class="case '+(st.v||'')+'" id="c-'+id+'"><h3>'+id+' · '+title+'<span class="room">'+room+'</span></h3>'
++'<div class="say">'+say+'</div><div class="good">Pass = <b>'+good+'</b></div>'
++'<div class="btns">'
++'<button class="'+(st.v==='p'?'on-p':'')+'" onclick="mark(\''+id+'\',\'p\')">Pass — would send as-is</button>'
++'<button class="'+(st.v==='f'?'on-f':'')+'" onclick="mark(\''+id+'\',\'f\')">Fail — would edit</button>'
++'<button class="'+(st.v==='s'?'on-s':'')+'" onclick="mark(\''+id+'\',\'s\')">Skip</button></div>'
++'<div class="tags">'+TAGS.map(t=>'<span class="'+((st.tags||[]).includes(t)?'on':'')+'" onclick="tag(\''+id+'\',this)">'+t+'</span>').join('')+'</div>'
++'<label>What landed (paste the output)</label><textarea class="landed" oninput="txt(\''+id+'\',\'landed\',this.value)">'+(st.landed||'')+'</textarea>'
++'<label>Remark — paste your preferred version if you have one</label><textarea class="remark" oninput="txt(\''+id+'\',\'remark\',this.value)">'+(st.remark||'')+'</textarea>'
++'</div>';
+}
+wrap.innerHTML=html;
+const ids=CASES.map(c=>c[0]);
+let dirty=false;
+function persist(){localStorage.setItem('tasteFresh',JSON.stringify(state));dirty=true;document.getElementById('save').textContent='saved locally — export for safety';count();}
+window.mark=function(id,v){state[id]=state[id]||{};state[id].v=v;const el=document.getElementById('c-'+id);el.className='case '+v;
+el.querySelectorAll('.btns button').forEach((b,i)=>b.className=(v==='p'&&i===0)?'on-p':(v==='f'&&i===1)?'on-f':(v==='s'&&i===2)?'on-s':'');persist();}
+window.tag=function(id,el){state[id]=state[id]||{};state[id].tags=state[id].tags||[];const t=el.textContent;
+const i=state[id].tags.indexOf(t);if(i<0){state[id].tags.push(t);el.classList.add('on')}else{state[id].tags.splice(i,1);el.classList.remove('on')}persist();}
+window.txt=function(id,k,v){state[id]=state[id]||{};state[id][k]=v;persist();}
+function count(){let p=0,f=0,d=0;for(const id of ids){const v=(state[id]||{}).v;if(v==='p')p++;if(v==='f')f++;if(v)d++;}
+document.getElementById('np').textContent=p;document.getElementById('nf').textContent=f;
+document.getElementById('nr').textContent=ids.length-d;}
+count();
+window.doExport=function(){
+let out='WORK MODE FRESH SET — results\n';
+for(const[id,room,title]of CASES){const s=state[id]||{};
+out+='\n'+id+' ('+title+'): '+(s.v==='p'?'PASS':s.v==='f'?'FAIL':s.v==='s'?'skip':'unmarked');
+if(s.tags&&s.tags.length)out+=' ['+s.tags.join(', ')+']';
+if(s.landed)out+='\n  landed: '+s.landed.replace(/\n/g,' / ');
+if(s.remark)out+='\n  remark: '+s.remark.replace(/\n/g,' / ');}
+const blob=new Blob([out],{type:'text/plain'});
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+a.download='workmode-fresh-results.txt';a.click();dirty=false;
+navigator.clipboard&&navigator.clipboard.writeText(out);
+}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+</script>
+</body>
+</html>
