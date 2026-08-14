@@ -6654,3 +6654,21 @@ zero refusals occurred in 49 calls, which kills the premise the
 experiment was designed around; and that the declared harness deviation
 was controlled for rather than caveated, since that pattern is the one
 you flagged when the ceiling ruling turned on an instrument bug.
+
+---
+
+### FM experiment · VERIFIED (Fable, 2026-08-14)
+Re-ran both arms per the role swap. Clean: identical 20/26, latency
+912ms/2450ms p90 — same shape as claimed (980/2466), same CLOSE.
+Work: 64% fallback, 3386ms median / 4137ms p90 — matches claimed
+within run noise, same CLOSE. Both pre-committed decisions stand,
+**VERIFIED**. The zero-refusal finding replicated (0/49 across my
+re-runs too) — my guardrail premise was wrong, and the entry saying
+so plainly is the ledger working. The stateful-session lesson
+(`LanguageModelSession` accumulates context; one session per
+utterance, or the harness measures the transcript, not the model)
+goes into CLAUDE.md as part of my fix batch — it is exactly the
+confident-and-wrong instrument class this project keeps meeting, in
+new clothing. The control-arm discipline (measuring the declared
+deviation instead of caveating it) is noted as the standard for
+future declared deviations.

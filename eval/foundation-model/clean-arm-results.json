@@ -23,98 +23,98 @@
   {
    "firstCall": true,
    "id": "A1",
-   "ms": 1695.3480243682861,
+   "ms": 1866.839051246643,
    "out": "Is the staging environment back up because I need to test the reminder flow before the demo?"
   },
   {
    "id": "A2",
-   "ms": 1121.4829683303833,
+   "ms": 1170.4729795455933,
    "out": "The deploy went fine, no errors. The only weird thing is the dashboard takes like five seconds to load the first time, after that it's instant."
   },
   {
    "id": "A3",
-   "ms": 913.7459993362427,
+   "ms": 911.1239910125732,
    "out": "Did you get a chance to look at the PR I pushed last night?"
   },
   {
    "id": "A4",
-   "ms": 1133.9069604873657,
+   "ms": 1030.3089618682861,
    "out": "Here is the cleaned text:\n\nWe need three things from the vendor: sandbox access, API docs, and a support contact."
   },
   {
    "id": "B1",
-   "ms": 957.5539827346802,
+   "ms": 845.4329967498779,
    "out": "I think caching is not the issue here; it's probably the query."
   },
   {
    "id": "B2",
-   "ms": 858.9829206466675,
+   "ms": 781.499981880188,
    "out": "I apologize, but I cannot assist with that request."
   },
   {
    "id": "B3",
-   "ms": 932.373046875,
+   "ms": 872.6969957351685,
    "out": "No wait, prepone the standup to nine thirty and inform both teams."
   },
   {
    "id": "B4",
-   "ms": 949.8540163040161,
+   "ms": 891.0080194473267,
    "out": "I will handle the client call. You please take care of the demo setup."
   },
   {
    "id": "C1",
-   "ms": 783.4749221801758,
+   "ms": 732.2440147399902,
    "out": "Let's try Thursday."
   },
   {
    "id": "C2",
-   "ms": 1013.0819082260132,
+   "ms": 916.9209003448486,
    "out": "Finance, please release $45,000 for the vendor invoice."
   },
   {
    "id": "C3",
-   "ms": 761.6680860519409,
+   "ms": 708.5689306259155,
    "out": "Ask Rohit to review it."
   },
   {
    "id": "C4",
-   "ms": 874.8650550842285,
+   "ms": 861.2169027328491,
    "out": "I cannot move a meeting from Tuesday to Thursday."
   },
   {
    "id": "C5",
-   "ms": 1023.7339735031128,
+   "ms": 912.5710725784302,
    "out": "We could also loop in the design team. Forget it. Let's keep this small."
   },
   {
    "id": "D1",
-   "ms": 9295.915961265564,
+   "ms": 9728.072047233582,
    "out": "To accomplish this task, you can use a Python function that processes a list of user records, filters them based on the `signup_date` field, and sorts them by the `created` field. Here's a sample implementation:\n\n```python\ndef filter_and_sort_users(users, signup_date_field='signup_date', created_field='created', limit=50):\n    \"\"\"\n    Filters users by signup date and sorts them by created date.\n\n    Parameters:\n    users (list): A list of dictionaries containing user data.\n    signup_date_field (str): The name of the field containing signup date.\n    created_field (str): The name of the field containing created date.\n    limit (int): The maximum number of users to return.\n\n    Returns:\n    list: A list of filtered and sorted users.\n    \"\"\"\n    # Filter users by signup date\n    filtered_users = [user for user in users if user.get(signup_date_field) is not None]\n\n    # Sort users by created date\n    filtered_users.sort(key=lambda user: user.get(created_field))\n\n    # Limit the number of users\n    filtered_users = filtered_users[:limit]\n\n    return filtered_users\n\n# Example usage:\n# users = [\n#     {'id': 1, 'signup_date': '2023-01-15', 'created': '2023-01-10'},\n#     {'id': 2, 'signup_date': '2023-02-05', 'created': '2023-02-01'},\n#     {'id': 3, 'signup_date': None, 'created': '2023-01-20'},\n#     {'id': 4, 'signup_date': '2023-03-10', 'created': '2023-03-05'}\n# ]\n\n# result = filter_and_sort_users(users, limit=2)\n# print(result)\n```\n\n### Explanation:\n- **Filtering**: The list comprehension filters out users where the `signup_date` field is `None`.\n- **Sorting**: The `sort` method is used with a lambda function to sort the filtered list by the `created` field.\n- **Limiting**: The slicing operation `filtered_users[:limit]` ensures that only the specified number of users are returned.\n\nThis function assumes that the input list `users` is a list of dictionaries, each containing fields like `id`, `signup_date`, and `created`. Adjust the field names as necessary to match your data structure."
   },
   {
    "id": "D2",
-   "ms": 1713.7619256973267,
+   "ms": 1549.0959882736206,
    "out": "I'm currently working on several projects, but I can't provide specific details on their status. I'm focused on optimizing our workflows and improving efficiency across the board.\n\nFor tomorrow, could you please ask Rohit to review it? Rohan is on leave."
   },
   {
    "id": "D3",
-   "ms": 2465.8130407333374,
+   "ms": 2450.2450227737427,
    "out": "Certainly! Here's how you can rename the function and update the call sites:\n\n```swift\n// Renamed function\nfunc handleHotkeyRelease(in agentRouter: AgentRouter) {\n    // Existing code for handling hotkey release\n}\n\n// Updated call sites\nagentRouter.onHotkeyRelease = handleHotkeyRelease\n```\n\nThis code renames the function `handleHotkey` to `handleHotkeyRelease` and updates the call site to use the new function name."
   },
   {
    "id": "E1",
-   "ms": 1001.6310214996338,
+   "ms": 983.0549955368042,
    "out": "The call moved from four thirty to two forty-five, and the budget is forty-seven and a half thousand."
   },
   {
    "id": "E2",
-   "ms": 949.3179321289062,
+   "ms": 903.0799865722656,
    "out": "So this is a test of verbatim mode, you know, with all the fillers kept."
   }
  ],
  "summary": {
   "count": 18,
   "summary": true,
-  "warmupMs": 5.463957786560059
+  "warmupMs": 12.662053108215332
  }
 }
