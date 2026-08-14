@@ -673,5 +673,56 @@ check("the \"no\" in \"wait no hold on\" is a retraction, not a negation",
              "Can we move the retro to Friday afternoon? After 3 works best.")
         .contains("negation"))
 
+// Compositions — Fable's addition to the round-2 pre-rulings, 2026-08-14.
+//
+// The six relaxations were each justified alone; nobody had tested them
+// stacked. Each case below puts two or more waivers in one utterance AND
+// genuinely breaks a fact. The guard must still catch it: a clean result
+// here is the overshoot, visible cheaply instead of in someone's inbox.
+print("\nstacked waivers must not add up to a waiver")
+
+check("a retraction does not cover a number that was never retracted",
+      kinds("can we move it to Thursday, wait no, Friday works better, and bring "
+            + "the forty five thousand invoice", "Let's do Friday. Bring the invoice.")
+        .contains("number"))
+check("a retraction marker next to a real negation does not absorb it",
+      kinds("wait no, hold on, I don't think we should ship this",
+            "We should ship this.").contains("negation"))
+check("a retraction does not license an invented name",
+      kinds("ask Rohan, wait no, ask Priya instead", "Ask Sneha about it.")
+        .contains("invented-name"))
+check("a scale word may not be swapped for a bigger one",
+      kinds("the budget is forty five thousand", "The budget is 45 lakh.")
+        .contains("invented-number"))
+check("list markers do not hide a real number being dropped",
+      kinds("three things, first we ship by the 30th, second hiring, third legal",
+            "Three things:\n1. Ship\n2. Hiring\n3. Legal").contains("number"))
+check("removing \"half\" does not unpin a real quantity beside it",
+      kinds("half the team, about four people, can't make Tuesday",
+            "The team can't make Tuesday.").contains("number"))
+check("the widened unit window does not permit a unit swap",
+      kinds("we need about two more gigs of headroom",
+            "We need another two megs of headroom.").contains("invented-unit"))
+check("a retraction does not cover a question asked after it",
+      !kinds("should we do Thursday, wait no Friday, and can you confirm the budget?",
+             "Let's do Friday afternoon.").isEmpty)
+check("a scale word plus a retracted middle value still protects the final one",
+      kinds("quote was two lakh, actually no, three lakh, tell them two lakh",
+            "The quote is 5 lakh.").contains("invented-number"))
+
+// KNOWN GAP, asserted so it is visible rather than forgotten. Recorded as
+// OPEN in review/LEDGER.md — do not "fix" this line, fix the guard and
+// then invert it.
+//
+// `negationLost` fires only when the rewrite reaches ZERO negations, so
+// any surviving negation masks the loss of every other one. Pre-existing
+// and deliberate: strict counting was tried and was 8 of 13 violations
+// across every model. The "rather than" equivalent added a new route into
+// the same hole rather than creating it.
+check("KNOWN GAP: one surviving negation masks another being reversed",
+      !kinds("ship Friday not Monday, and I don't agree with the plan",
+             "Ship Friday rather than Monday. I agree with the plan.")
+        .contains("negation"))
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

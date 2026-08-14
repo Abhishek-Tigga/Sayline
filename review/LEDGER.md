@@ -5158,3 +5158,142 @@ Not verified by me. The calibration set is now the instrument that judges
 the instrument, and it is ours; an independent look at whether
 `grammarTolerance` should have been 2 rather than 3 would be worth having,
 since made-11 sits at +5 and nothing sits at +3 or +4.
+
+---
+
+## WORK MODE · Round 2 pre-rulings (Fable, 2026-08-14)
+
+Answering `review/FABLE-PROMPT-round2.md`. Four rulings, one addition,
+before the user runs the round.
+
+### 1 · The loosening question: protocol endorsed, plus one adversarial
+### exercise worth an hour
+The fact-column-first reading is adopted, with its precedence stated
+as the round's law: **any invented fact fails the round regardless of
+taste score** — 80% sendable with two invented facts is a worse product
+than 60% with none, exactly as framed. One addition that can run
+before or alongside the round: the six relaxations were each justified
+alone, but nobody has tested their **intersections**. Compose a
+handful of adversarial transcripts that stack waivers — a retraction
+marker plus a middle number plus a scale word in one utterance; a
+"no wait" adjacent to a real negation and a real name — and score
+them. If any composition waives something no single rule would have,
+that is the overshoot made visible cheaply, without waiting for it to
+reach an inbox.
+
+### 2 · The calibration set: compromised as self-diagnosed, and the
+### fix is a rolling held-out protocol
+The diagnosis is correct and honestly made — tuning the guard until
+the fifteen passed, then making the fifteen the test, is fitting to
+the test set. Ruling: **round 2's outputs become a held-out set. Do
+not fold them into calibration until they have served one full cycle
+as unseen judges.** Standing protocol from here: each taste round
+produces fresh held-out material; it validates the changes made since
+the previous round; only then does it graduate into the calibration
+set, and the next round mints new held-outs. The fifteen keep their
+regression-detection job; they are simply no longer evidence that
+this week's changes were right — round 2 is.
+
+### 3 · grammarTolerance stays 2
+The data cannot distinguish 2 from 3 — which is an argument for
+holding, not loosening. Six relaxations with none tightened is the
+recorded drift direction; when evidence is indifferent, the tighter
+value wins by default. The knob is named, the suite pins it, and it
+turns only if round 2 produces length complaints — in either
+direction.
+
+### 4 · The gate: tiered, because its job is to pick the next move
+A single bar answers pass/fail; a tiered one decides what happens
+Monday. Hard conditions first, both absolute: **zero invented facts**
+(any one names the rule to tighten and fails the round) and **zero
+silent fallbacks** (every fallback the user experienced must match a
+notice they saw — this live-tests the salience fix for free). Then
+send-unedited, tiered: **below 30%**, the prompt approach itself is
+re-examined — that would mean the rebuild missed something
+structural, and tag patterns say what. **30–60%**: the system works
+and iterates — tag-driven fixes, round 3, no architecture changes.
+**At or above 60%** (the proposed number, adopted as the top tier):
+taste work de-prioritizes and the launch spine takes back priority;
+refinement continues on real usage rather than rounds. One more read
+requested regardless of tier: R1/R2 get their own paragraph — round
+1's consistency verdict was contaminated by silent fallbacks, and
+with a 0%-fallback model these two cases measure real
+model-plus-speaker variance for the first time.
+
+### Endorsements and one note
+Export-to-file with close protection: the right lesson from losing
+round 1's marks. The harness refusing partial Groq data, again: keep.
+The N3 currency residual is correctly argued — a rewrite introducing
+"₹" for a transcript that named no currency is invention, and the
+user's own ideal doing it does not change the guard's rule; if the
+user wants automatic currency symbols, that is a *setting* (default
+currency) to design later, not a loosening. And the harness once
+rewriting R1's *instructions* — inventing a month and a name from
+"speak T2 again from memory" — goes in the drawer of reasons the
+no-tools quarantine rules exist: models rewrite whatever text they
+are handed, including stage directions.
+
+---
+
+### OPEN · A surviving negation masks another being reversed
+2026-08-14 · Opus · `still-broken`, reported not fixed
+
+Found by Fable's composition exercise, on the first run. Nine of ten
+stacked-waiver cases were caught; this one is clean and should not be:
+
+```
+said : ship Friday not Monday, and I don't agree with the plan
+wrote: Ship Friday rather than Monday. I agree with the plan.
+guard: clean
+```
+
+The position is reversed and nothing fires.
+
+**Cause, and it is not this week's loosening.** `negationLost` fires only
+when the rewrite reaches **zero** negations, so any one surviving negation
+masks the loss of all others. Confirmed pre-existing: the same transcript
+with the "not" kept verbatim ("Ship Friday not Monday. I agree with the
+plan.") is equally clean, and always was. The "rather than" equivalent
+added a new route into an existing hole rather than digging one. Worth
+saying plainly because the exercise was aimed at this week's changes and
+this is not one of them.
+
+**The obvious fix is already measured and rejected.** Strict counting was
+tried before the model bake-off and was 8 of 13 violations across every
+model — the comment above the check records it. Work mode deletes
+thinking-out-loud, and a deleted rhetorical question takes its negation
+with it, so counting is structurally wrong for this mode.
+
+**A discriminator was prototyped and does not clear the bar.** The idea:
+fire only where the clause *survives* but its negation does not, since the
+false positives delete the whole clause and the reversal keeps it. Content
+words within ±4 of each raw negation, scored for survival in the rewrite:
+
+```
+threshold   catches the hole   misses            new on 31   breaks ideals
+0.6         yes                legitimate merge  4           S2
+0.8         NO                 merge + reversal  3           none
+```
+
+At 0.6 it breaks the calibration set; at 0.8 it stops catching a plain
+reversal, which is the entire point. Tuning the threshold further against
+these seven cases is precisely the fit-to-the-test-set error ruled on
+hours earlier, so it stops here rather than being tuned into looking good.
+
+**Not fixed, deliberately.** This is a live meaning-reversal hole and the
+worst class this product has, but every available fix either reintroduces
+a measured false-positive rate or overfits. It wants a design decision, and
+it is not ours to take unilaterally — the same reason the ceiling waited.
+
+Ran:
+- 10 stacked compositions, 9 caught, 1 clean; all now permanent suite cases
+- the gap itself is pinned by a check asserting the *current* behaviour and
+  labelled `KNOWN GAP`, so a future fix turns the suite red and forces this
+  entry to be revisited rather than the finding being silently lost
+- discriminator prototype measured against the 31, the 15 ideals, and the
+  two documented false positives
+
+For round 2 this raises the stakes on one column specifically: a reversed
+position will not be caught by the guard, so the `fact wrong` tag is the
+only thing standing between this and an inbox. Worth telling the user
+before they run, and it is now in the checklist note.
