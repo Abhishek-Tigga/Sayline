@@ -5537,3 +5537,64 @@ mode's R1/R2; the harness must not score them.
 
 Explicitly out of scope and untouched: paragraph breaks (D2 unrun), emoji,
 Whisper vocabulary biasing.
+
+---
+
+### CLEAN MODE · Scored against the real expecteds; one self-inflicted bug caught
+2026-08-14 · Opus · `claimed-fixed`
+
+Fable's `eval/clean-mode/round1-baseline.json` landed and the build was
+re-scored against it. It found a bug I had introduced hours earlier, which
+is the whole argument for having it.
+
+**C2 emitted `5,000` where the invoice is `45,000`.** My reordering fix
+had added the retraction successor's own slot to the drop budget, so
+"forty thousand, sorry, forty five thousand" carried *two* droppable
+"forty"s and the diff spent the second one on the real number. A wrong
+number that reads perfectly — the failure class this product least
+tolerates, shipped by a change whose isolated test passed.
+
+The fix moves the decision to where the evidence is. Relocation is now
+permitted only when the cleaned text carries at least as many copies of
+the word as the raw did: nothing lost, which is the contract stated
+exactly. "The word moved" and "the word is needed twice" are
+indistinguishable from inside `FactGuard`'s span and trivial to tell apart
+from the counts in the validator.
+
+**Per workstream, before → after, against the user's expected outputs:**
+
+```
+punctuation        2/7  ->  6/7
+grammar policy     2/7  ->  7/7
+numbers            0/1  ->  1/1
+self-correction    5/7  ->  7/7
+```
+
+Whole-string exact match is 4/17, unchanged from baseline, and that number
+is not the story: every remaining miss is one token, and three of the four
+are outside the table the user legislated.
+
+**The four remaining gaps, and whose call each is:**
+- `E1`/`B3` want clock times — "four thirty" → `4:30`, "nine thirty" →
+  `9:30`. Not in the number rules given (which name only the half-thousand
+  and the spacing artifact), and adding it unasked would widen a scope the
+  file's own comment declares closed. **Wants a ruling.**
+- `C2` wants "Finance" capitalized as a team name. Noted in the baseline
+  round as a small win; not in the table either. **Wants a ruling.**
+- `B3` wants a sentence split after "Do one thing". Prompt-side, model
+  behaviour.
+- `A3` lost "No rush, just checking" to lowercase-no-comma **after** the
+  self-correction prompt lines went in — it was correct before them. The
+  likeliest cause is the new marker list ("actually no") nudging the model
+  on a sentence that opens with "no". This is the tripwire's shape, so it
+  is recorded rather than tuned: if round 2 repeats it, delete the two
+  reason-judgment lines per the pre-agreed retreat.
+
+Ran: 9/9 suites green, work-mode calibration 14/15 unchanged, speed lock
+244 ms median / 356 ms p90.
+
+**Process note, endorsed.** Fable's change — every completed round gets
+extracted into `eval/` as part of reading it, checklist as capture tool,
+repo as record — is the right lesson. Browser localStorage was invisible
+to this session and cost a full session reconstructing work mode's
+fifteen. It also would have caught the C2 bug hours earlier.

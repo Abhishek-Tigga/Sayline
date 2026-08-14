@@ -445,15 +445,15 @@ enum FactGuard {
                 span.formUnion(marker..<markerEnd)
                 // The reason zone, between marker and successor.
                 if markerEnd < successor { span.formUnion(markerEnd..<successor) }
-                // And the successor's own slot. A corrected sentence
-                // usually moves the replacement to where the retracted
-                // value stood — "ask Rohan… I mean Rohit" becomes "Ask
-                // Rohit…" — which reads to a positional diff as the
-                // successor being deleted from the end. It is not lost:
-                // `successor` is by definition a word that survived into
-                // the cleaned text, so permitting its old position costs
-                // nothing the contract protects.
-                span.insert(successor)
+                // The successor's own slot is deliberately NOT added
+                // here. A corrected sentence often moves the replacement
+                // to where the retracted value stood, which reads to a
+                // positional diff as a deletion — but "the word moved"
+                // and "the word is needed twice" look identical from
+                // inside this function. Adding it put a second "forty"
+                // in C2's budget and the diff spent it on the real
+                // number, turning 45,000 into 5,000. The validator
+                // decides relocation instead, where the counts are.
             }
         }
         return span

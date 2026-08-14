@@ -94,10 +94,30 @@ enum TranscriptCleanupValidator {
             retractionBudget[budgetKey(word), default: 0] += 1
         }
 
+        // Relocation, not deletion. Inside a retraction the model may
+        // move the replacement to where the retracted value stood, and a
+        // positional diff reads that as the successor being deleted from
+        // its old slot. It is only safe to permit when the cleaned text
+        // still carries at least as many copies of the word as the raw
+        // did — then nothing is lost, which is the whole contract.
+        //
+        // C2 is why this is a count and not a flag: "forty thousand,
+        // sorry, forty five thousand" needs its second "forty", and a
+        // rule that merely knew the word survived somewhere deleted it
+        // and produced 5,000.
+        var relocatable: Set<String> = []
+        if !retractionBudget.isEmpty {
+            var rawCount: [String: Int] = [:], cleanedCount: [String: Int] = [:]
+            for t in rawCores { rawCount[budgetKey(t), default: 0] += 1 }
+            for t in cleanedCores { cleanedCount[budgetKey(t), default: 0] += 1 }
+            for (k, n) in rawCount where (cleanedCount[k] ?? 0) >= n { relocatable.insert(k) }
+        }
+
         let decisions = buildDecisions(
             ops: ops, rawTokens: rawTokens, rawCores: rawCores,
             cleanedTokens: cleanedTokens, cleanedCores: cleanedCores,
-            falseStartIndices: falseStarts, retractionBudget: &retractionBudget
+            falseStartIndices: falseStarts, retractionBudget: &retractionBudget,
+            relocatable: relocatable
         )
 
         let disallowed = decisions.reduce(0) { count, d in
@@ -137,7 +157,8 @@ enum TranscriptCleanupValidator {
     private static func buildDecisions(
         ops: [DiffOp], rawTokens: [String], rawCores: [String],
         cleanedTokens: [String], cleanedCores: [String],
-        falseStartIndices: Set<Int>, retractionBudget: inout [String: Int]
+        falseStartIndices: Set<Int>, retractionBudget: inout [String: Int],
+        relocatable: Set<String>
     ) -> [Decision] {
         var decisions: [Decision] = []
         var insertionsUsed = 0
@@ -157,7 +178,8 @@ enum TranscriptCleanupValidator {
                 }
                 if isAllowedDeletion(rawTokens: rawTokens, rawCores: rawCores, index: ri,
                                      falseStartIndices: falseStartIndices,
-                                     retractionBudget: &retractionBudget) {
+                                     retractionBudget: &retractionBudget,
+                                     relocatable: relocatable) {
                     decisions.append(.dropRaw)
                 } else {
                     decisions.append(.restore(rawIndex: ri))
@@ -185,7 +207,8 @@ enum TranscriptCleanupValidator {
 
     private static func isAllowedDeletion(rawTokens: [String], rawCores: [String], index: Int,
                                           falseStartIndices: Set<Int>,
-                                          retractionBudget: inout [String: Int]) -> Bool {
+                                          retractionBudget: inout [String: Int],
+                                          relocatable: Set<String>) -> Bool {
         let c = rawCores[index]
         if fillerWords.contains(c) { return true }
         if !c.isEmpty, index > 0, rawCores[index - 1] == c { return true } // repeat of previous word
@@ -208,6 +231,8 @@ enum TranscriptCleanupValidator {
             retractionBudget[key] = remaining - 1
             return true
         }
+        // Moved, not lost — see `relocatable`.
+        if !retractionBudget.isEmpty, relocatable.contains(key) { return true }
         return false
     }
 
