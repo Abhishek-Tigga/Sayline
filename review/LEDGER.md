@@ -5811,3 +5811,141 @@ these two rules.
 
 Open: awaiting the user's six dictations. Assignment key stays sealed
 until their verdicts are exported.
+
+---
+
+### WORK MODE · Context detection verified from the log; the list rule I had just written did not work
+2026-08-14 · Fable · `claimed-fixed`, one verification `VERIFIED` by log evidence
+
+The user asked, before dictating the A/B round, whether app detection was
+working — they remembered Gmail-in-Chrome reading as "just Chrome", and
+had also tried Apple Mail. Checking answered that question and then found
+a real defect in my own hour-old prompt fix.
+
+### Detection: working, both paths, and the remembered bug is the fixed one
+```
+15:30  Chrome  "Inbox (22,257) - ...@gmail.com - Gmail - Google Chrome"  -> context: email
+15:34  Chrome  "Amazon Pay ICICI ... - ...@gmail.com - Gmail - Chrome"   -> context: email
+15:45  Mail    "New Message"                                             -> context: email
+15:50  Mail    "New Message"                                             -> context: email
+```
+Across both log files, **10 Gmail-titled windows, 0 fell to `general`.**
+The behaviour the user remembers was real and is already fixed — the
+comment above `browserBundleIDs` records it as found by live testing
+("dictating into Gmail-in-Chrome fell to .general even though the window
+title clearly said Gmail"), and the webmail-title signature is the fix.
+Non-webmail Chrome tabs still correctly read `general` (13:58, "Aggregation
+Query Focus"). No change needed. This is `VERIFIED` on log evidence rather
+than `claimed-fixed`: I ran nothing, but the log is production's own record
+across ten instances.
+
+### The finding: my numbered-list rule was ineffective, and email was why
+The user dictated an E4-shaped update into Apple Mail twice. Both landed as
+flowing prose, no list — the defect the fresh set flagged as G3, reproduced
+live in the destination that matters.
+
+I nearly reported something much worse first. `grep`-ing the log showed
+`[work] work -> Hi, here is the weekly update with three things.` and
+nothing else, which reads as the entire body being deleted. It is not:
+work-mode output is multi-line and grep shows only the first line. Reading
+the region verbatim showed the full three-paragraph output. **Recorded
+because the near-miss is instructive: `grep` on this log understates
+multi-line entries, and a catastrophic-looking finding deserves a verbatim
+read before it is reported.**
+
+Then testing the fix on those two real transcripts, old prompt vs new,
+both shell-less so the only difference was my two rules:
+
+```
+                      shipped-at-the-time   my "fix"
+15:45 live (email)         no list           no list
+15:51 live (email)         no list           no list
+```
+
+**The rule I had written and logged as fixed did nothing.** Diagnosis, by
+testing across contexts rather than rewording and hoping:
+
+```
+case            context   shipped   corrected
+E4 round-1      general      0          3
+E4 round-1      email        0          3
+15:45 live      general      3          3
+15:45 live      email        0          3
+15:51 live      general      0          3
+15:51 live      email        0          3
+T1 (no list)    both         0          0     <- control, correctly untouched
+```
+
+Two causes, both structural, neither fixable by insisting harder:
+1. **The unconditional `Shape: two or three short paragraphs` line
+   outranked it.** The list rule sat eight bullets below, under "Rules you
+   must not break". A model told unconditionally to write paragraphs
+   writes paragraphs. Fixed by moving the condition INTO the Shape rule —
+   the list *is* the shape, not an exception to it.
+2. **The email register suppressed lists entirely.** "Complete sentences"
+   reads as "prose", which is why every Mail dictation lost its list while
+   the same transcript in `general` sometimes kept one. The rule now says
+   "this holds in email too" explicitly.
+   A third defect showed up while testing: `conclusion or bad news first`
+   made the model hoist item 1 to the front and then repeat it as item 1
+   — the guard caught one as `longer-than-speech`. "Do NOT lift an item
+   out to the front and do not repeat it" is now in the same rule.
+
+Result: **6 of 6 across both contexts, no duplication, guard clean**, with
+T1 unchanged as the negative control.
+
+This is the CLAUDE.md convention earning itself again — "every attempt to
+fix a routing bug by rewording the prompt has failed" — with the amendment
+that a prompt rule *can* work when it changes which rule is in charge
+rather than adding another voice. The general lesson is narrower and
+sharper: **a prompt rule is not landed until it has been run against real
+input in the real context. Mine passed a build and a 31-case eval while
+doing nothing at all,** because neither instrument looks at list shape.
+
+Measured after: **13% broke / 100% rescued / 0% fallback / 1013 ms** on
+the 31 (baseline 10% / 100% / 0% / 1071–1092 ms — one extra case, rescued,
+inside today's run-to-run bounce), calibration **14/15 unchanged**,
+`factguard-checks` green.
+
+### Two things for the user, from the same log lines
+1. **A number was misheard, twice, in the worst class.** "if it **slips**
+   past Friday" was transcribed "if it **ships** past Friday" both times —
+   which inverts the sentence's meaning — and "**two** strong yes
+   candidates" became "**one** strong yes candidates" in the 15:51 take
+   (the plural noun after "one" gives it away). Neither is a rewrite
+   defect; the guard correctly protected the wrong word it was given.
+   The vocabulary-biasing build's evidence pile now includes a
+   meaning-flipping mishear and a number mishear.
+2. **The spoken sign-off lands unformatted.** The user dictated "Best
+   Abhishek" as a separate hold; it landed as `Best Abhishek.` — one line,
+   no comma, no break, where every ideal has "Best,\nAbhishek". That hold
+   ran Clean, not Work, so the closing-line rule does not reach it. Worth
+   a decision now that speaking the sign-off is the chosen approach: a
+   deterministic "Best/Thanks/Regards + name" → two-line form, in Clean.
+   Not built — it is Clean's file and another session owns it.
+
+### A/B baseline re-frozen, once, before any transcript ran
+`ab-blind/prompts-frozen.json` was re-frozen after these fixes so the bare
+arm is the shipping prompt rather than an obsolete one. Prompt is now ~848
+tokens general / ~857 email, up from ~686/~695 — the list rule is longer
+than the bullet it replaced. Both arms move together, so the comparison is
+unaffected; the few-shot arm's absolute token cost rises accordingly and
+its latency must still clear the pre-committed 1.5 s median.
+
+---
+
+### CLEAN · Self-correction kept; A3's comma accepted (user decision, 2026-08-14)
+Option 1 of `review/FABLE-PROMPT-selfcorrection-cost.md`. The three
+corrections — a changed day, a changed number, a changed name with its
+reason — resolve, and A3 landing as "no rush just checking" is accepted.
+
+The user's reasoning, and it is the right read: nothing is deleted. The
+model over-deletes, the validator restores, and restoration returns the
+words as Whisper heard them, which is without punctuation. The cost is a
+rougher sentence, not a lost one.
+
+`grammarTolerance`-style note for whoever revisits: the retreat mechanism
+recorded in the C-group tripwire remains measured-ineffective regardless
+of this decision, and that finding is still Fable's to rule on. So is
+whether the 70B — which lost the model A/B on p90 latency alone, by
+52 ms, and is the plausible fix for A3 — is worth reopening.

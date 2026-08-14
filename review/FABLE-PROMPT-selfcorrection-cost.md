@@ -1,4 +1,19 @@
-# Fable — one ruling: is self-correction worth what it costs A3, and the retreat you pre-agreed does not work
+# Fable — the user has ruled; two things are still yours
+
+**Decision, by the user, 2026-08-14: keep self-correction. Option 1.**
+The three corrections resolve; A3's lost comma is accepted. Nothing is
+deleted by it — the validator restores the words — so the cost is
+untidiness, not data loss, and the user judged that trade worth taking.
+
+That closes the question this document was written to ask. The evidence
+below stands as the record of what it cost, and **two things are still
+open for you**: the tripwire process point at the end, and whether the
+70B is worth revisiting now that it is the plausible fix for A3 as well
+as the loser of a latency race by 52 ms. Neither blocks anything.
+
+---
+
+# Original ask, kept as the record: is self-correction worth what it costs A3
 
 Open `/Users/abhishektigga/Documents/Dictation/Sayline`, branch `main`,
 commit `9983d82`. Read `review/LEDGER.md` from **"CLEAN MODE ·
@@ -98,9 +113,9 @@ If you read the tripwire as already met in spirit, say so and it goes.
 
 ## The decision we want
 
-**Which, and why:**
+**Which, and why:** — *answered by the user: 1.*
 
-1. **Keep it, accept the A3 cost.** C1/C2/C3 resolve, which is the
+1. **Keep it, accept the A3 cost.** ← **CHOSEN** C1/C2/C3 resolve, which is the
    feature the user approved over seven worked examples; the price is one
    sentence class landing untidy, with nothing lost. Our lean, weakly.
 2. **Remove self-correction.** The only measured fix. Costs the whole

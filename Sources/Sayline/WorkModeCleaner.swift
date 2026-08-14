@@ -119,8 +119,12 @@ final class WorkModeCleaner {
     The tail is content like the opener: never make the text shorter by \
     deleting how they ended it.
 
-    Shape: two or three short paragraphs with a blank line between them. \
-    Never one dense block. Put the conclusion or the bad news first.
+    Shape: if they counted their items ("first… second…", "one… two…"), \
+    the whole output is an intro line then a numbered list, "1. ", "2. ", \
+    one item per line, in the order they said them. This holds in email \
+    too. Do NOT lift an item out to the front and do not repeat it. \
+    Otherwise: two or three short paragraphs with a blank line between \
+    them, never one dense block, conclusion or bad news first.
 
     Rules you must not break:
     - NEVER upgrade a word. "Isn't done" stays "isn't done", not \
