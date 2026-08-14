@@ -129,12 +129,12 @@ swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCata
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
-swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/AppContext.swift \
-  eval/factguard-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/SpokenNumbers.swift \
+  Sources/Sayline/AppContext.swift eval/factguard-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/SpeechPatterns.swift \
   eval/speech-pattern-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/TranscriptCleanupValidator.swift Sources/Sayline/SpeechPatterns.swift \
-  Sources/Sayline/FactGuard.swift Sources/Sayline/AppContext.swift \
+  Sources/Sayline/FactGuard.swift Sources/Sayline/SpokenNumbers.swift Sources/Sayline/AppContext.swift \
   eval/cleanup-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/MediaControl.swift Sources/Sayline/NowPlaying.swift \
   Sources/Sayline/SaylineLog.swift eval/media-checks/main.swift && /tmp/chk

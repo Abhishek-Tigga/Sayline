@@ -1,3 +1,7 @@
+// Rebuild after ANY FactGuard/SpokenNumbers change, or it scores with old rules:
+//   swiftc -o eval/work-mode/verifier/verify Sources/Sayline/FactGuard.swift \
+//     Sources/Sayline/SpokenNumbers.swift Sources/Sayline/AppContext.swift \
+//     eval/work-mode/verifier/main.swift
 import Foundation
 
 // Two modes:

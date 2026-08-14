@@ -1,3 +1,8 @@
+// Rebuild after ANY validator/SpeechPatterns/FactGuard change:
+//   swiftc -o eval/clean-mode/validator/validate Sources/Sayline/TranscriptCleanupValidator.swift \
+//     Sources/Sayline/SpeechPatterns.swift Sources/Sayline/FactGuard.swift \
+//     Sources/Sayline/SpokenNumbers.swift Sources/Sayline/AppContext.swift \
+//     eval/clean-mode/validator/main.swift
 import Foundation
 
 // stdin: one {"raw": "...", "cleaned": "..."} per line
