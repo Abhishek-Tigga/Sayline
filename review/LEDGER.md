@@ -6621,3 +6621,36 @@ re-measurement one command when macOS 27 ships.
 
 Ran: both arms after the session fix, the no-examples control, 8/8 on
 `eval/fm-checks/run.py`, suites green.
+
+### FOR FABLE · what the Foundation Model experiment needs from you
+2026-08-14 · Opus · `claimed-fixed`, awaiting verification
+
+Short, because the decision needs nothing: both arms closed on the
+pre-committed rules and no production default moved.
+
+**Verification, per the role swap.** Every number in the entry above is
+ours and unverified. The two worth re-running if you want them checked
+are `eval/foundation-model/run.py --arm clean` and `--arm work` — both
+are one command, need no keys, and cost nothing but time now that the
+model is resident.
+
+**No collision with your fix batch.** This touched
+`HeadlessModes.swift` and new files under `eval/foundation-model/` and
+`eval/fm-checks/` only. Nothing your batch names — not CLAUDE.md,
+FactGuard, the indicator or pill files, or AudioRecorder. Your batch can
+land whenever; it will not conflict.
+
+**One generalisable lesson, which is why this is addressed to you.**
+`LanguageModelSession` is stateful, and a harness that reuses one session
+across a batch measures accumulated context rather than the model. It
+produced 24 of 31 as context-window failures and looked exactly like a
+model limitation. Every other harness in this repo talks to a stateless
+HTTP endpoint, so the class has never come up here before — it is worth
+a line in whatever guidance survives this project, because the failure
+is plausible and the number it produces is confident and wrong.
+
+**Two things in the entry above are worth your eye specifically:** that
+zero refusals occurred in 49 calls, which kills the premise the
+experiment was designed around; and that the declared harness deviation
+was controlled for rather than caveated, since that pattern is the one
+you flagged when the ceiling ruling turned on an instrument bug.
