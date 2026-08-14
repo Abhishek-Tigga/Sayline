@@ -80,6 +80,7 @@ enum FactGuard {
         /// caught a model appending "there are 2 potential issues".
         case inventedNumber(Int)
         case inventedDay(String)
+        case inventedTime(String)
         case inventedMonth(String)
         case inventedUnit(String)
         /// The rewrite is longer than the speech.
@@ -135,6 +136,7 @@ enum FactGuard {
                 return "the speaker asked a question and the rewrite answered it instead"
             case .inventedNumber(let n): return "it introduced the number \(n), which was never said"
             case .inventedDay(let d): return "it introduced \(d.capitalized), which was never said"
+            case .inventedTime(let t): return "it introduced \"\(t)\", which was never said"
             case .inventedMonth(let m): return "it introduced \(m.capitalized), which was never said"
             case .inventedUnit(let u): return "it introduced the unit \(u), which was never said"
             case .inventedName(let n):
@@ -166,6 +168,7 @@ enum FactGuard {
             case .questionLost: return "question-lost"
             case .inventedNumber: return "invented-number"
             case .inventedDay: return "invented-day"
+            case .inventedTime: return "invented-relative-time"
             case .inventedMonth: return "invented-month"
             case .inventedUnit: return "invented-unit"
             case .inventedName: return "invented-name"
@@ -265,10 +268,19 @@ enum FactGuard {
         for unit in facts.units.sorted() where !rewriteUnits.contains(unit) {
             violations.append(.unitLost(unit))
         }
-        let rewriteTimes = relativeTimes(in: words)
-        for time in facts.relativeTimes.sorted() where !rewriteTimes.contains(time) {
-            violations.append(.timeLost(time))
-        }
+        // Waiver 1 (Fable, 2026-08-14): `timeLost` is DELETED as a class.
+        //
+        // It was added for the real-6 week-swap danger, but a presence
+        // check never protected against a swap — the raw contains both
+        // weeks, so any rewrite passes the subset test. All it ever caught
+        // was *deletions*, and the deletions it caught were "all morning"
+        // and "going back and forth" — the journey the prompt explicitly
+        // orders removed. The class was mis-specified, not mis-implemented:
+        // the guard was reporting the prompt doing its job.
+        //
+        // The invention side stays, in the `raw:rewrite:` overload. A
+        // relative time APPEARING that was never spoken is still a
+        // violation — that direction was never the problem.
 
         // Counted, not matched, and in BOTH directions. Which words carry
         // the negation is the model's business — "I don't think we should"
@@ -308,11 +320,186 @@ enum FactGuard {
         return violations
     }
 
+    // MARK: - Retraction waivers
+    //
+    // Fable's decision, 2026-08-14, after self-correction became the
+    // dominant false positive: **tolerance, not deletion.** The model
+    // already decides what to write; these waivers only stop the guard
+    // punishing a decision the speaker made out loud.
+    //
+    // That framing is what keeps this away from PRODUCT.md's rejected
+    // "delete the self-correction" idea, which was adjacent to the
+    // data-loss bug. Nothing here removes text. A waiver being wrong means
+    // a violation is not raised — and it is only ever consulted when the
+    // model already dropped the value, because a good rewrite keeps real
+    // facts anyway.
+
+    /// Phrases that mark the speaker taking something back.
+    ///
+    /// **Phrases, not words — this was a bug before it was a design.** The
+    /// first version listed bare words including "wait", "no", "make" and
+    /// "mean". In "Priya and Arjun are both out so the release has to
+    /// WAIT unless Meera can cover it", the ordinary verb "wait" was read
+    /// as a retraction and silently waived two dropped names. That is the
+    /// failure direction Fable's decision warned about: a false retraction
+    /// loses protection with no violation and no fallback to notice.
+    ///
+    /// Each single word left here is one that essentially only appears
+    /// when someone is correcting themselves. Everything ambiguous — wait,
+    /// no, make, mean — now needs its partner, which is how people
+    /// actually say it: "no wait", "hold on", "I mean", "make that".
+    private static let retractionPhrases: [[String]] = [
+        ["actually"], ["instead"], ["sorry"],
+        ["no", "wait"], ["wait", "no"], ["hold", "on"],
+        ["scratch", "that"], ["i", "mean"], ["make", "that"],
+    ]
+
+    /// Indices in `words` where a retraction phrase begins.
+    private static func retractionMarkerIndices(in words: [String]) -> Set<Int> {
+        var found: Set<Int> = []
+        for start in words.indices {
+            for phrase in retractionPhrases where start + phrase.count <= words.count {
+                if Array(words[start..<(start + phrase.count)]) == phrase {
+                    found.insert(start)
+                }
+            }
+        }
+        return found
+    }
+
+    /// Drops violations the speaker's own correction explains.
+    ///
+    /// Works on positions, which is why it lives here rather than in the
+    /// `FactSet` overload — a FactSet has thrown the word order away, and
+    /// "was there a marker BETWEEN these two values" is the whole rule.
+    private static func withoutRetractions(_ violations: [Violation],
+                                           raw: String, rewrite: String) -> [Violation] {
+        let rawWords = tokenize(raw)
+        let rewriteWords = tokenize(rewrite)
+        let rewriteSet = Set(rewriteWords)
+        let rewriteNumbers = numbers(in: rewriteWords)
+        let rawNames = properNouns(in: raw)
+        let markers = retractionMarkerIndices(in: rawWords)
+
+        /// A marker sits strictly between two positions.
+        func markerBetween(_ a: Int, _ b: Int) -> Bool {
+            markers.contains { $0 > a && $0 < b }
+        }
+
+        /// Waiver 2, in one shape for every class: the dropped value
+        /// appears at some position, a same-class value that SURVIVED
+        /// appears later, and a retraction marker sits between them.
+        ///
+        /// The between-ness is what keeps the both-real case safe. "Move
+        /// Tuesday's meeting to Thursday" has no marker between the days,
+        /// so a dropped Tuesday still flags — that is in the suite as this
+        /// waiver's boundary.
+        func retracted(dropped: [Int], classPositions: [Int],
+                       survived: (String) -> Bool) -> Bool {
+            dropped.contains { start in
+                classPositions.contains { later in
+                    later > start && survived(rawWords[later]) && markerBetween(start, later)
+                }
+            }
+        }
+
+        var kept: [Violation] = []
+        var waivedAny = false
+
+        for violation in violations {
+            switch violation {
+            case .dayLost(let day):
+                let all = rawWords.indices.filter { dayNames.contains(rawWords[$0]) }
+                let mine = all.filter { rawWords[$0] == day }
+                if retracted(dropped: mine, classPositions: all,
+                             survived: { rewriteSet.contains($0) }) {
+                    waivedAny = true; continue
+                }
+
+            case .nameLost(let name):
+                let all = rawWords.indices.filter { rawNames.contains(rawWords[$0]) }
+                let mine = all.filter { rawWords[$0] == name }
+                if retracted(dropped: mine, classPositions: all,
+                             survived: { rewriteSet.contains($0) }) {
+                    waivedAny = true; continue
+                }
+
+            case .numberLost(let value):
+                let all = rawWords.indices.filter { !numbers(in: [rawWords[$0]]).isEmpty }
+                let mine = all.filter { numbers(in: [rawWords[$0]]).contains(value) }
+                let survived: (String) -> Bool = { word in
+                    !numbers(in: [word]).isEmpty
+                        && !numbers(in: [word]).isDisjoint(with: rewriteNumbers)
+                }
+                if retracted(dropped: mine, classPositions: all, survived: survived) {
+                    waivedAny = true; continue
+                }
+                // Waiver 3 — middle values, numbers only, no marker needed.
+                //
+                // real-10 is "from 430 to 2 but I have a conflict at 2 so
+                // I told them 245": the retraction is carried by "but I
+                // have a conflict", which is not a marker word and never
+                // will be without turning the list into a language model.
+                // Position does the work instead.
+                //
+                // Two-value cases have no middle and stay fully protected:
+                // "from 430 to 245" and "move Tuesday's to Thursday" both
+                // still flag. Residual, accepted: an enumeration losing its
+                // FIRST or LAST value ("flights at 9, 11 and 2 — book the
+                // 11") still flags. That costs a retry, not a fact, and the
+                // retry message restores it.
+                if let first = all.first, let last = all.last,
+                   !mine.isEmpty,
+                   mine.allSatisfy({ $0 != first && $0 != last }),
+                   mine.contains(where: { start in
+                       all.contains { $0 > start && survived(rawWords[$0]) }
+                   }) {
+                    waivedAny = true; continue
+                }
+
+            default:
+                break
+            }
+            kept.append(violation)
+        }
+
+        guard waivedAny else { return kept }
+
+        // Rider A: a "no" spent as a retraction marker is not a stance.
+        //
+        // real-5 says "Actually, wait, no. Thursday is the all hands." That
+        // "no" takes Thursday back; it is not the speaker disagreeing with
+        // anything. Counting it as the negation baseline made a faithful
+        // rewrite look like it had reversed a position.
+        //
+        // Rider B: a question superseded by a retraction is not one the
+        // rewrite must preserve. "Can we do the demo on Thursday?" was
+        // answered by the speaker themselves, two sentences later.
+        //
+        // Both riders only apply when something was actually waived, so an
+        // ordinary negation or question is untouched.
+        return kept.filter { violation in
+            switch violation {
+            case .negationLost:
+                // Only a "no" spent inside a retraction phrase is exempt.
+                return !markers.contains { rawWords[$0] == "no" || (rawWords[$0] == "wait" && $0 + 1 < rawWords.count && rawWords[$0 + 1] == "no") }
+            case .questionLost: return false
+            default: return true
+            }
+        }
+    }
+
+    /// Names as extraction sees them, for the successor test.
+    private static func namesInRaw(_ raw: String) -> Set<String> {
+        properNouns(in: raw)
+    }
+
     /// Full check including invention, which needs the original text
     /// rather than only the extracted facts.
     static func verify(raw: String, rewrite: String,
                        context: AppContext = .general) -> [Violation] {
         var violations = verify(raw: extract(from: raw), rewrite: rewrite, context: context)
+        violations = withoutRetractions(violations, raw: raw, rewrite: rewrite)
 
         // The inverse check, and the more dangerous half. A name the model
         // introduced is a person put in the user's mouth; a dropped name
@@ -346,6 +533,23 @@ enum FactGuard {
         }
         for month in newFacts.months.subtracting(rawFacts.months).sorted() {
             violations.append(.inventedMonth(month))
+        }
+        // Built, not merely kept. Waiver 1 deleted `timeLost` on the
+        // reasoning that a presence check "never protected against swaps",
+        // which is true of real-6 — "end of next week not this week" has
+        // both weeks in the raw, so any rewrite passes a subset test.
+        //
+        // It is NOT true of the single-value case, and the suite caught it:
+        // "we can ship this week" → "we can ship next week" moves a
+        // deadline by a week, and `timeLost` was the only thing catching
+        // it. Deleting the class without this would have traded a false
+        // positive for a silent lost week.
+        //
+        // Checking the invention side catches the same swap from the other
+        // end, and does it without punishing the journey deletions the
+        // prompt orders. "all morning" disappearing invents nothing.
+        for time in newFacts.relativeTimes.subtracting(rawFacts.relativeTimes).sorted() {
+            violations.append(.inventedTime(time))
         }
         for unit in newFacts.units.subtracting(rawFacts.units).sorted() {
             violations.append(.inventedUnit(unit))

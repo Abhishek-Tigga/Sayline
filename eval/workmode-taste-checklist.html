@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work mode — taste round 1</title>
+<style>
+:root{--bg:#faf9f6;--card:#fff;--ink:#1a1a1a;--mut:#6b6a66;--line:#e4e2dc;--pass:#e7f2e3;--passb:#5a8a4a;--fail:#fbe9e7;--failb:#b0492f;--skip:#f0efe9;--accent:#4a5568}
+@media (prefers-color-scheme:dark){:root{--bg:#191917;--card:#222220;--ink:#eceae5;--mut:#98968f;--line:#3a3934;--pass:#26331f;--passb:#8fbf7a;--fail:#3a2320;--failb:#e08b70;--skip:#2a2926;--accent:#a9b4c4}}
+*{box-sizing:border-box}
+body{font:16px/1.6 -apple-system,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 20px 80px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+h2{font-size:17px;font-weight:600;margin:36px 0 4px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 12px}
+.bar{position:sticky;top:0;background:var(--bg);padding:10px 0;display:flex;gap:16px;align-items:center;font-size:14px;border-bottom:1px solid var(--line);z-index:5}
+.bar b{font-size:18px}
+.case{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0}
+.case.p{border-color:var(--passb);background:linear-gradient(var(--pass),var(--pass)),var(--card)}
+.case.f{border-color:var(--failb)}
+.case.s{opacity:.55}
+.case h3{font-size:15px;font-weight:600;margin:0 0 2px}
+.room{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;background:var(--skip);color:var(--mut);margin-left:6px;vertical-align:1px}
+.say{background:var(--skip);border-radius:8px;padding:10px 12px;font-size:14.5px;margin:8px 0;font-style:italic}
+.say::before{content:"Speak (roughly — drift freely): ";font-style:normal;font-weight:600;font-size:12px;color:var(--mut);display:block;margin-bottom:2px}
+.good{font-size:13.5px;color:var(--mut);margin:6px 0 10px}
+.good b{color:var(--ink)}
+.btns{display:flex;gap:8px;margin:8px 0}
+.btns button{font-size:13px;padding:5px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.btns button.on-p{background:var(--pass);border-color:var(--passb);font-weight:600}
+.btns button.on-f{background:var(--fail);border-color:var(--failb);font-weight:600}
+.btns button.on-s{background:var(--skip);font-weight:600}
+.tags{display:none;flex-wrap:wrap;gap:6px;margin:8px 0}
+.case.f .tags{display:flex}
+.tags span{font-size:12px;padding:3px 10px;border-radius:12px;border:1px solid var(--line);cursor:pointer;color:var(--mut)}
+.tags span.on{background:var(--fail);border-color:var(--failb);color:var(--ink)}
+textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:13.5px/1.5 ui-monospace,Menlo,monospace;padding:8px 10px;margin:4px 0;resize:vertical}
+textarea.landed{min-height:54px}
+textarea.remark{min-height:36px;font-family:inherit}
+label{font-size:12px;font-weight:600;color:var(--mut)}
+.export{position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.note{font-size:13.5px;color:var(--mut);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Work mode — taste, round 1</h1>
+<p class="sub">18 cases · the bar for <b>pass</b> is one question only: <b>would you press send without editing a single word?</b> Not "is it good" — would you ship it as-is. If you'd touch it, it's a fail, and the tags say why.</p>
+<div class="note">Protocol: chord-dictate each script into the named room (or a stand-in text field), speaking naturally — the script is a prompt, not scripture; your own ums and detours make the test better. Paste what landed, mark it, tag fails, add a remark where the tags don't cover it. Marks save in this browser automatically. Hit <b>Export results</b> when done (partial is fine) and paste the summary back to Fable.</div>
+
+<div class="bar"><span>Pass <b id="np">0</b></span><span>Fail <b id="nf">0</b></span><span>Left <b id="nr">18</b></span><span id="save" style="color:var(--mut);font-size:12px"></span></div>
+
+<div id="cases"></div>
+</main>
+<button class="export" onclick="doExport()">Export results</button>
+<script>
+const TAGS=["too formal","too long","lost my edge","too blunt for me","meaning changed","robotic","padding added","wrong register","structure wrong","fact wrong","fell back"];
+const CASES=[
+["T1","Slack","Disagreeing with a teammate",
+"so I saw your comment on the ticket and um, look, I get the reasoning but I don't think caching is the fix here, like the numbers are wrong BEFORE they hit the cache, I checked yesterday, so caching would just make wrong numbers faster, um can we look at the aggregation query first, that's my bet",
+"Your disagreement stays plain (\"I don't think caching is the fix\"), your bet stays yours, and it reads like a teammate — not a review committee."],
+["T2","Slack","Status with honest caveats",
+"quick status on the payments migration, so we're basically done with the read path, um the write path is trickier than we thought because of the retry logic, honestly I'd say seventy percent overall, and I don't want to promise Friday, Monday is realistic",
+"70% and the refusal to promise Friday both survive. \"Trickier than we thought\" doesn't become \"presented unforeseen complexities.\""],
+["T3","Slack","Asking a favor without groveling",
+"hey um sorry to ping you on this again but I'm blocked on the API keys thing, I know you're slammed, whenever you get like ten minutes today could you approve the request, it's the last thing between us and the staging deploy",
+"One light apology max — not amplified into three. The ask is direct, the deadline pressure stays gentle but real."],
+["T4","Slack","Delivering blocker news upward",
+"so heads up, um the vendor sandbox went down this morning and their support says forty eight hours, which honestly kills our Thursday demo, I think we either fake the vendor responses for the demo or we push it, I'd rather fake it, wanted you to know now not Wednesday night",
+"Bad news first, not buried. \"Kills our Thursday demo\" keeps its bluntness. Your preference (fake it) stays stated as yours."],
+["E1","Email","Bad news to a client",
+"hi Nikhil, so um about the integration timeline, look I have to be straight with you, the March date isn't going to happen, we found a data issue on our side that needs maybe two more weeks, um the new realistic date is mid April, I know that's not what you wanted to hear, happy to get on a call this week if that helps",
+"\"I have to be straight with you\" energy survives in email form. No \"we regret to inform\", no burying mid-April under paragraph three."],
+["E2","Email","Declining firmly but warmly",
+"hi thanks for thinking of us for the webinar, um honestly this quarter is just not possible, we're heads down on a launch, I don't want to half commit and then flake, maybe ping us again in the summer",
+"The no is an actual no, early and clear. \"Don't want to half commit and then flake\" keeps its humanity — not \"unable to allocate bandwidth.\""],
+["E3","Email","The nudge on a dead thread",
+"hi just floating this back up, um I sent the invoice details two weeks back and I know things get buried, we'd really like to close this out before month end, let me know if anything's missing from our side",
+"Polite without being servile. No \"gentle reminder\" boilerplate unless you said it. Short — a nudge, not a letter."],
+["E4","Email","Long update to your manager",
+"hi so the weekly update, um three things really, the launch prep is on track, QA finishes Wednesday and we're go for Tuesday, second thing the hiring loop, we did four onsites, two strong yes candidates, I'll send the debrief separately, and third, the thing I'm worried about, the vendor contract renewal is stuck with legal and if it slips past Friday it starts blocking the roadmap work, that one needs your help",
+"The dictated three-part structure lands as three clear parts. The worry stays flagged as a worry, and the ask for help survives at the end."],
+["N1","Slack","Saying no to someone senior",
+"hey so about adding the export feature to this sprint, um I have to push back on this one, the sprint is genuinely full and something would have to drop, if export goes in I'd suggest we drop the settings redesign, but I don't think we should just absorb it, that never works",
+"\"I have to push back\" stays. \"That never works\" — your earned opinion — is not sanded into \"may present challenges.\""],
+["N2","Slack","Apologizing exactly once",
+"hey um my bad on the standup confusion this morning, I misread the calendar, the demo is actually tomorrow not today, sorry about the fire drill, tomorrow same time works for everyone I hope",
+"One \"my bad\" plus one \"sorry\" — as spoken — and no invented extra remorse. Light, quick, done."],
+["N3","Email","Correcting your own earlier email",
+"hi quick correction on my last mail, um I said the invoice was forty five thousand, it's actually forty seven five, my mistake, the PO number stays the same, nothing else changes",
+"47,500 lands correctly (say it naturally!). The correction is matter-of-fact — no drama, no over-apology."],
+["N4","Slack","Praise without corporate gloss",
+"just want to say um the way Sneha handled that outage call yesterday was really something, she kept everyone calm, had the rollback ready before anyone asked, honestly we got lucky she was on call, worth a shoutout in the all hands I think",
+"Warm and specific, in your words. Not inflated into \"exemplary incident management demonstrating outstanding leadership.\""],
+["S1","Slack","A dictated list stays a list",
+"okay decisions from the design review, three things, one we're going with the tabbed layout, two dark mode ships in the same release not after, three the settings page moves to v2, that's it",
+"Three items land as three scannable items (bullets or clean lines). No invented header, no fourth item, no meta-sentence about the list."],
+["S2","Slack","Self-correction mid-ramble",
+"can we move the retro to Thursday, wait no hold on, Thursday is the town hall, okay Friday, let's do Friday afternoon, um after three works best",
+"Lands as Friday afternoon after 3 — one clean ask. Thursday and the detour are gone, OR your exact words fall back with a visible flash. Wrong day = fail + fact-wrong tag."],
+["S3","Email","Ends on a real question",
+"hi so I looked at the proposal, um most of it works for us, the only sticking point is the support SLA, four hours feels tight for our team size, would eight hours be acceptable on your side, that's really the only open thing",
+"The email still ENDS with the question, as a question. Not converted into \"we would prefer eight hours.\""],
+["I1","Slack","Indian workplace idiom, one",
+"hey um can we prepone the client call to eleven, the afternoon slot clashes with the town hall, and also please do share the deck before, whoever has the latest version kindly do the needful",
+"\"Prepone\" survives or resolves to \"move up\" — either is fine, but the meaning holds. \"Do the needful\" may smooth into a plain ask; the TIME (11) must survive."],
+["R1","Slack","REPEAT of T2 — consistency check",
+"(speak T2's status update again, from memory, in your own words — don't reread the script)",
+"Compare against what T2 produced: same facts, same register, same shape. Pass = you couldn't tell which run was which. Different structure/tone for the same thought = fail, tag robotic or wrong register."],
+["R2","Email","REPEAT of E1 — consistency check",
+"(speak E1's bad-news mail again, from memory, in your own words)",
+"Same bar: equivalent output. The date, the two-weeks reason, and the call offer all land again; the tone doesn't wobble between runs."]
+];
+const state=JSON.parse(localStorage.getItem('taste1')||'{}');
+const wrap=document.getElementById('cases');
+let html='';let lastGroup='';
+const groups={T:"Tone in the room",E:"Email replies",N:"The rephraser-killers — where AI usually ruins it",S:"Structure and mechanics",I:"Idiom",R:"Consistency — same thought, second run"};
+for(const[id,room,title,say,good]of CASES){
+const g=id[0];
+if(g!==lastGroup){html+='<h2>'+groups[g]+'</h2>';lastGroup=g;}
+const st=state[id]||{};
+html+='<div class="case '+(st.v||'')+'" id="c-'+id+'"><h3>'+id+' · '+title+'<span class="room">'+room+'</span></h3>'
++'<div class="say">'+say+'</div><div class="good">Pass looks like: <b>'+good+'</b></div>'
++'<div class="btns">'
++'<button class="'+(st.v==='p'?'on-p':'')+'" onclick="mark(\''+id+'\',\'p\')">Pass — would send as-is</button>'
++'<button class="'+(st.v==='f'?'on-f':'')+'" onclick="mark(\''+id+'\',\'f\')">Fail — would edit</button>'
++'<button class="'+(st.v==='s'?'on-s':'')+'" onclick="mark(\''+id+'\',\'s\')">Skip</button></div>'
++'<div class="tags">'+TAGS.map(t=>'<span class="'+((st.tags||[]).includes(t)?'on':'')+'" onclick="tag(\''+id+'\',this)">'+t+'</span>').join('')+'</div>'
++'<label>What landed (paste the output)</label><textarea class="landed" oninput="txt(\''+id+'\',\'landed\',this.value)">'+(st.landed||'')+'</textarea>'
++'<label>Remark</label><textarea class="remark" oninput="txt(\''+id+'\',\'remark\',this.value)">'+(st.remark||'')+'</textarea>'
++'</div>';
+}
+wrap.innerHTML=html;
+function persist(){localStorage.setItem('taste1',JSON.stringify(state));document.getElementById('save').textContent='saved';setTimeout(()=>document.getElementById('save').textContent='',900);count();}
+function mark(id,v){state[id]=state[id]||{};state[id].v=v;const el=document.getElementById('c-'+id);el.className='case '+v;
+el.querySelectorAll('.btns button').forEach((b,i)=>b.className=(v==='p'&&i===0)?'on-p':(v==='f'&&i===1)?'on-f':(v==='s'&&i===2)?'on-s':'');persist();}
+function tag(id,el){state[id]=state[id]||{};state[id].tags=state[id].tags||[];const t=el.textContent;
+const i=state[id].tags.indexOf(t);if(i<0){state[id].tags.push(t);el.classList.add('on')}else{state[id].tags.splice(i,1);el.classList.remove('on')}persist();}
+function txt(id,k,v){state[id]=state[id]||{};state[id][k]=v;persist();}
+function count(){let p=0,f=0,d=0;for(const[id]of CASES){const v=(state[id]||{}).v;if(v==='p')p++;if(v==='f')f++;if(v)d++;}
+document.getElementById('np').textContent=p;document.getElementById('nf').textContent=f;document.getElementById('nr').textContent=CASES.length-d;}
+count();
+function doExport(){
+let out='WORK MODE TASTE ROUND 1 — results\n';
+for(const[id,room,title]of CASES){const s=state[id]||{};
+out+='\n'+id+' ('+title+'): '+(s.v==='p'?'PASS':s.v==='f'?'FAIL':s.v==='s'?'skip':'unmarked');
+if(s.tags&&s.tags.length)out+=' ['+s.tags.join(', ')+']';
+if(s.landed)out+='\n  landed: '+s.landed.replace(/\n/g,' / ');
+if(s.remark)out+='\n  remark: '+s.remark.replace(/\n/g,' / ');}
+navigator.clipboard.writeText(out).then(()=>alert('Copied to clipboard — paste it back to Fable.'),()=>{
+const w=window.open('','_blank');w.document.write('<pre>'+out.replace(/</g,'&lt;')+'</pre>');});
+}
+</script>
+</body>
+</html>

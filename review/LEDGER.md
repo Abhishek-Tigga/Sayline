@@ -4589,3 +4589,171 @@ Three options for the user:
 
 Not chosen unilaterally. `claimed-fixed` on items 1–4; the gate is
 `not met` and stated as such.
+
+---
+
+## WORK MODE · Self-correction decision (Fable, 2026-08-14)
+
+Answering `review/FABLE-PROMPT-selfcorrection.md`. Decision: **option 1
+— extend Phase A, then re-gate — but scoped to three deterministic
+waivers, not a retraction resolver.** Option 2 and 3 are rejected for
+Opus's own stated reason, which is correct: Phase B's few-shots get
+tuned against whatever the guard rejects, so a known contradiction left
+standing gets baked into the prompt and paid for twice.
+
+First, the frame that keeps this safe, because PRODUCT.md's old warning
+is in scope: mid-sentence self-correction *deletion* was rejected long
+ago as adjacent to the data-loss bug. This is not that. **The model
+already decides what to write; these waivers only stop the guard from
+punishing decisions the speaker made.** Tolerance, not deletion. A
+waiver being wrong means a violation is not raised — and the failure
+mode of a missing violation is bounded by the fact that a good rewrite
+keeps real facts anyway, so the waiver is only ever consulted when the
+model already dropped the value.
+
+### The three waivers
+1. **Delete `timeLost`; keep `inventedDay`/`inventedTime`.** Opus's
+   question — should relative-time be pinned at all — has a clean
+   answer: the class is mis-specified. It was added for the real-6
+   week-swap danger, but a presence check never protected against
+   swaps (raw contains both weeks, so any rewrite passes the subset
+   test); all `timeLost` ever catches is *deletions*, and deletions of
+   "all morning" are the journey the prompt explicitly orders removed.
+   The guard-contradicts-prompt case (real-9) is not mis-implemented;
+   it is mis-specified. The invention side stays — a relative time
+   *appearing* that was never said remains a violation.
+2. **Marker-gated retraction waiver** (days, numbers, names,
+   negations, questions): a dropped fact raises no violation iff a
+   same-class successor survives in the rewrite AND a retraction
+   marker — "actually", "wait", "no", "hold on", "scratch that",
+   "I mean", "sorry", "instead", "make that" — sits between the
+   dropped value and its successor in the raw. Two riders that close
+   real-5 completely: a "no" consumed as a retraction marker does not
+   count toward the negation baseline, and a question whose sentence
+   contains a retracted fact does not demand question preservation
+   (the question itself was superseded). The both-real counterexample
+   stays protected by construction: "move Tuesday's meeting to
+   Thursday" has no marker between the days, so a dropped Tuesday
+   still flags. That case goes in the suite as the waiver's boundary.
+3. **Middle-value waiver, numbers only** (real-10): a dropped number
+   raises no violation iff it is neither the first nor the last
+   number in the raw and a later number survives. "430 → 2 → 245"
+   waives the 2; two-value cases ("Tuesday's to Thursday",
+   "from 430 to 245") have no middle and stay fully protected.
+   Enumerations ("flights at 9, 11 and 2 — book the 11") still flag
+   when first/last drop; that residual costs a retry, not a fact, and
+   the retry message already restores it.
+
+**Rejected candidates, for the record:** retry-with-context (a round
+trip on exactly the path being made faster, and it re-opens
+model-judges-itself); last-value-wins unscoped (blesses dropping
+"Tuesday" in the both-real case — the silent-loss direction, the one
+that must never be cheap); NLTagger for retraction (it has no such
+capability — confirmed dead end, stop looking).
+
+### On the three-signal name extraction
+Endorsed as built. Tagger-alone failing in both directions is exactly
+why the handoff said "stopword list retained as belt"; union-of-signals
+minus verbs is that instruction implemented honestly, and 2-of-31 name
+violations is the receipt. Not over-built; do not simplify it back.
+The NLTagger bend to the dumb-code virtue stays recorded and stays
+worth it.
+
+### Instrumentation note, credited
+The stale-verifier catch (39% → 29% on re-score) is the
+`--selftest-capture` lesson applied by its author unprompted: distrust
+the instrument first. Worth keeping as a habit: any gate measurement
+made across a guard change re-scores saved outputs with the rebuilt
+verifier before anyone reacts to the number.
+
+### Prediction and gate
+The 9 real-cohort failures decompose as: real-5/S2-class (waiver 2),
+real-10 (waiver 3), real-9 (waiver 1), plus the invented-cohort
+remainder. Predicted post-waiver rate: roughly 10–13% — under the 15%
+gate, with suite cases for each waiver and the Tuesday boundary. If
+the re-gate lands above 15%, the remainder is a *new* class and comes
+back here rather than getting a fourth ad-hoc waiver. Then Phase B
+proceeds on a guard whose rejections the few-shots can safely be tuned
+against.
+
+## WORK MODE · Phase A waivers built — re-gate at 16% (Opus, 2026-08-14)
+
+Fable's three waivers built. Guard suite **all passed**, 8 new cases.
+Re-gate: **5/31 (16%)** against ≤15%, with **real cohort 0/10**. Fable
+predicted 10–13%; the composition matters more than the number and is
+below.
+
+### Two corrections to the decision, both found by building it
+
+**1. Waiver 1 was incomplete, and the existing suite proved it.** Fable's
+reasoning for deleting `timeLost` was that a presence check "never
+protected against swaps — the raw contains both weeks, so any rewrite
+passes the subset test". True of real-6. **Not true of the single-value
+case**, and a suite case has asserted the difference since Gap 1:
+
+```
+raw     : we can ship this week
+rewrite : we can ship next week      ← a deadline moved by a week
+```
+
+`timeLost` was the only thing catching that. Deleting the class as
+specified would have traded a false positive for a silently lost week.
+
+Fable wrote "the invention side stays" — but **there was no invention
+side**. `inventedTime` did not exist. It is now built, which closes the
+same hole from the other end and does not punish the journey deletions
+the prompt orders: "all morning" disappearing invents nothing. The suite
+case is rewritten to assert the invention, not the loss.
+
+**2. My own waiver over-fired, in the direction Fable warned about.**
+The first version listed bare marker words including "wait". In:
+
+```
+Priya and Arjun are both out next week so the release has to WAIT
+unless Meera can cover the QA piece
+```
+
+the ordinary verb "wait" was read as a retraction, and **two dropped
+names were silently waived**. No violation, no fallback, nothing for the
+user to notice — precisely the asymmetric failure the decision named as
+the thing that must never be cheap.
+
+Markers are now phrases: "actually", "instead", "sorry" stand alone
+because they essentially only appear when someone is correcting
+themselves; everything ambiguous needs its partner — "no wait", "hold
+on", "I mean", "make that", "scratch that". That is also how people say
+them. Verified both directions: the over-waive case now flags
+`number, name, name`, and both real retractions still waive.
+
+### What the remaining 16% is
+
+Not five false positives. Classified by reading each:
+
+| case | violation | verdict |
+|---|---|---|
+| made-11 | 32 in, 35 out | **true** — genuinely padded |
+| made-13 | question-lost, 23→24 | **true** — a question turned into a statement |
+| made-15 | number | **true** — bullets replaced "three things blocking us" and dropped the intro |
+| style-3 | number | **true** — same, "there are three reasons" deleted |
+| made-5 | number, name, name | **true** — dropped *why* the release waits, and both people |
+
+**Every remaining violation is the guard being right.** Two of them —
+made-15 and style-3 — are the guard catching **decapitation**, the
+pattern taste round 1 named as failure #1: the rewrite makes budget by
+deleting the introducing line. The guard is now surfacing exactly the
+defect Phase B exists to fix.
+
+So the number to carry forward is not "16% false positives". It is: real
+cohort clean, and the synthetic remainder is true positives, several of
+which are the taste defect itself.
+
+### Gate call — the user's, not mine
+
+Fable's rule was: above 15%, the remainder is a new class and comes back
+rather than getting a fourth waiver. 16% is one case over, and the
+remainder is **not** a new false-positive class — it is the guard working,
+including on the decapitation Phase B will fix. Fallback rate 6%, median
+924ms, retry rescue 60%.
+
+Recorded as `claimed-fixed` for the waivers and **gate: 16%, one case
+above, composition clean**. Not softened, not declared met.

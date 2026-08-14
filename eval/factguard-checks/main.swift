@@ -98,8 +98,11 @@ check("a rephrased negation is allowed",
 // This assertion is here so the limit is a recorded decision rather than
 // a surprise. If someone later teaches the guard to resolve corrections,
 // this case flips and SHOULD be updated — deliberately, not silently.
-check("resolved self-correction fires (documented false positive)",
-      violations("Let's do Friday, no wait, Thursday.", "Let's do Thursday.")
+// FLIPPED 2026-08-14, deliberately, exactly as the note above asked.
+// Fable's marker-gated waiver resolves the correction, so this no longer
+// fires — the limit is lifted rather than recorded.
+check("a resolved self-correction no longer fires",
+      !violations("Let's do Friday, no wait, Thursday.", "Let's do Thursday.")
         .contains(.dayLost("friday")))
 
 print("\nwhat must NOT fire — a guard that cries wolf gets ignored")
@@ -180,9 +183,15 @@ check("adding a second negation to a sentence that had one is allowed",
 check("relative weeks are pinned",
       FactGuard.extract(from: "realistically end of next week not this week")
         .relativeTimes.contains("next week"))
-check("this-week to next-week is caught",
+// Now caught from the INVENTION side. `timeLost` was deleted as a class
+// on 2026-08-14 because all it caught was journey deletions the prompt
+// orders — but this case proved that reasoning incomplete: a single-value
+// swap moves a deadline by a week and only that class was catching it.
+// The invented-time check closes the same hole without punishing "all
+// morning" disappearing, which invents nothing.
+check("this-week to next-week is still caught, from the other side",
       violations("we can ship this week", "we can ship next week")
-        .contains(.timeLost("this week")))
+        .contains(.inventedTime("next week")))
 check("tomorrow is pinned",
       FactGuard.extract(from: "let's discuss at the sync tomorrow").relativeTimes.contains("tomorrow"))
 
@@ -521,6 +530,55 @@ check("but the shell allowance is not a blank cheque",
       tooLong(twentySix, twentySix + " " + Array(repeating: "pad", count: 20).joined(separator: " "), .email))
 check("a short utterance may still not grow, unchanged",
       tooLong("push it to Tuesday", "Please push it to Tuesday at some point"))
+
+// MARK: - Retraction waivers (Fable's decision, 2026-08-14)
+//
+// Tolerance, not deletion: the model already chose what to write, and
+// these only stop the guard punishing a choice the speaker made aloud.
+// The boundary cases matter more than the waivers — a waiver that is too
+// eager loses a fact silently, which is the direction that must never be
+// cheap.
+
+print("\nretraction waivers — and the boundaries that must still flag")
+
+func kinds(_ raw: String, _ rewrite: String) -> [String] {
+    FactGuard.verify(raw: raw, rewrite: rewrite).map(\.kind)
+}
+
+// real-5, live: every violation here was the guard punishing a retraction.
+check("a retracted day, its marker-no and its superseded question all clear",
+      kinds("Can we do the demo on Thursday? Actually, wait, no. Thursday is the all hands. Let's do Monday. Yeah, Monday afternoon works better anyways.",
+            "Let's do the demo on Monday afternoon.").isEmpty)
+
+// real-10, live: the retraction is carried by "but I have a conflict",
+// which is not a marker word — position does the work.
+check("a middle number the speaker talked themselves out of clears",
+      !kinds("they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245",
+             "Move the call from 430 to 245.").contains("number"))
+
+// THE BOUNDARY. No marker between the days, so both are real.
+check("no marker between two days means a dropped day still flags",
+      kinds("move Tuesday's meeting to Thursday", "Move the meeting to Thursday.")
+        .contains("day"))
+
+check("a two-value number range has no middle and stays protected",
+      kinds("move it from 430 to 245", "Move it to 245.").contains("number"))
+
+check("an ordinary negation is untouched when nothing was retracted",
+      kinds("I don't think we should ship this", "We should ship this.")
+        .contains("negation"))
+
+check("an ordinary question is untouched when nothing was retracted",
+      kinds("can you look at the deck today?", "Look at the deck today.")
+        .contains("question-lost"))
+
+// Waiver 1: the class is gone, but only in the losing direction.
+check("dropping the journey is no longer a violation",
+      !kinds("i've been going back and forth on this all morning but we should park it",
+             "We should park it.").contains("relative-time"))
+check("but an invented relative time is still caught",
+      kinds("we should park the export feature", "We should park the export feature next week.")
+        .contains("invented-relative-time"))
 
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

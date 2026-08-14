@@ -4,8 +4,8 @@
     "id": "real-1",
     "cohort": "real",
     "raw": "Hey, so about the design review, Rohan said he can't make Wednesday anymore. So I'm thinking we move it to Friday morning like 11ish. Doesn't that work for you or is Friday bad?",
-    "rewrite": "Rohan can't make Wednesday anymore. Let's move the design review to Friday morning around 11. Does that work for you, or is Friday bad?",
-    "ms": 1301.5055830000008
+    "rewrite": "Rohan can't make Wednesday anymore, so let's move the design review to Friday morning around 11. Does that work for you, or is Friday bad?",
+    "ms": 905.6450419999998
   },
   {
     "model": "gpt-4o-mini",
@@ -13,23 +13,23 @@
     "cohort": "real",
     "raw": "Hi, thanks for sending this over. So I went through the dock and honestly, I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. So let's discuss the sync tomorrow before we reply to them.",
     "rewrite": "I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. Let's discuss the sync tomorrow before we reply to them.",
-    "ms": 1142.2415830000004
+    "ms": 1061.0374170000014
   },
   {
     "model": "gpt-4o-mini",
     "id": "real-3",
     "cohort": "real",
     "raw": "okay so bug i found um when you upload a file bigger than 25 megs the progress bar just goes to like 99 and sits there forever no error nothing so it on chrome didn't check safari yet probably the timeout on the upload",
-    "rewrite": "When you upload a file bigger than 25 megs, the progress bar goes to 99 and stays there without any error. This happens on Chrome; I haven't checked Safari yet. It's probably a timeout issue on the upload.",
-    "ms": 1177.2504579999995
+    "rewrite": "When you upload a file bigger than 25 megs, the progress bar goes to 99 and stays there without any error. This happens on Chrome; I haven't checked Safari yet. It\u2019s probably a timeout issue on the upload.",
+    "ms": 1028.645749999999
   },
   {
     "model": "gpt-4o-mini",
     "id": "real-4",
     "cohort": "real",
     "raw": "so quick recap from the stand up um ankit is taking the payment flow changes sneha got the dashboard redesign and the analytic migration thing someone should pick up this week because it's been sitting here since like two sprints",
-    "rewrite": "- Ankit is taking the payment flow changes.  \n- Sneha got the dashboard redesign.  \n- Someone should pick up the analytic migration this week because it's been sitting here since two sprints.",
-    "ms": 1019.4550000000006
+    "rewrite": "- Ankit is taking the payment flow changes.  \n- Sneha got the dashboard redesign.  \n- The analytic migration needs to be picked up this week because it's been sitting here for two sprints.",
+    "ms": 976.1447079999996
   },
   {
     "model": "gpt-4o-mini",
@@ -37,7 +37,7 @@
     "cohort": "real",
     "raw": "Can we do the demo on Thursday? Actually, wait, no. Thursday is the all hands. Let's do Monday. Yeah, Monday afternoon works better anyways.",
     "rewrite": "Let's do the demo on Monday afternoon.",
-    "ms": 710.0605830000006
+    "ms": 644.6174999999989
   },
   {
     "model": "gpt-4o-mini",
@@ -45,15 +45,15 @@
     "cohort": "real",
     "raw": "So update on the onboarding remap. We are at about 70% I'd say. The email verification piece turned out messier than we thought. So realistically end of next week not this week I know that's not ideal.",
     "rewrite": "We're at about 70%. The email verification piece turned out messier than we thought. Realistically, it will be done by the end of next week, not this week. I know that's not ideal.",
-    "ms": 1052.4418329999996
+    "ms": 1010.8439170000007
   },
   {
     "model": "gpt-4o-mini",
     "id": "real-7",
     "cohort": "real",
     "raw": "So about the price page, I looked at the new copy and I really don't want to remove the free tier mention. I get why marketing wants it gone but I don't agree. We can keep it until we are actually talk to sale.",
-    "rewrite": "I really don't want to remove the free tier mention from the price page. I get why marketing wants it gone, but I don't agree. We can keep it until we actually talk to sales.",
-    "ms": 1168.9075419999995
+    "rewrite": "I really don't want to remove the free tier mention. I get why marketing wants it gone, but I don't agree. We can keep it until we actually talk to sales.",
+    "ms": 925.3577090000018
   },
   {
     "model": "gpt-4o-mini",
@@ -61,7 +61,7 @@
     "cohort": "real",
     "raw": "Hey quick one can you approve the vendor invoice when you get a chance it's the one from design well for 45,000 rupees finance needs it cleared before the 30th or it slips to the next month cycle",
     "rewrite": "Please approve the vendor invoice from Design Well for 45,000 rupees. Finance needs it cleared before the 30th, or it slips to the next month cycle.",
-    "ms": 913.6647920000023
+    "ms": 1123.1384579999997
   },
   {
     "model": "gpt-4o-mini",
@@ -69,7 +69,7 @@
     "cohort": "real",
     "raw": "so i've been going back and forth on this all morning like the user research says people want the export export feature but the numbers from the beta says barely anyone clicked it and building it properly is like three weeks of work so honestly i think we should park it this quarter that's where i have landed",
     "rewrite": "We should park the export feature this quarter. User research indicates demand, but beta numbers show barely anyone clicked it, and building it properly is about three weeks of work.",
-    "ms": 915.7971249999974
+    "ms": 859.5320409999978
   },
   {
     "model": "gpt-4o-mini",
@@ -77,7 +77,7 @@
     "cohort": "real",
     "raw": "okay so for the customer calls with Mira's team um they asked to move it from 430 to 2 but I have a conflict at 2 so I told them 245 can you update the invite and also add Karen this time he wasn't on the last one",
     "rewrite": "Update the invite to move the customer calls with Mira's team from 430 to 245 and add Karen, who wasn't on the last one.",
-    "ms": 968.2863750000017
+    "ms": 924.1371660000013
   },
   {
     "model": "gpt-4o-mini",
@@ -85,7 +85,7 @@
     "cohort": "made",
     "raw": "so the migration slipped again we said March originally but realistically it's April now maybe even May if the vendor stuff isn't sorted",
     "rewrite": "The migration slipped again; we said March originally, but realistically it's April now, maybe even May if the vendor stuff isn't sorted.",
-    "ms": 969.7241669999989
+    "ms": 774.3956250000003
   },
   {
     "model": "gpt-4o-mini",
@@ -93,7 +93,7 @@
     "cohort": "made",
     "raw": "the export is coming out at like 400 megs which is way too big for email so we need to compress it or split it into two files",
     "rewrite": "The export is 400 megs, which is too big for email, so we need to compress it or split it into two files.",
-    "ms": 1066.8687080000013
+    "ms": 934.7227090000025
   },
   {
     "model": "gpt-4o-mini",
@@ -101,7 +101,7 @@
     "cohort": "made",
     "raw": "can you send it by end of this week not next week because the client review is on the 15th and I don't want to be scrambling",
     "rewrite": "Send it by the end of this week, not next week, because the client review is on the 15th and I don't want to be scrambling.",
-    "ms": 1129.8365419999996
+    "ms": 845.243374999999
   },
   {
     "model": "gpt-4o-mini",
@@ -109,7 +109,7 @@
     "cohort": "made",
     "raw": "I'm not saying we shouldn't do it I'm saying we shouldn't do it now there's a difference and I think the team is conflating the two",
     "rewrite": "I'm saying we shouldn't do it now. There's a difference, and I think the team is conflating the two.",
-    "ms": 947.0514160000007
+    "ms": 1551.6071670000001
   },
   {
     "model": "gpt-4o-mini",
@@ -117,7 +117,7 @@
     "cohort": "made",
     "raw": "Priya and Arjun are both out next week so the release has to wait unless Meera can cover the QA piece but she's already stretched",
     "rewrite": "The release has to wait next week unless Meera can cover the QA piece, but she's already stretched.",
-    "ms": 871.5547080000015
+    "ms": 861.1372919999986
   },
   {
     "model": "gpt-4o-mini",
@@ -125,7 +125,7 @@
     "cohort": "made",
     "raw": "let's target the 12th no sorry the 14th the 12th is a holiday so nothing will get signed off anyway",
     "rewrite": "Let's target the 14th. The 12th is a holiday, so nothing will get signed off anyway.",
-    "ms": 927.6788340000018
+    "ms": 962.600792
   },
   {
     "model": "gpt-4o-mini",
@@ -133,7 +133,7 @@
     "cohort": "made",
     "raw": "someone needs to own the analytics migration it's been unassigned for two sprints now and it keeps slipping",
     "rewrite": "Someone needs to own the analytics migration. It's been unassigned for two sprints and keeps slipping.",
-    "ms": 862.1600419999993
+    "ms": 827.2032500000001
   },
   {
     "model": "gpt-4o-mini",
@@ -141,15 +141,15 @@
     "cohort": "made",
     "raw": "the quote came in at 1,20,000 rupees which is over budget by about 20 percent so I want to push back before we sign",
     "rewrite": "The quote came in at 120,000 rupees, which is over budget by about 20 percent, so I want to push back before we sign.",
-    "ms": 955.4539579999996
+    "ms": 933.02525
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-9",
     "cohort": "made",
     "raw": "the standup moved to 9:45 from 10 so we get the room before the sales team takes it",
-    "rewrite": "The standup moved to 9:45 from 10 so we get the room before the sales team.",
-    "ms": 958.9057919999995
+    "rewrite": "The standup moved to 9:45 from 10 to get the room before the sales team takes it.",
+    "ms": 969.349084000001
   },
   {
     "model": "gpt-4o-mini",
@@ -157,15 +157,15 @@
     "cohort": "made",
     "raw": "conversion dropped from 4.2 percent to 3.1 percent after the redesign which is not what we expected at all",
     "rewrite": "Conversion dropped from 4.2 percent to 3.1 percent after the redesign, which isn't what we expected at all.",
-    "ms": 871.3354169999974
+    "ms": 751.2325420000003
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-11",
     "cohort": "made",
     "raw": "quick update on the pilot we're at 80 percent done, Rohan finished the backend on Tuesday, the front end is maybe two more days, so end of next week for the demo",
-    "rewrite": "We're at 80 percent done with the pilot. Rohan finished the backend on Tuesday. The front end is maybe two more days, so the demo is set for the end of next week.",
-    "ms": 887.0575000000009
+    "rewrite": "We're at 80 percent done with the pilot. Rohan finished the backend on Tuesday, and the front end should take maybe two more days, so the demo is set for the end of next week.",
+    "ms": 1128.4905839999979
   },
   {
     "model": "gpt-4o-mini",
@@ -173,23 +173,23 @@
     "cohort": "made",
     "raw": "honestly I don't love the new onboarding copy it feels condescending but I don't want to block the launch over it so let's ship and revisit",
     "rewrite": "I don't love the new onboarding copy; it feels condescending. I don't want to block the launch over it, so let's ship and revisit.",
-    "ms": 1032.9620410000048
+    "ms": 853.1686670000021
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-13",
     "cohort": "made",
     "raw": "do we still need the Friday sync now that we have the async updates? feels like a lot of meetings for not much",
-    "rewrite": "Do we still need the Friday sync now that we have the async updates? It feels like a lot of meetings for not much.",
-    "ms": 1050.3192919999974
+    "rewrite": "We might not need the Friday sync now that we have the async updates. It feels like a lot of meetings for not much.",
+    "ms": 962.4931249999981
   },
   {
     "model": "gpt-4o-mini",
     "id": "made-14",
     "cohort": "made",
     "raw": "found something weird if you refresh during checkout the cart empties completely no warning no recovery just gone I lost my test order twice",
-    "rewrite": "If you refresh during checkout, the cart empties completely with no warning or recovery. I lost my test order twice.",
-    "ms": 954.9690420000019
+    "rewrite": "Refreshing during checkout empties the cart completely, with no warning or recovery. I lost my test order twice.",
+    "ms": 764.2584170000007
   },
   {
     "model": "gpt-4o-mini",
@@ -197,7 +197,7 @@
     "cohort": "made",
     "raw": "three things blocking us first the API keys aren't provisioned second legal hasn't signed off on the terms and third we still don't have staging access",
     "rewrite": "- The API keys aren't provisioned.  \n- Legal hasn't signed off on the terms.  \n- We still don't have staging access.",
-    "ms": 866.7845840000012
+    "ms": 988.3384999999976
   },
   {
     "model": "gpt-4o-mini",
@@ -205,7 +205,7 @@
     "cohort": "made",
     "raw": "let us do Friday actually wait Friday is the offsite let's do it on Thursday",
     "rewrite": "Let's do it on Thursday. Friday is the offsite.",
-    "ms": 662.3892500000039
+    "ms": 657.3171670000022
   },
   {
     "model": "gpt-4o-mini",
@@ -213,7 +213,7 @@
     "cohort": "made",
     "raw": "I don't agree with the new pricing copy I get why marketing wants it but I don't want to remove the free tier mention",
     "rewrite": "I don't agree with the new pricing copy. I get why marketing wants it, but I don't want to remove the free tier mention.",
-    "ms": 854.1053329999997
+    "ms": 859.5274159999988
   },
   {
     "model": "gpt-4o-mini",
@@ -221,23 +221,23 @@
     "cohort": "made",
     "raw": "there are three reasons. first the quote. second the timeline. third nobody asked for it",
     "rewrite": "- the quote  \n- the timeline  \n- nobody asked for it",
-    "ms": 757.2543329999987
+    "ms": 735.0298329999987
   },
   {
     "model": "gpt-4o-mini",
     "id": "style-4",
     "cohort": "made",
     "raw": "the backend isn't done I'd say sixty percent at best so I don't think we should commit to March yet",
-    "rewrite": "The backend isn't done; I'd say sixty percent at best, so I don't think we should commit to March yet.",
-    "ms": 931.9770000000034
+    "rewrite": "The backend isn't done; I'd say sixty percent at best. I don't think we should commit to March yet.",
+    "ms": 758.2032919999974
   },
   {
     "model": "gpt-4o-mini",
     "id": "style-5",
     "cohort": "made",
     "raw": "hey quick one can you approve the invoice when you get a chance finance needs it before the 30th",
-    "rewrite": "Approve the invoice when you can. Finance needs it before the 30th.",
-    "ms": 904.140875000003
+    "rewrite": "Please approve the invoice when you can; finance needs it before the 30th.",
+    "ms": 961.1402079999962
   },
   {
     "model": "gpt-4o-mini",
@@ -245,6 +245,6 @@
     "cohort": "made",
     "raw": "I've been going back and forth on this all morning but honestly I think we should just park it this quarter",
     "rewrite": "We should just park it this quarter.",
-    "ms": 605.7008749999966
+    "ms": 662.1659590000064
   }
 ]
