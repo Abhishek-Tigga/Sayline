@@ -5598,3 +5598,71 @@ extracted into `eval/` as part of reading it, checklist as capture tool,
 repo as record — is the right lesson. Browser localStorage was invisible
 to this session and cost a full session reconstructing work mode's
 fifteen. It also would have caught the C2 bug hours earlier.
+
+---
+
+### CLEAN MODE · Clock times and Finance ruled in; a self-correction cost measured
+2026-08-14 · Opus · `claimed-fixed`, one item needing a decision
+
+**Both rulings implemented.** Clock times — "from four thirty to two forty
+five" → 4:30 / 2:45, "to 930" → 9:30 — and "finance" → "Finance". The
+time rule carries two guards, because "two forty five" is 2:45 and "forty
+five thousand" is 45,000 and only context separates them: the hour must be
+1-12, which no money amount starts with, and a cue word ("at", "from",
+"to", "by"…) must sit immediately before. Without the cue, "we need three
+fifteen minute slots" becomes 3:15. Ten new suite cases including that
+boundary. Team names are a list with one entry, extended by ruling.
+
+**Per workstream, against the user's expected outputs:**
+
+```
+punctuation        2/7  ->  6/7
+grammar policy     2/7  ->  7/7
+numbers + times    3/5  ->  5/5
+self-correction    5/7  ->  7/7
+TOTAL             12/26 -> 25/26
+```
+
+Whole-string exact matches: 4/17 → **5/15 of the cases that have an
+expected**, with most remaining misses now a single missing comma.
+
+**OPEN · Self-correction costs "no rush", and the pre-agreed retreat does
+not fix it.** The resolution instruction makes the 8B delete "No rush"
+from A3 — the validator catches the over-deletion and restores the words,
+so nothing is lost, but the sentence lands as "no rush just checking"
+where the baseline produced "No rush, just checking." A visible
+regression on one case class.
+
+Measured, one variable at a time, temperature 0:
+
+```
+prompt variant                          A3        C1        C3
+full, as built                          DROPS     ok        ok
+minus the two reason-judgment lines     DROPS     ok        ok     <- the retreat
+minus the whole self-correction block   KEEPS     n/a       n/a
+narrower "same kind" formulation        DROPS     BREAKS    ok
+```
+
+Three findings in that table. The pre-agreed retreat is **ineffective** —
+the reason lines are not the cause, the resolution instruction is. A
+tighter marker list naming "no rush" explicitly as something to keep did
+not help either; the model dropped it anyway. And the narrower
+formulation broke C1 while still failing A3.
+
+So the honest statement is that **the 8B cannot hold "resolve
+self-corrections" and "do not touch phrases starting with no"
+simultaneously**, across four attempts. The 70B might, and is the model
+that lost the A/B on p90 latency — which makes this a second, independent
+reason to revisit that trade rather than a settled matter.
+
+**Not retreated, deliberately.** The tripwire's stated conditions are C1
+and C3 wobbling at temperature 0, or a live round dropping a reason.
+Neither holds: C1 and C3 are stable on the shipped configuration, this is
+not a live round, and "No rush" is a softener rather than a reason clause.
+Retreating on a condition that has not fired — using a mechanism now
+measured not to work — would be worse than recording it and letting round
+2 arbitrate, which is what round 2 is for. Flagged to the user as a known
+cost before they run it.
+
+Ran: 9/9 suites green, work-mode calibration 14/15 unchanged, speed lock
+283 ms median / 411 ms p90.

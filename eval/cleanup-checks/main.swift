@@ -39,7 +39,7 @@ eq("C1 resolves aggressively, reason dropped",
 eq("C2 resolves minimally, only the wrong number dies",
    raw: "tell finance to release forty thousand uh sorry forty five thousand for the vendor invoice",
    llm: "Tell finance to release forty five thousand for the vendor invoice.",
-   "Tell finance to release 45,000 for the vendor invoice.")
+   "Tell Finance to release 45,000 for the vendor invoice.")
 eq("C3 resolves and keeps the reason",
    raw: "ask Rohan to review it no wait I mean Rohit Rohan's on leave",
    llm: "Ask Rohit to review it. Rohan is on leave.",

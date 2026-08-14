@@ -64,6 +64,8 @@ print("\nnumber normalization")
 eq("forty seven and a half thousand -> 47,500",
    "the budget is forty seven and a half thousand",
    "the budget is 47,500")
+eq("...and the swapped wording the model started emitting",
+   "the budget is forty seven thousand and a half", "the budget is 47,500")
 eq("plain scale still works", "the budget is forty seven thousand",
    "the budget is 47,000")
 // Three-digit grouping, pinned. This machine's locale would give
@@ -77,6 +79,27 @@ eq("a year is not a thousands group", "in 2024 15 people joined",
    "in 2024 15 people joined")
 eq("a non-number phrase is left alone", "a thousand apologies",
    "a thousand apologies")
+
+print("\nclock times — ruled in 2026-08-14")
+eq("spoken time after a cue", "the call moved from four thirty to two forty five",
+   "the call moved from 4:30 to 2:45")
+eq("digit time after a cue", "just prepone the standup to 930",
+   "just prepone the standup to 9:30")
+eq("o'clock", "let's meet at four o'clock", "let's meet at 4:00")
+// The money/time ambiguity the cue and the 1-12 hour exist to settle.
+eq("money is not a time", "release forty five thousand for the invoice",
+   "release 45,000 for the invoice")
+eq("money after a cue is still money", "the budget is up to forty seven thousand",
+   "the budget is up to 47,000")
+eq("no cue, no time", "we need three fifteen minute slots",
+   "we need three fifteen minute slots")
+eq("an invalid hour is left alone", "call me at 1330", "call me at 1330")
+
+print("\nteam names — ruled in 2026-08-14")
+eq("finance is a team", "tell finance to release the invoice",
+   "tell Finance to release the invoice")
+eq("already capitalized stays", "tell Finance to release", "tell Finance to release")
+eq("not a substring", "refinanced the loan", "refinanced the loan")
 
 print("\nidempotence — this runs on text a cooperative model may have already fixed")
 let once = SpeechPatterns.apply("Myself, I will revert back about the both teams by forty seven and a half thousand")

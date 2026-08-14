@@ -80,6 +80,14 @@ enum SpeechPatterns {
 
     // MARK: - Numbers
 
+    /// Team names the user capitalizes.
+    ///
+    /// One entry, because one was ruled on. A list rather than a special
+    /// case so the next one is a line rather than a rewrite — but it grows
+    /// by ruling, not by guessing which words look like teams.
+    private static let teamNames = ["finance"]
+
+
     /// Spoken money and spacing artifacts, small and deterministic.
     ///
     /// "forty seven and a half thousand" → 47,500 mirrors `FactGuard`'s
@@ -92,6 +100,38 @@ enum SpeechPatterns {
     /// about output.
     static func normalizeNumbers(_ text: String) -> String {
         var out = text
+
+        // Clock times run FIRST, before the scale rules, because "two
+        // forty five" is 2:45 and "forty five thousand" is 45,000 and the
+        // difference is entirely context.
+        //
+        // Two guards make that safe. The hour must be 1-12, which "forty"
+        // is not — so no amount of money can start a time. And a cue word
+        // must sit immediately before: "from four thirty to two forty
+        // five", "prepone the standup to 930". Without the cue, "we need
+        // three fifteen minute slots" would become 3:15.
+        let cue = "(?:at|by|from|to|till|until|around|before|after|past)"
+        let hour = "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+        let minute = "(?:o'?clock|(?:twenty|thirty|forty|fifty)(?:[\\s-](?:one|two|three|four|five|six|seven|eight|nine))?|ten|fifteen|five)"
+        // Spoken: "to two forty five" -> "to 2:45"
+        out = replace(out, "(?i)\\b(\(cue))\\s+(\(hour))\\s+(\(minute))\\b(?!\\s+(?:thousand|lakh|crore|million|hundred|minute|minutes|hour|hours|page|pages))") { m in
+            guard let h = spokenValue(m[2]) else { return m[0] }
+            let mins = m[3].lowercased().hasPrefix("o") ? 0 : (spokenValue(m[3]) ?? -1)
+            guard (0...59).contains(mins) else { return m[0] }
+            return String(format: "%@ %d:%02d", m[1], h, mins)
+        }
+        // Digits: "to 930" -> "to 9:30". Whisper writes times this way.
+        out = replace(out, "(?i)\\b(\(cue))\\s+(\\d{3,4})\\b(?!\\s*(?:am|pm))") { m in
+            guard let value = Int(m[2]) else { return m[0] }
+            let h = value / 100, mins = value % 100
+            guard (1...12).contains(h), (0...59).contains(mins) else { return m[0] }
+            return String(format: "%@ %d:%02d", m[1], h, mins)
+        }
+
+        for name in teamNames {
+            out = replace(out, "(?<![A-Za-z])\(name)(?![A-Za-z])",
+                          name.prefix(1).uppercased() + name.dropFirst())
+        }
 
         // "40 000" / "40 000" (thin space) → "40,000". Digit-space-triple
         // only, so "in 2024 15 people" is untouched: the trailing group
@@ -106,6 +146,17 @@ enum SpeechPatterns {
         let num = (tens.keys.sorted() + units.keys.sorted()).joined(separator: "|")
         let run = "(?:\(num))(?:[\\s-](?:\(num))){0,3}"
         let scales = "thousand|lakh|crore|million"
+
+        // "forty seven thousand and a half" → 47,500. The same figure the
+        // speaker said, with the scale and the half swapped — a wording
+        // the 8B started producing once the prompt grew. Handled here
+        // rather than argued with in the prompt, for the reason the whole
+        // file exists.
+        out = replace(out, "(?i)\\b(\(run))\\s+(\(scales))\\s+and\\s+a\\s+half\\b") { m in
+            guard let base = spokenValue(m[1]), let scale = scaleValue(m[2].lowercased())
+            else { return m[0] }
+            return group(base * scale + scale / 2)
+        }
 
         // "forty seven and a half thousand" → 47,500
         out = replace(out, "(?i)\\b(\(run))\\s+and\\s+a\\s+half\\s+(\(scales))\\b") { m in

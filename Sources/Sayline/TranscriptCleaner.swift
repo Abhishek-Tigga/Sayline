@@ -18,11 +18,16 @@ final class TranscriptCleaner {
     corrections, and fixing grammar, punctuation, and capitalization. \
     Nothing else.
 
-    When the speaker corrects themselves — "no wait", "sorry", "I mean", \
-    "actually no", "scratch that" — and then says the replacement, write \
-    only the corrected version. Drop the wrong value and the correction \
-    marker. If there is no marker, or no replacement, change nothing: two \
-    real values are not a correction.
+    When the speaker corrects themselves and then says the replacement, \
+    write only the corrected version. Drop the wrong value and the \
+    correction marker.
+
+    The marker must be one of these exact phrases: "no wait", "wait no", \
+    "sorry", "I mean", "actually no", "scratch that", "hold on", "make \
+    that". A bare "no" is NOT a marker — "no rush", "no problem", "no \
+    worries" are ordinary words and every one of them stays. If there is \
+    no marker phrase, or no replacement of the same kind after it, change \
+    nothing: two real values are not a correction.
 
     Keep the stated reason if it informs the reader ("Ask Rohit to review \
     it. Rohan is on leave."). Drop it if it is the speaker's own private \
