@@ -52,6 +52,38 @@ card is missing, empty, or code-less. Update the design doc's
 decision 10 with this amendment and the user's correction as the
 reason.
 
+## 5 · The "Which Ashutosh?" list was not comprehensive (user report)
+
+The question offered two Ashutoshes; the one the user wanted was not
+among them. Three mechanisms, in likely order — check all three, they
+are not exclusive:
+
+- **The option cap is a bug regardless.** `SharePageExecutor`'s ask
+  shows `options.prefix(2)` — a third or fourth match is silently
+  dropped, and nothing in the log or the question says so. If the
+  resolver ever returns more than two, the cap must go (or the
+  question must say "and 2 more — say the full name"). The pill can
+  carry more than two choices; the current 2 is a UI convenience
+  discarding real answers.
+- **Contacts without a phone number are skipped silently.**
+  `readContacts()` keeps only cards with at least one phone number.
+  A wanted contact stored with just an email (or nothing) never
+  becomes a candidate, and the user cannot tell "filtered out" from
+  "not found". If the resolver drops name-matches for having no
+  number, say so in the failure/ask: "Ashutosh Verma has no phone
+  number in Contacts."
+- **The account boundary.** CNContactStore only sees accounts enabled
+  in macOS Internet Accounts. An Ashutosh who lives in WhatsApp (or
+  an unsynced Google account) is invisible to us — same class as the
+  calendar-source finding in BACKLOG.md. Nothing to code; the
+  failure message should hint it: "…in your Mac's Contacts."
+
+Diagnostic to run before fixing: log the total candidate count and
+the name-match count at resolve time (names only, never numbers),
+then have the user search Contacts.app for the missing Ashutosh —
+whether the card exists and whether it carries a phone number decides
+which mechanism this was.
+
 ## Also known, not yours
 
 - Glossary doesn't rebuild on a Contacts *grant* mid-session (needs a
