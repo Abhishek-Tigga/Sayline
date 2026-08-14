@@ -7091,3 +7091,56 @@ for the default target. Both need the user's machine and accounts.
 
 `AgentExecutor.execute`'s `.sharePage` arm now logs and returns false: a
 `Bool` cannot ask a question, and no non-interactive caller shares today.
+
+---
+
+## BIASING · Live incident: glossary echo executed by agent mode — guard built (Fable, 2026-08-14)
+
+**The incident.** Hours after biasing shipped, the user reported random
+words in the speech box and apps opening unasked, suspecting Opus's
+share feature. The log says otherwise: at 21:25 and 21:29 Whisper
+returned the bias glossary itself as the transcript — verbatim,
+in list order, including the template word "Glossary" — and the router
+faithfully executed it: seven apps opened, plus openWebsite calls to
+figma.com, logip.com, vodka.com, zimbab.com. **My feature, not
+Opus's.** Opus's share implementation was reviewed the same evening
+and is sound (four minor findings, reported separately to the user;
+one live router miss on bare "share this" belongs to Opus's queue).
+
+**Why the guardrails missed it.** Guardrail 2's control clips are
+clear speech with trap words; the echo fires on marginal audio that
+passes the too-short gate while carrying no usable speech. And there
+is no loudness band to hide in: the echoed holds peaked at 0.08 and
+1.0 (a breath pegs the meter). The guardrail's PASS was real but
+tested the wrong distribution — recorded as method, the same class as
+the partial-run lesson.
+
+**The fix, live now.**
+- `VocabularyBias.looksLikeEcho` — structural, deterministic, no audio
+  signal: trips on the template word appearing twice (or opening the
+  transcript beside an entry), or on ≥3 entries recited in
+  list-consecutive order. Nobody speaks three consecutive items of an
+  alphabetical list they have never seen.
+- Wired at both choke points beside `WhisperHallucination` — dictation
+  and agent. An echo now dies with a visible "Didn't catch that" and a
+  `[bias]` log line; in agent mode this is the difference between a
+  flash message and seven apps opening.
+- Suite: 23/23, both live echoes verbatim as fixtures, plus negatives
+  ("open Figma and WhatsApp", a single legitimate "glossary", three
+  non-neighbor entries) so the guard cannot eat real speech quietly.
+- `echoprobe-silence` (generated near-silence) added to the
+  transcription eval, unscored: documents the model-side echo behavior
+  every run. First run heard "Thank you for watching!" — the classic
+  filler, caught by the existing guard; the echo is probabilistic,
+  which is why both guards exist.
+- Design doc amended: guardrail 5, with the incident as its reason.
+
+**Residual, known:** pure gibberish hallucinations that echo nothing
+("Gug Pimper 8…", 21:22, routed to a Google search) predate biasing
+and are not this guard's job — they are the old hallucination class at
+agent-mode stakes, and belong with the router's own defenses.
+
+**What Opus should run:** the bias suite line (now 23 cases); then the
+cruel test — hold the hotkey in agent mode, tap the desk once, say
+nothing, release: the log must show either the filler guard or
+`[bias] discarded an agent glossary echo`, and nothing may open.

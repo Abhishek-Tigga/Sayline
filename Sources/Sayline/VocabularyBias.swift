@@ -27,11 +27,17 @@ enum VocabularyBias {
                          appNames: [String],
                          historyText: String,
                          isKnownWord: (String) -> Bool) -> String? {
-        let entries = assemble(myWords: myWords,
-                               contactFirstNames: contactFirstNames,
-                               appNames: appNames,
-                               historyText: historyText,
-                               isKnownWord: isKnownWord)
+        glossaryLine(assemble(myWords: myWords,
+                              contactFirstNames: contactFirstNames,
+                              appNames: appNames,
+                              historyText: historyText,
+                              isKnownWord: isKnownWord))
+    }
+
+    /// The template applied to an already-assembled list — split out so
+    /// the builder can keep the entries (the echo guard needs them) and
+    /// the line without two copies of the phrasing.
+    static func glossaryLine(_ entries: [String]) -> String? {
         guard !entries.isEmpty else { return nil }
         return "Glossary: " + entries.joined(separator: ", ")
     }
@@ -94,6 +100,74 @@ enum VocabularyBias {
     /// budget above absorbs the error.
     static func estimateTokens(_ text: String) -> Int {
         max(1, (text.count + 3) / 4)
+    }
+
+    /// True when a transcript is Whisper reading our own hint list back
+    /// instead of transcribing — observed live 2026-08-14, when an echo
+    /// opened seven apps and sent the agent to vodka.com.
+    ///
+    /// Deliberately structural, with NO loudness gate: both observed
+    /// echoes had peaks of 0.08 and 1.0 (a breath or desk tap pegs the
+    /// meter), so unlike `WhisperHallucination` there is no quiet band
+    /// to lean on. Two signals, either sufficient:
+    ///
+    /// 1. The word "glossary" — the template's own label — appearing
+    ///    twice, or opening the transcript alongside a list entry.
+    ///    Nobody dictates our template word twice; an echo repeats it.
+    ///    A single mention in real speech ("add a glossary to the doc")
+    ///    passes untouched.
+    /// 2. Three or more entries appearing in the transcript in the
+    ///    list's own order, each one the list-neighbor of the last.
+    ///    "Open Figma and WhatsApp" names two, not neighbors — passes.
+    ///    "…Microsoft Word, Muesli, Numbers, OneDrive…" is the list
+    ///    reciting itself — no one speaks three consecutive items of an
+    ///    alphabetical list they have never seen.
+    static func looksLikeEcho(transcript: String, entries: [String]) -> Bool {
+        guard !entries.isEmpty else { return false }
+        let words = tokens(of: transcript)
+        guard !words.isEmpty else { return false }
+
+        let glossaryMentions = words.filter { $0 == "glossary" }.count
+
+        // Every occurrence of every entry, as (position in transcript,
+        // index in the glossary), in transcript order.
+        var hits: [(position: Int, entry: Int)] = []
+        for (entryIndex, entry) in entries.enumerated() {
+            let entryWords = tokens(of: entry)
+            guard !entryWords.isEmpty,
+                  words.count >= entryWords.count else { continue }
+            for start in 0...(words.count - entryWords.count) {
+                if Array(words[start..<start + entryWords.count]) == entryWords {
+                    hits.append((start, entryIndex))
+                }
+            }
+        }
+        hits.sort { $0.position < $1.position }
+
+        if glossaryMentions >= 2 { return true }
+        if glossaryMentions >= 1, words.first == "glossary", !hits.isEmpty { return true }
+
+        var run = 1
+        var longestRun = hits.isEmpty ? 0 : 1
+        for i in 1..<max(1, hits.count) where i < hits.count {
+            run = hits[i].entry == hits[i - 1].entry + 1 ? run + 1 : 1
+            longestRun = max(longestRun, run)
+        }
+        return longestRun >= 3
+    }
+
+    private static func tokens(of text: String) -> [String] {
+        var words: [String] = []
+        var word = ""
+        for character in text.lowercased() {
+            if character.isLetter || character.isNumber {
+                word.append(character)
+            } else if !word.isEmpty {
+                words.append(word); word = ""
+            }
+        }
+        if !word.isEmpty { words.append(word) }
+        return words
     }
 
     private static func wordCounts(of text: String) -> [String: Int] {

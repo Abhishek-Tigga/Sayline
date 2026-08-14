@@ -101,6 +101,47 @@ do {
           "blank box entries dropped, whitespace trimmed")
 }
 
+// MARK: Echo guard — Whisper reciting the hint list back (2026-08-14 live)
+do {
+    // The glossary as it was the night the echo opened seven apps.
+    let live = ["ChatGPT", "DetailsPro", "Display Pilot 2", "Figma",
+                "Google Chrome", "HeyClicky", "LogiPluginService",
+                "Microsoft Excel", "Microsoft Word", "Muesli", "Numbers",
+                "OneDrive", "Pages", "RemotePlay", "Sticky Notepad",
+                "VoiceOS", "WhatsApp", "Wispr Flow", "Xcode", "cmux",
+                "iMovie", "logioptionsplus"]
+    func echo(_ t: String) -> Bool {
+        VocabularyBias.looksLikeEcho(transcript: t, entries: live)
+    }
+
+    // Both real echoes from the log, verbatim.
+    check(echo("Glossary, LogiPluginService, Microsoft Word, Muesli, Numbers, OneDrive, Pages, RemotePlay,"),
+          "the seven-app echo trips (consecutive run)")
+    check(echo("Glossary, Figma, Glossary, LogiP, Vodka, Zimbab, Glossary."),
+          "the garbled vodka.com echo trips (repeated template word)")
+
+    // Real speech that must never trip.
+    check(!echo("open Figma and WhatsApp"),
+          "naming two apps is a command, not an echo")
+    check(!echo("open Microsoft Excel and Microsoft Word"),
+          "two list-neighbors stay under the run threshold")
+    check(!echo("Figma, WhatsApp and Xcode please"),
+          "three non-neighbor entries in list order do not trip")
+    check(!echo("add a glossary section to the Figma doc"),
+          "one mention of the word glossary in real speech survives")
+    check(!echo("what does glossary mean"),
+          "the word glossary with no entries survives")
+    check(!echo(""), "empty transcript is not an echo")
+    check(!VocabularyBias.looksLikeEcho(transcript: "Glossary, Figma, Glossary",
+                                        entries: []),
+          "no glossary sent means nothing can be an echo of it")
+
+    // The failure that motivated the no-loudness-gate design: these
+    // arrived with peaks of 1.0 and 0.08 — the guard must not care.
+    check(echo("Glossary, LogiPluginService, Microsoft Word, Muesli, Numbers, OneDrive, Pages, RemotePlay,"),
+          "structural detection needs no audio signal (same case, restated)")
+}
+
 print(failures == 0 ? "PASS — vocabulary bias ladder holds"
                     : "FAIL — \(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

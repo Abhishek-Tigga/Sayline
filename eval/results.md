@@ -378,3 +378,12 @@ Key terms are the names, brands and figures whose loss actually costs something 
 | model | WER | key terms kept | median | clips |
 |---|---|---|---|---|
 | `whisper-large-v3 (current) + bias (app)` | 6.5% | 75% | 363 ms | 11/13 **partial — not comparable** |
+
+### Transcription bake-off — 2026-08-14 21:44
+
+14 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median | clips |
+|---|---|---|---|---|
+| `whisper-large-v3 (current) + bias (app)` | 10.0% | 67% | 355 ms | 13/13 |

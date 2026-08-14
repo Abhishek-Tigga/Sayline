@@ -12,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let alwaysVerbatimKey = "com.abhishektigga.sayline.alwaysVerbatim"
     private static let signOffNameKey = "com.abhishektigga.sayline.signOffName"
 
+    /// When the current turn's hold ended — the e2e stopwatch's zero.
+    private var holdEndedAt: Date?
+
     @Published var isRecording = false
     @Published var isAccessibilityTrusted = false
     @Published var isMicAuthorized = false
@@ -483,6 +486,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     private func handleHotkeyUp() {
         SoundEffectPlayer.shared.playHotkeyUp()
+        // The end-to-end stopwatch: key-release to delivered result.
+        // Every per-stage number in the evals is a part; this is the
+        // whole, measured on real use rather than benchmarks.
+        holdEndedAt = Date()
         isRecording = false
         // Everything below reads state the recorder settles as it shuts the
         // engine down — lastRecordingURL, capturedNoAudio, the duration —
@@ -583,6 +590,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                         self.indicatorWindow.hide()
                         // Say so rather than doing nothing — a silent drop is
                         // indistinguishable from the app being broken.
+                        self.indicatorWindow.flashMessage("Didn't catch that")
+                    }
+                    return
+                }
+                if VocabularyBias.looksLikeEcho(transcript: rawText,
+                                                entries: VocabularyBiasBuilder.currentEntries) {
+                    SaylineLog.log("[bias] discarded a glossary echo — Whisper read the hint list back instead of transcribing")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
                         self.indicatorWindow.flashMessage("Didn't catch that")
                     }
                     return
@@ -784,6 +801,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     }
                     return
                 }
+                // The echo guard matters most here: an echoed transcript
+                // in agent mode doesn't just paste junk, it EXECUTES it —
+                // 2026-08-14, seven apps opened and a trip to vodka.com.
+                if VocabularyBias.looksLikeEcho(transcript: transcript,
+                                                entries: VocabularyBiasBuilder.currentEntries) {
+                    SaylineLog.log("[bias] discarded an agent glossary echo — nothing routed")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
+                        self.indicatorWindow.flashMessage("Didn't catch that")
+                    }
+                    return
+                }
 
                 await MainActor.run {
                     self.isTranscribing = false
@@ -817,6 +847,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                         self.indicatorWindow.flashMessage("Agent: nothing matched")
                         return
                     }
+                    // "First action" rather than "turn complete": a turn
+                    // can span a follow-up question the user answers at
+                    // their own pace, which would measure the user, not
+                    // the app.
+                    self.logEndToEnd(mode: "agent", outcome: "first action")
                     self.turnRunner.run(actions)
                 }
             } catch {
@@ -843,6 +878,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         indicatorWindow.hide()
         addHistoryEntry(text: text, usedLocal: usedLocal, mode: producedBy)
         TextInjector.insert(text)
+        logEndToEnd(mode: producedBy, outcome: "text inserted")
+    }
+
+    /// One line per completed turn: what the user actually waited,
+    /// key-release to result. Grep `[e2e]` for the real-use latency
+    /// distribution per mode.
+    private func logEndToEnd(mode: String, outcome: String) {
+        guard let holdEndedAt else { return }
+        let ms = Date().timeIntervalSince(holdEndedAt) * 1000
+        SaylineLog.log(String(format: "[e2e] %@: %.0f ms from key-release to %@",
+                              mode, ms, outcome))
+        self.holdEndedAt = nil
     }
 
     private func runCommand(_ command: VoiceCommand) {

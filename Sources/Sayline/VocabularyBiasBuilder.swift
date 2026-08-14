@@ -15,12 +15,21 @@ enum VocabularyBiasBuilder {
 
     private static let lock = NSLock()
     private static var current: String?
+    private static var entries: [String] = []
 
     /// What the transcriber sends, or nil. Read on the transcription
     /// task, written on the main thread — hence the lock.
     static var currentGlossary: String? {
         lock.lock(); defer { lock.unlock() }
         return current
+    }
+
+    /// The assembled list itself, for the echo guard: a transcript that
+    /// recites these in order is Whisper reading our hint back, not the
+    /// user speaking.
+    static var currentEntries: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return entries
     }
 
     /// `/usr/share/dict/words`, ~235k lowercase entries, shipped with
@@ -43,21 +52,21 @@ enum VocabularyBiasBuilder {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-        let glossary = VocabularyBias.glossary(
+        let assembled = VocabularyBias.assemble(
             myWords: myWords,
             contactFirstNames: contactFirstNames(),
             appNames: InstalledAppCatalog.biasCandidateNames,
             historyText: historyText,
             isKnownWord: { knownWords.isEmpty ? false : knownWords.contains($0) })
+        let glossary = VocabularyBias.glossaryLine(assembled)
 
         lock.lock()
         current = glossary
+        entries = assembled
         lock.unlock()
 
         if let glossary {
-            let entries = glossary.dropFirst("Glossary: ".count)
-                .split(separator: ",").count
-            SaylineLog.log("[bias] glossary rebuilt — \(entries) entries, ~\(VocabularyBias.estimateTokens(glossary)) tokens")
+            SaylineLog.log("[bias] glossary rebuilt — \(assembled.count) entries, ~\(VocabularyBias.estimateTokens(glossary)) tokens")
         } else {
             SaylineLog.log("[bias] no vocabulary sources yet — transcription runs unbiased")
         }

@@ -117,6 +117,24 @@ judgment):
    dictation is never blocked, and the log records that biasing was
    skipped. A biasing failure must never cost a dictation.
 
+   **Amended 2026-08-14, hours after shipping.** Guardrail 2 as
+   written tested the wrong distribution: control clips are *clear
+   speech* with trap words, but the echo fires on *marginal audio* —
+   observed live the same evening, when Whisper recited the glossary
+   back as the transcript and agent mode executed it (seven apps
+   opened, one visit to vodka.com). Loudness is no defense: the
+   echoed holds peaked at 0.08 and 1.0. The fix is a fifth guardrail:
+
+5. **The echo guard.** `VocabularyBias.looksLikeEcho` — deterministic,
+   structural, no audio signal: a transcript dominated by the
+   template's own word ("Glossary" twice, or opening the transcript
+   beside an entry) or reciting ≥3 list-consecutive entries in order
+   is Whisper reading the hint back, and is discarded at both
+   choke points (dictation and agent) with a visible "Didn't catch
+   that". Suite-covered with both live echoes as fixtures; an
+   `echoprobe-silence` clip in the transcription eval documents the
+   model-side behavior each run, unscored.
+
 ## Out of scope, written down
 
 - **The numbers problem.** "Two forty five" heard as "4:45" survives

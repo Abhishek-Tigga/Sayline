@@ -238,6 +238,14 @@ def main():
                 print(f"  {clip_id}: FAILED — {str(exc)[:90]}")
                 errors += 1
                 continue
+            if clip_id.startswith("echoprobe"):
+                # Generated near-silence. Documents the model's echo
+                # behavior with a hint attached — the app-side guard
+                # (VocabularyBias.looksLikeEcho) must swallow whatever
+                # appears here, so this is informational, never scored.
+                print(f"  {clip_id:<11} (probe, unscored)  heard: "
+                      + (repr(heard[:90]) if heard else "<nothing> — clean"))
+                continue
             score = wer(script[clip_id], heard)
             wers.append(score)
             latencies.append(ms)

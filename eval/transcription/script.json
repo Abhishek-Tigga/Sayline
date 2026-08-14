@@ -50,5 +50,9 @@
   {
     "id": "control-3",
     "text": "Please move the planter off the balcony before it rains tomorrow evening."
+  },
+  {
+    "id": "echoprobe-silence",
+    "text": ""
   }
 ]
