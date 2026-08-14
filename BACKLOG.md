@@ -753,6 +753,19 @@ and [CHANGELOG.md](CHANGELOG.md).
   Watch for it recurring; if it does, check logs for that specific run
   before guessing at a fix.
 
+## Housekeeping · Delete the `ui-speech-back` branch (2026-08-14)
+
+Merged into `main` (fast-forward, same commit) and kept only because
+other agent sessions may still have it checked out. Once those sessions
+wind down, delete it:
+
+```bash
+git branch -d ui-speech-back && git push origin --delete ui-speech-back
+```
+
+The five other UI branches were deleted the same day; commits stay
+recoverable via `git reflog` for ~30 days.
+
 ## Deferred to the end of V2 (already decided, not re-litigated here)
 
 - Auto-updates
