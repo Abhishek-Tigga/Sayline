@@ -39,7 +39,18 @@ enum HeadlessModes {
             // launch on a Mac that has neither.
             if #available(macOS 26.0, *) {
                 switch arguments[1] {
-                case "--fm-check": emit(foundationModelAvailability()); exit(0)
+                case "--fm-check":
+                    // Two extra arguments compare a language pair instead
+                    // of reading the machine's. The mismatch branch is
+                    // otherwise only reachable by changing System
+                    // Settings, so this is the only way it stays tested.
+                    if arguments.count > 3 {
+                        emit(["mac": arguments[2], "siri": arguments[3],
+                              "same": sameLanguage(arguments[2], arguments[3])])
+                    } else {
+                        emit(foundationModelAvailability())
+                    }
+                    exit(0)
                 case "--fm-clean": foundationModelBatch(work: false)
                 default:           foundationModelBatch(work: true)
                 }
@@ -423,7 +434,44 @@ extension HeadlessModes {
 @available(macOS 26.0, *)
 extension HeadlessModes {
 
-    /// Availability, and *which* condition failed when it is not.
+    /// The Mac's language and Siri's language, which must match.
+    ///
+    /// Apple's `UnavailableReason` has three values and none of them says
+    /// "your two language settings disagree" — a mismatch simply reports
+    /// `appleIntelligenceNotEnabled`, which reads as "go and switch it
+    /// on" and sends the user to a pane where the switch is not there.
+    /// Confirmed on this machine 2026-08-14: Mac on English (India), Siri
+    /// on English (United States), no toggle shown, no download offered.
+    /// Setting Siri to English (India) changed the reason to
+    /// `modelNotReady` and the download began.
+    ///
+    /// Both values are readable, so the app can say the true thing
+    /// instead of the API's approximation.
+    static func languageMismatch() -> (mac: String, siri: String)? {
+        let mac = Locale.preferredLanguages.first ?? Locale.current.identifier
+        guard let siri = UserDefaults(suiteName: "com.apple.assistant.backedup")?
+                .string(forKey: "Session Language") else { return nil }
+        return sameLanguage(mac, siri) ? nil : (mac, siri)
+    }
+
+    /// Compares two language tags the way Apple's requirement does:
+    /// language *and* region, so en-IN and en-US are different, while
+    /// "en_IN" and "en-IN" are the same.
+    static func sameLanguage(_ a: String, _ b: String) -> Bool {
+        func parts(_ tag: String) -> (String, String?) {
+            let bits = tag.replacingOccurrences(of: "_", with: "-")
+                .split(separator: "-").map(String.init)
+            return (bits.first?.lowercased() ?? "",
+                    bits.count > 1 ? bits[1].uppercased() : nil)
+        }
+        let (langA, regionA) = parts(a), (langB, regionB) = parts(b)
+        guard langA == langB else { return false }
+        guard let regionA, let regionB else { return true }
+        return regionA == regionB
+    }
+
+    /// Availability, *which* condition failed, and what the user can
+    /// actually do about it.
     static func foundationModelAvailability() -> [String: Any] {
         let model = SystemLanguageModel.default
         switch model.availability {
@@ -431,13 +479,40 @@ extension HeadlessModes {
             return ["available": true]
         case .unavailable(let reason):
             let name: String
+            var diagnosis: String
             switch reason {
-            case .deviceNotEligible: name = "deviceNotEligible"
-            case .appleIntelligenceNotEnabled: name = "appleIntelligenceNotEnabled"
-            case .modelNotReady: name = "modelNotReady"
-            @unknown default: name = "unknown"
+            case .deviceNotEligible:
+                name = "deviceNotEligible"
+                diagnosis = "This Mac cannot run Apple Intelligence."
+            case .appleIntelligenceNotEnabled:
+                name = "appleIntelligenceNotEnabled"
+                // The language check comes FIRST, because a mismatch
+                // produces this same reason and the honest instruction is
+                // completely different: there is no switch to turn on
+                // until the languages agree.
+                if let (mac, siri) = languageMismatch() {
+                    diagnosis = "Apple Intelligence needs your Mac and Siri set to the "
+                        + "same language. Your Mac is \(mac) and Siri is \(siri). "
+                        + "Change Siri's language to \(mac) in Settings."
+                } else {
+                    diagnosis = "Turn on Apple Intelligence in System Settings."
+                }
+            case .modelNotReady:
+                name = "modelNotReady"
+                diagnosis = "Apple Intelligence is on and the model is still downloading."
+            @unknown default:
+                name = "unknown"
+                diagnosis = "Apple Intelligence is unavailable."
             }
-            return ["available": false, "reason": name]
+            var payload: [String: Any] = [
+                "available": false, "reason": name, "diagnosis": diagnosis,
+                "settingsURL": "x-apple.systempreferences:com.apple.Siri-Settings.extension",
+            ]
+            if let (mac, siri) = languageMismatch() {
+                payload["macLanguage"] = mac
+                payload["siriLanguage"] = siri
+            }
+            return payload
         @unknown default:
             return ["available": false, "reason": "unknown"]
         }

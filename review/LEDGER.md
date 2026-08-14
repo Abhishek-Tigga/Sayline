@@ -6482,3 +6482,47 @@ calibration 14/15 unchanged.
 Next: the user enables Apple Intelligence, then
 `eval/foundation-model/run.py --arm clean` and `--arm work`. No numbers
 are claimed here, and none should be quoted from this entry.
+
+---
+
+### EXPERIMENT · Apple Intelligence unavailability is diagnosable; Apple's reason is not enough
+2026-08-14 · Opus · `claimed-fixed`
+
+The user asked whether the app could tell someone *why* the on-device
+model is unavailable, rather than repeating Apple's approximation. It
+can, and the gap is worth writing down because it will hit real users.
+
+**Apple's `UnavailableReason` has three values and none of them is the
+one that actually happened.** This Mac reported
+`appleIntelligenceNotEnabled`, which reads as "go and switch it on" — and
+sends the user to a settings pane where that switch is not present. The
+real cause was that the Mac was set to English (India) and Siri to
+English (United States), and Apple Intelligence requires them to match.
+Apple says so in a banner in that pane; the API does not say it at all.
+
+Confirmed by the fix: setting Siri to English (India) changed the reason
+to `modelNotReady` and the download began. Same machine, same build, one
+setting.
+
+**Both values are readable, so the app can say the true thing.**
+`--fm-check` now returns a `diagnosis` string and, on a mismatch, the two
+language tags. The language check runs *before* the generic "turn it on"
+message, because a mismatch produces the same reason code and the honest
+instruction is completely different.
+
+**The comparator is tested through the binary** (`eval/fm-checks/run.py`,
+8 cases). Region counts — en-US and en-GB are a mismatch — while
+separator and case do not, and a bare "en" cannot contradict "en-IN". A
+`--fm-check <mac> <siri>` form exists solely so that branch stays tested:
+it is otherwise reachable only by changing System Settings.
+
+**Product consequence, and it is not small.** The user hit two separate
+barriers in ten minutes — the toggle, then a language rule nobody would
+guess. There is no API to enable Apple Intelligence, with or without
+consent, so an on-device path can never be the only path. If the Clean
+arm wins, the cloud fallback is the main road and the on-device model is
+the optimisation, not the reverse. That is the architecture already
+sketched, and today is evidence for it rather than a hypothetical.
+
+Ran: `--fm-check` live before and after the language change,
+`eval/fm-checks/run.py` 8/8, build clean.
