@@ -7144,3 +7144,76 @@ agent-mode stakes, and belong with the router's own defenses.
 cruel test — hold the hotkey in agent mode, tap the desk once, say
 nothing, release: the log must show either the filler guard or
 `[bias] discarded an agent glossary echo`, and nothing may open.
+
+---
+
+### BUILD · Share feature: the five live-session fixes
+2026-08-14 · Opus · `claimed-fixed`
+
+Answering `review/FABLE-PROMPT-whatsapp-fixes.md`. All five landed; two
+of them turned out to be something other than what the report said, and
+that is the useful part.
+
+**1 · "Send this to me" — the diagnosis was one layer off.** The report
+put it on the `recipient` description not covering bare "me". The actual
+output was `[]` — **no tool call at all**. The model was never selecting
+`share_page`, so nothing about the `recipient` parameter could have
+helped; I changed that first and the eval did not move. The fix is in the
+tool's own top-level description, which is what decides selection: it now
+says sending the page to yourself is a normal use rather than a special
+case, and lists the four phrasings.
+
+```
+router eval   78/84 baseline  ->  79, 79, 81 over three runs
+prompt+tools  2836 -> 2930 tokens
+```
+
+Reported as a spread because it is one: the same build scores differently
+run to run, which is the instability flagged in the previous entry and is
+now measured rather than suspected. "send me this page" passes
+consistently; the other two flap.
+
+**2 · The dead-end logs.** Three lines added — a timeout, an answer
+matching several, an answer matching none — because the user's experience
+was "it does nothing" and the flash message was the only trace, gone in
+three seconds.
+
+**3 · The choice is remembered, and the options are ranked.**
+Per-spoken-name memory (`sharePageNameChoices`), so "Ashutosh" resolving
+once skips the question next time, logged as `(remembered)`, overwritten
+by a later answer. Option order uses
+`VocabularyBias.rankedByHistory` — exposed rather than reimplemented,
+because a second copy of "how often has this been said" would drift from
+the one that decides the glossary.
+
+**4 · The me-card is read first.** Design decision 10 is amended in place
+with the user's correction as the reason: it assumed the card is
+"unreliable — usually empty", and theirs is filled in. A number with a
+country code is used silently; the ask survives only for a missing,
+empty, or code-less card.
+
+**5 · The option cap was the bug.** `options.prefix(2)` silently dropped
+a third or fourth match — which is the reported symptom exactly, a
+question whose list did not contain the wanted person. Every match is now
+offered. The other two mechanisms are handled as the report asked: a name
+match with no phone number is named specifically ("X has no phone number
+in Contacts") rather than reported as absent, and the not-found wording
+now says "in your Mac's Contacts" to hint the account boundary. The
+diagnostic is in: candidate count and name-match count at resolve time,
+names only.
+
+**One bug of my own, caught before it shipped.** `dictationHistory()`
+read a key I guessed — `"transcriptionHistory"` — which does not exist.
+It would have returned an empty string forever and made the ranking a
+silent no-op that no test would have failed on. Corrected to
+`HistoryStorage.defaultsKey` and `HistoryEntry`, the same path the
+glossary builder uses. This is the fourth time in two days that a guessed
+identifier survived a green build; the only thing that caught it was
+checking how the neighbouring feature reads the same data.
+
+Ran: 12/12 suites green (`whatsapp-checks` now 48 cases, +6 for the
+option cap and the ranking), three eval runs, build green.
+
+Not done, unchanged: nothing tested by hand, and no Settings control for
+the default target. The user's retest script from the report is the next
+thing to run.

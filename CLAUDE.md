@@ -132,7 +132,7 @@ swiftc -o /tmp/chk Sources/Sayline/AgentAction.swift Sources/Sayline/WebsiteCata
 swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swift \
   eval/meeting-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
-swiftc -o /tmp/chk Sources/Sayline/ShareLink.swift \
+swiftc -o /tmp/chk Sources/Sayline/ShareLink.swift Sources/Sayline/VocabularyBias.swift \
   eval/whatsapp-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/VocabularyBias.swift \
   eval/bias-checks/main.swift && /tmp/chk

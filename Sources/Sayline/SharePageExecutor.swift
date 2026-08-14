@@ -148,10 +148,37 @@ enum SharePageExecutor {
     private static func deliverToSelf(target: ShareLink.Target,
                                       url: URL, message: String) -> Step {
         if target == .airdrop { return airDrop(url: url) }
-        guard let number = selfNumber, !number.isEmpty else {
-            return askSelfNumber(message: message)
+        if let number = selfNumber, !number.isEmpty {
+            return openWhatsApp(number: number, message: message, who: "yourself")
         }
-        return openWhatsApp(number: number, message: message, who: "yourself")
+        // Decision 10, amended 2026-08-14 on the user's correction: the
+        // me-card was assumed unreliable and never consulted. Theirs is
+        // filled in and they expect it used. Asked for only when the card
+        // is missing, empty, or carries no country code.
+        if let fromCard = meCardNumber() {
+            SaylineLog.log("[share] using the number on your Contacts me-card")
+            selfNumber = fromCard
+            return openWhatsApp(number: fromCard, message: message, who: "yourself")
+        }
+        return askSelfNumber(message: message)
+    }
+
+    /// The user's own card, when it has a dialable number.
+    private static func meCardNumber() -> String? {
+        guard CNContactStore.authorizationStatus(for: .contacts) != .denied else { return nil }
+        let keys = [CNContactPhoneNumbersKey] as [CNKeyDescriptor]
+        guard let me = try? CNContactStore().unifiedMeContactWithKeys(toFetch: keys) else {
+            SaylineLog.log("[share] no me-card in Contacts")
+            return nil
+        }
+        let mobiles = me.phoneNumbers.filter { ShareLink.isMobile($0.label ?? "") }
+        let ordered = mobiles.isEmpty ? me.phoneNumbers : mobiles
+        for entry in ordered {
+            let digits = ShareLink.normalize(entry.value.stringValue)
+            if ShareLink.hasCountryCode(digits) { return digits }
+        }
+        SaylineLog.log("[share] me-card has no number with a country code")
+        return nil
     }
 
     /// Decision 10 — asked once, stored locally, editable later.
@@ -191,6 +218,28 @@ enum SharePageExecutor {
 
     private static func resolve(spoken: String, candidates: [ShareLink.Candidate],
                                 message: String) -> Step {
+        // Diagnostic for the "the list was not comprehensive" report.
+        // Names only, never numbers — the log file is meant to be handed
+        // over. Counting both tells the missing-contact question apart
+        // from the wrong-answer one without another round of guessing.
+        let nameMatches = candidates.filter { ShareLink.matches(spoken: spoken, name: $0.name) }
+        SaylineLog.log("[share] \(candidates.count) contacts with numbers, "
+            + "\(nameMatches.count) matched what was heard")
+
+        // A name resolved once is remembered, so the same question is not
+        // asked every time. macOS exposes no call history to any app, so
+        // this is the buildable half of "rank by who I actually message":
+        // the user's own previous answer. Safe under decision 4 — the
+        // chat opens prefilled and a wrong face is visible before Enter.
+        if let remembered = rememberedName(for: spoken),
+           let match = candidates.first(where: { $0.name == remembered }) {
+            SaylineLog.log("[share] \(spoken) -> \(remembered) (remembered)")
+            if case .resolved(let name, let number) =
+                ShareLink.resolve(spoken: match.name, in: [match]) {
+                return openWhatsApp(number: number, message: message, who: name)
+            }
+        }
+
         switch ShareLink.resolve(spoken: spoken, in: candidates) {
         case .resolved(let name, let number):
             SaylineLog.log("[share] resolved to \(name)")
@@ -199,11 +248,25 @@ enum SharePageExecutor {
         case .ambiguous(let name, let options):
             // Decision 5: ask, never guess. A wrong recipient is the worst
             // outcome this feature can produce, and silence picks nobody.
-            SaylineLog.log("[share] ambiguous recipient: \(options.count) options")
+            //
+            // Every option is offered. This used to show `prefix(2)`,
+            // which silently dropped a third or fourth match and said
+            // nothing about it — the user reported a question whose list
+            // did not contain the person they wanted, and a cap that
+            // discards real answers is a bug however tidy it looks.
+            //
+            // Ordered by how often the user actually says each name,
+            // using the glossary's own ranking rather than a second copy.
+            let ranked = VocabularyBias.rankedByHistory(options,
+                                                        historyText: dictationHistory())
+            SaylineLog.log("[share] ambiguous recipient: \(ranked.count) options offered")
             return .ask(question: "Which \(name)?",
-                        detail: options.prefix(2).joined(separator: " or "),
-                        choices: Array(options.prefix(2))) { answer in
-                guard let answer else { return .failed("") }
+                        detail: ranked.joined(separator: ", "),
+                        choices: ranked) { answer in
+                guard let answer else {
+                    SaylineLog.log("[share] disambiguation timed out — nothing sent")
+                    return .failed("")
+                }
                 // Re-resolve against the narrowed answer rather than
                 // indexing the option list: the user may say a surname,
                 // and the same matching rule should decide both times.
@@ -212,8 +275,14 @@ enum SharePageExecutor {
                         || $0.numbers.contains { $0.number == answer }
                 }
                 guard narrowed.count == 1 else {
+                    // Logged, because the user experienced this as the app
+                    // doing nothing: a flash message is the only trace and
+                    // it is gone in three seconds.
+                    SaylineLog.log("[share] answer matched \(narrowed.count) contacts "
+                        + "— nothing sent")
                     return .failed("Still not sure which \(name) — nothing sent.")
                 }
+                remember(narrowed[0].name, for: name)
                 return resolve(spoken: narrowed[0].name, candidates: narrowed,
                                message: message)
             }
@@ -234,8 +303,19 @@ enum SharePageExecutor {
         case .notFound(let heard):
             // Names what was heard, so a mishearing is obvious rather
             // than mysterious.
+            //
+            // A card that matches the name but carries no phone number is
+            // filtered out before this point, and the user cannot tell
+            // "filtered" from "absent" — so it is named specifically. The
+            // wording also hints the account boundary: `CNContactStore`
+            // only sees accounts enabled in Internet Accounts, so someone
+            // who lives only in WhatsApp is invisible to us.
+            if let numberless = numberlessMatch(for: heard) {
+                SaylineLog.log("[share] matched a contact with no phone number")
+                return .failed("\(numberless) has no phone number in Contacts.")
+            }
             SaylineLog.log("[share] no contact matched what was heard")
-            return .failed("No contact called \"\(heard)\".")
+            return .failed("No contact called \"\(heard)\" in your Mac's Contacts.")
         }
     }
 
@@ -254,6 +334,55 @@ enum SharePageExecutor {
                 numbers: contact.phoneNumbers.map { ($0.label ?? "", $0.value.stringValue) }))
         }
         return candidates
+    }
+
+    /// The spoken name the user said, mapped to the card they meant.
+    /// Overwritten by a later answer, so a changed mind wins.
+    static func rememberedName(for spoken: String) -> String? {
+        (UserDefaults.standard.dictionary(forKey: "sharePageNameChoices")
+            as? [String: String])?[spoken.lowercased()]
+    }
+
+    private static func remember(_ resolved: String, for spoken: String) {
+        var stored = UserDefaults.standard.dictionary(forKey: "sharePageNameChoices")
+            as? [String: String] ?? [:]
+        stored[spoken.lowercased()] = resolved
+        UserDefaults.standard.set(stored, forKey: "sharePageNameChoices")
+        SaylineLog.log("[share] remembered that choice for next time")
+    }
+
+    /// A contact whose name matches but who has no number at all — the
+    /// case `readContacts()` filters out and the user cannot see.
+    private static func numberlessMatch(for spoken: String) -> String? {
+        let keys = [CNContactGivenNameKey, CNContactFamilyNameKey,
+                    CNContactPhoneNumbersKey] as [CNKeyDescriptor]
+        var found: String?
+        try? CNContactStore().enumerateContacts(
+            with: CNContactFetchRequest(keysToFetch: keys)
+        ) { contact, stop in
+            let name = [contact.givenName, contact.familyName]
+                .filter { !$0.isEmpty }.joined(separator: " ")
+            if contact.phoneNumbers.isEmpty,
+               ShareLink.matches(spoken: spoken, name: name) {
+                found = name
+                stop.pointee = true
+            }
+        }
+        return found
+    }
+
+    /// The dictation history the glossary ranks from.
+    ///
+    /// Read through `HistoryStorage.defaultsKey` and `HistoryEntry`, the
+    /// same path the glossary builder uses, so the option order here and
+    /// the glossary's ranking cannot disagree. Written from a guessed key
+    /// first, which returned an empty string forever and made the ranking
+    /// a silent no-op — the failure this whole file's comments keep
+    /// warning about, committed once more.
+    private static func dictationHistory() -> String {
+        let data = UserDefaults.standard.data(forKey: HistoryStorage.defaultsKey) ?? Data()
+        let entries = (try? JSONDecoder().decode([HistoryEntry].self, from: data)) ?? []
+        return entries.map(\.text).joined(separator: " ")
     }
 
     /// Per-contact, because the failure table says asked once and then

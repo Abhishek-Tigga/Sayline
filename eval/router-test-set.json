@@ -1,5 +1,5 @@
 {
- "version": 2,
+ "version": 3,
  "created": "2026-08-09",
  "about": "Frozen test set for the agent router. Written BEFORE any candidate implementation exists, so no arm can be tuned against it after the fact. Every case marked source 'live-log' is a verbatim transcript Whisper actually produced during real use on 2026-08-09 — including its mishearings ('doc' for 'dock', 'Closed' for 'Close'), which are real input the router must survive. Cases marked 'constructed' fill coverage gaps for actions that were never exercised live.",
  "scoring": "Mechanical only. An arm passes a case when the produced action list matches `expect` on action name and on every argument listed. Arguments not listed are ignored. Never score by judging whether output 'looks reasonable'.",
@@ -1057,6 +1057,50 @@
    "source": "design-doc",
    "expect": [],
    "guards": "Messaging a person is not sharing the page. v1 has no send-a-message tool, so the correct answer is no action rather than a share with an invented note."
+  },
+  {
+   "id": "share-self-me-on-whatsapp",
+   "transcript": "send this to me on WhatsApp",
+   "source": "live-log-21:50",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "self",
+      "target": "whatsapp"
+     }
+    }
+   ],
+   "guards": "Live failure 2026-08-14 21:50: routed to nothing. \"Share this to my WhatsApp\" worked, so the gap is bare \"me\" — the tool description named my/myself and not the pronoun people actually use."
+  },
+  {
+   "id": "share-self-send-me",
+   "transcript": "send me this page",
+   "source": "live-log-21:50",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "self"
+     }
+    }
+   ],
+   "guards": "Same class, different word order."
+  },
+  {
+   "id": "share-self-whatsapp-this-to-me",
+   "transcript": "WhatsApp this to me",
+   "source": "live-log-21:50",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "self",
+      "target": "whatsapp"
+     }
+    }
+   ],
+   "guards": "Same class, channel first."
   }
  ]
 }

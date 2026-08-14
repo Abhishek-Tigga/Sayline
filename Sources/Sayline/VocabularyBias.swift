@@ -170,6 +170,27 @@ enum VocabularyBias {
         return words
     }
 
+    /// Ranks names by how often the user has actually said them.
+    ///
+    /// The same stable ordering rung 2 uses, exposed because the share
+    /// feature's disambiguation question wants exactly it: when two
+    /// contacts share a first name, the one the user talks about should
+    /// be offered first. Reused rather than reimplemented — a second
+    /// copy of "how often has this been said" would drift from the one
+    /// that decides the glossary.
+    static func rankedByHistory(_ names: [String], historyText: String) -> [String] {
+        let counts = wordCounts(of: historyText)
+        func score(_ name: String) -> Int {
+            name.split(separator: " ")
+                .map { counts[$0.lowercased(), default: 0] }
+                .max() ?? 0
+        }
+        return names.enumerated().sorted {
+            let a = score($0.element), b = score($1.element)
+            return a == b ? $0.offset < $1.offset : a > b
+        }.map { $0.element }
+    }
+
     private static func wordCounts(of text: String) -> [String: Int] {
         var counts: [String: Int] = [:]
         var word = ""

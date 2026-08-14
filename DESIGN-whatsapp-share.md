@@ -7,7 +7,8 @@ fix. Recorded because the reasoning is the part that gets lost — the
 decisions will be obvious from the code, the rejected alternatives will
 not.
 
-Nothing here is built yet.
+Built 2026-08-14; decisions 5 and 10 amended the same day from live
+testing, each marked in place with the reason.
 
 ## The model in one paragraph
 
@@ -112,12 +113,17 @@ Rejected: Work-mode treatment (wrong register), auto-adding the page
 title as text (WhatsApp link previews already show it; our copy would
 be noise).
 
-**10 · Self-send number is asked once and stored locally.** First
-"save to my WhatsApp" triggers a one-time follow-up for the user's own
-number, stored on the machine, editable in Settings. Rejected: reading
-the Contacts "me" card (unreliable — usually empty), and requiring
-Settings setup before first use (the feature should be discoverable by
-speaking to it).
+**10 · Self-send number: the me-card first, then ask.** *(Amended
+2026-08-14 after the first live session — the user corrected the
+premise.)* The original decision rejected the Contacts "me" card as
+"unreliable — usually empty" and always asked. The user's card is filled
+in and they expected it to be used; assuming a card is empty when it is
+not is a worse failure than reading one. Now: the me-card is read first
+and a number carrying a country code is used silently (the log says
+which), and the one-time follow-up fires only when the card is missing,
+empty, or code-less. The answer is still stored locally and editable.
+Rejected, unchanged: requiring Settings setup before first use — the
+feature should be discoverable by speaking to it.
 
 **11 · Browsers in, everything else fails visibly.** Safari, Chrome,
 Edge, Brave, Arc — all scriptable, all already in `AppContext`'s

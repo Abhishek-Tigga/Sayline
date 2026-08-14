@@ -442,13 +442,13 @@ final class AgentRouter {
             "type": "function",
             "function": [
                 "name": "share_page",
-                "description": "Shares the web page the user is currently reading, to WhatsApp or AirDrop. Use for 'send this to <name>', 'share this', 'save this to my WhatsApp', 'AirDrop this'. The word 'this' means the page on screen. Do NOT use for sending an email, or for messaging someone text that is not about the current page.",
+                "description": "Shares the web page the user is currently reading, to WhatsApp or AirDrop. Use whenever the user says to send, share or save 'this' — the word 'this' means the page on screen. Examples that all belong here: 'send this to Priya', 'send this to me on WhatsApp', 'send me this page', 'WhatsApp this to me', 'share this', 'save this to my WhatsApp', 'AirDrop this'. Sending it to the user themselves is a normal use, not a special case. Do NOT use for sending an email, or for messaging someone text that is not about the current page.",
                 "parameters": [
                     "type": "object",
                     "properties": [
                         "recipient": [
                             "type": "string",
-                            "description": "The person's name as spoken, e.g. 'Priya'. Use 'self' when they mean themselves ('my WhatsApp', 'to me'). Use 'unnamed' when no person is mentioned ('share this').",
+                            "description": "The person's name as spoken, e.g. 'Priya'. Use exactly 'self' when the user means themselves — 'send this to me', 'send me this page', 'WhatsApp this to me', 'save this to my WhatsApp', 'to myself'. A bare 'me' is always self. Use exactly 'unnamed' when no person is mentioned at all ('share this').",
                         ],
                         "note": [
                             "type": "string",

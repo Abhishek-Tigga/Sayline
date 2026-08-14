@@ -138,5 +138,35 @@ eq("spoken digits with spaces normalize",
 check("a number spoken without a country code is refused",
       !ShareLink.hasCountryCode(ShareLink.normalize("9876543210")))
 
+
+// Fix 5: every match is offered. The cap used to be prefix(2), which
+// dropped a third silently — the user met a question whose list did not
+// contain the person they wanted.
+print("\nevery ambiguous option is offered")
+let threeAshutosh = [
+    ShareLink.Candidate(name: "Ashutosh Sharma", numbers: [("_$!<Mobile>!$_", "+91 90000 00001")]),
+    ShareLink.Candidate(name: "Ashutosh Verma",  numbers: [("_$!<Mobile>!$_", "+91 90000 00002")]),
+    ShareLink.Candidate(name: "Ashutosh Rao",    numbers: [("_$!<Mobile>!$_", "+91 90000 00003")]),
+]
+if case .ambiguous(_, let opts) = ShareLink.resolve(spoken: "Ashutosh", in: threeAshutosh) {
+    eq("all three come back, not two", opts.count, 3)
+    check("the third is present", opts.contains("Ashutosh Rao"))
+} else {
+    check("three same-first-name contacts are ambiguous", false)
+}
+
+// Fix 3: history ranks the options, and only ranks — it never adds or
+// drops one.
+print("\nhistory ranks the options without changing the set")
+let names = ["Ashutosh Sharma", "Ashutosh Verma", "Ashutosh Rao"]
+let history = "spoke to verma yesterday and verma again this morning about rao"
+let ranked = VocabularyBias.rankedByHistory(names, historyText: history)
+eq("the most-mentioned goes first", ranked.first, "Ashutosh Verma")
+eq("nothing is added or lost", Set(ranked), Set(names))
+eq("an empty history keeps the original order",
+   VocabularyBias.rankedByHistory(names, historyText: ""), names)
+eq("a history mentioning nobody keeps the original order",
+   VocabularyBias.rankedByHistory(names, historyText: "unrelated words"), names)
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)
