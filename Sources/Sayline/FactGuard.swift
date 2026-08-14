@@ -241,6 +241,14 @@ enum FactGuard {
     /// Two words is grammar. Three is padding. See the ruling in
     /// `review/LEDGER.md` for why this is a constant and not a
     /// percentage.
+    ///
+    /// **Held at 2 deliberately, not tuned to it.** The evidence cannot
+    /// distinguish 2 from 3 — the violations sit at +1, +3 and +5 and
+    /// nothing observed sits at +3 or +4. Fable's ruling: when evidence is
+    /// indifferent the tighter value wins by default, because the recorded
+    /// drift this week was six relaxations and no tightenings. It moves
+    /// only if a taste round produces length complaints, in either
+    /// direction.
     static let grammarTolerance = 2
 
     static func verify(raw facts: FactSet, rewrite: String,

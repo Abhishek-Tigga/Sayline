@@ -17,6 +17,16 @@ Ground truth is `ideals.json`, the 15 rewrites the user accepted, supplied
 2026-08-14. Opener anchors below are read off those ideals rather than
 invented, so the check tracks what the user actually kept.
 
+**The fifteen are no longer evidence that a change was right.** The guard
+was tuned until they passed and they were then made the test that the
+guard is correct, which is fitting to the test set. Fable's protocol,
+2026-08-14: each taste round produces fresh held-out material; it validates
+the changes made since the previous round; only then does it graduate into
+the calibration set, and the next round mints new held-outs. Round 2's
+outputs are held out — do NOT fold them in until they have served one full
+cycle as unseen judges. The fifteen keep their regression-detection job,
+which is real, and lose their promotion job, which was never sound.
+
     ./taste_score.py --scored path/to/rewrites.json
     ./taste_score.py --model gpt-4o-mini          # runs the 18 first
 """

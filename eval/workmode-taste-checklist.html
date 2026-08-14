@@ -47,7 +47,19 @@ label{font-size:12px;font-weight:600;color:var(--mut)}
 <h1>Work mode — taste, round 2</h1>
 <p class="sub">18 cases · the bar for <b>pass</b> is one question only: <b>would you press send without editing a single word?</b> Not "is it good" — would you ship it as-is. If you'd touch it, it's a fail, and the tags say why.</p>
 <div class="note">Protocol: chord-dictate each script into the named room (or a stand-in text field), speaking naturally — the script is a prompt, not scripture; your own ums and detours make the test better. Paste what landed, mark it, tag fails, add a remark where the tags don't cover it. Marks save in this browser only, which is how round 1's answers were lost. <b>Export downloads a file</b> — do it partway through, not just at the end. Send the file to Fable.</div>
-<div class="note" style="border-color:#c86"><b>Check the facts, not just the tone.</b> The guard was made more permissive on 2026-08-14 — six rules relaxed, none tightened. So for every case, verify each number, name, day and time against what you actually said, and tag <b>fact wrong</b> if any drifted. That is the half the machine is now weakest at, and a wrong number is invisible in a sentence that reads well.</div>
+<div class="note" style="border-color:#c86"><b>Check the facts, not just the tone.</b> The guard was made more permissive on 2026-08-14 — six rules relaxed, none tightened. So for every case, verify each number, name, day and time against what you actually said, and tag <b>fact wrong</b> if any drifted. That is the half the machine is now weakest at, and a wrong number is invisible in a sentence that reads well.
+<br><br><b>One hole the guard cannot cover.</b> If a sentence keeps any negative word,
+the guard will not notice a <i>different</i> position being flipped. So
+"I don't agree with the plan" arriving as "I agree with the plan" can pass
+silently. Read every position — a no must still be a no.</div>
+<div class="note"><b>The bar for this round</b> (Fable, 2026-08-14). Two absolutes:
+<b>zero invented facts</b> and <b>zero silent fallbacks</b> — every time you got
+your own words back, you should have seen a notice saying so. Then send-unedited:
+under 30% means the prompt approach gets re-examined, 30–60% means iterate,
+60%+ means taste work steps back and the launch work takes priority.
+Give R1 and R2 their own note: round 1's consistency read was contaminated by
+silent fallbacks, so with a 0%-fallback model these two measure real variance
+for the first time.</div>
 
 <div class="bar"><span>Pass <b id="np">0</b></span><span>Fail <b id="nf">0</b></span><span>Left <b id="nr">18</b></span><span id="save" style="color:var(--mut);font-size:12px"></span></div>
 
