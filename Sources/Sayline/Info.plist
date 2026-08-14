@@ -27,10 +27,14 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Sayline asks your browser for the page you are reading, so it can share that link when you ask.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Sayline reads your calendar to find the next meeting and its join link. It never creates, edits or deletes events.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Sayline reads your calendar to find the next meeting and its join link. It never creates, edits or deletes events.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Sayline looks up the person you name when you share a page, so it can open the right WhatsApp chat. Contacts are read on your Mac and never sent anywhere.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sayline needs microphone access to transcribe your speech into text.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>

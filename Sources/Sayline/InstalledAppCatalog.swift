@@ -39,6 +39,15 @@ enum InstalledAppCatalog {
         SaylineLog.log("found \(namesByNormalized.count) installed apps")
     }
 
+    /// Every installed app's display name, for the vocabulary bias
+    /// ladder. Sorted so the list is stable run to run — the bias
+    /// budget cuts from the end, and which apps fall off must not
+    /// depend on filesystem enumeration order.
+    static var allNames: [String] {
+        load()
+        return namesByNormalized.values.sorted()
+    }
+
     /// The app's real name for a spoken one, or nil if nothing matches.
     ///
     /// Exact match only, after normalising. Fuzzy matching belongs to the

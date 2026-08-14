@@ -1,9 +1,10 @@
 import Cocoa
+import Contacts
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private static let useLocalTranscriptionDefaultsKey = "com.abhishektigga.sayline.useLocalTranscription"
-    private static let historyDefaultsKey = "com.abhishektigga.sayline.history"
+    private static let historyDefaultsKey = HistoryStorage.defaultsKey
     private static let maxHistoryEntries = 20
     private static let preferredInputDeviceDefaultsKey = "com.abhishektigga.sayline.preferredInputDeviceUID"
     private static let hotkeyOptionDefaultsKey = "com.abhishektigga.sayline.hotkeyOption"
@@ -284,6 +285,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 guard let self else { return }
                 self.isAgentModeThisRecording = true
                 self.indicatorWindow.updateAgentMode(true)
+                // Decision 3 of DESIGN-whatsapp-share.md: "this" means the
+                // page they were looking at when they asked, not the one
+                // in front when routing finishes seconds later. Captured
+                // here — on an agent-flagged hold only — so a plain
+                // dictation never fires an Apple Event at the browser.
+                SharePageState.captureCurrentPage()
             }
         }
 
@@ -302,6 +309,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
 
         loadHistory()
+
+        // The vocabulary glossary — after history, which ranks its
+        // contacts, and rebuilt when an input changes, never
+        // mid-dictation (DESIGN-vocabulary-biasing.md, decision 5).
+        rebuildVocabularyBias()
+        NotificationCenter.default.addObserver(
+            forName: .CNContactStoreDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.rebuildVocabularyBias()
+        }
+    }
+
+    /// Off the main thread: contacts enumeration and the dictionary
+    /// load are launch work, not launch-blocking work. The history text
+    /// is snapshotted on main first, so the background pass reads no
+    /// shared state.
+    func rebuildVocabularyBias() {
+        let historyText = historyEntries.map(\.text).joined(separator: " ")
+        DispatchQueue.global(qos: .utility).async {
+            VocabularyBiasBuilder.rebuild(historyText: historyText)
+        }
     }
 
     private func loadHistory() {
@@ -407,6 +435,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         isRecording = true
         transcriptionError = nil
         isAgentModeThisRecording = false
+        // Nothing outlives the gesture that justified it.
+        SharePageState.clear()
         // A plain hold means Work when the default is flipped; the chord
         // callback overrides this if one arrives.
         //

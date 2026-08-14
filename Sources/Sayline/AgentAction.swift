@@ -61,6 +61,19 @@ enum AgentAction {
     case takeScreenshot
     /// Opens a site, or a site's search results. `label` is only for the
     /// log — the URL is already resolved by WebsiteCatalog.
+    /// Share the page the user was reading when they flagged agent mode.
+    ///
+    /// The URL is deliberately NOT here. Decision 2 of
+    /// `DESIGN-whatsapp-share.md` keeps the page address out of the model
+    /// prompt entirely, so the router has no way to emit one and this
+    /// case has nowhere to put it — the executor attaches the captured
+    /// URL afterwards. If a URL field ever appears on this case, the
+    /// privacy line the product is pitched on has quietly moved.
+    case sharePage(recipient: ShareLink.Recipient,
+                   note: String?,
+                   target: ShareLink.Target?,
+                   makeDefault: Bool)
+
     case openWebsite(label: String, url: URL)
     /// The name matched no known site and wasn't a domain. Refused on
     /// purpose rather than guessing a TLD: opening the wrong site is more

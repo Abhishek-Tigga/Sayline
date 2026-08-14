@@ -438,6 +438,36 @@ final class AgentRouter {
                 ],
             ],
         ],
+        [
+            "type": "function",
+            "function": [
+                "name": "share_page",
+                "description": "Shares the web page the user is currently reading, to WhatsApp or AirDrop. Use for 'send this to <name>', 'share this', 'save this to my WhatsApp', 'AirDrop this'. The word 'this' means the page on screen. Do NOT use for sending an email, or for messaging someone text that is not about the current page.",
+                "parameters": [
+                    "type": "object",
+                    "properties": [
+                        "recipient": [
+                            "type": "string",
+                            "description": "The person's name as spoken, e.g. 'Priya'. Use 'self' when they mean themselves ('my WhatsApp', 'to me'). Use 'unnamed' when no person is mentioned ('share this').",
+                        ],
+                        "note": [
+                            "type": "string",
+                            "description": "Any message the user dictated to accompany the link, in their own words. Omit when they said none.",
+                        ],
+                        "target": [
+                            "type": "string",
+                            "enum": ["whatsapp", "airdrop"],
+                            "description": "Only when the user names a channel out loud ('on WhatsApp', 'via AirDrop'). Omit otherwise.",
+                        ],
+                        "make_default": [
+                            "type": "boolean",
+                            "description": "True only when the user said the choice should stand from now on, e.g. 'WhatsApp, always'.",
+                        ],
+                    ],
+                    "required": ["recipient"],
+                ],
+            ],
+        ],
     ]
 
     /// Groq occasionally emits malformed tool-call syntax (a stochastic
@@ -793,6 +823,26 @@ final class AgentRouter {
             return .controlMedia(command)
         case "close_current_tab":
             return .closeCurrentTab
+        case "share_page":
+            // Decision 2: no URL crosses this boundary. The recipient and
+            // the note are all the model is trusted with; the executor
+            // attaches the page address it captured locally.
+            let spoken = (arguments["recipient"] as? String ?? "").trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            let recipient: ShareLink.Recipient
+            switch spoken.lowercased() {
+            case "self", "me", "myself", "my whatsapp": recipient = .selfTarget
+            case "", "unnamed", "none", "nobody":       recipient = .unnamed
+            default:                                    recipient = .named(spoken)
+            }
+            let note = (arguments["note"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return .sharePage(
+                recipient: recipient,
+                note: (note?.isEmpty ?? true) ? nil : note,
+                target: (arguments["target"] as? String).flatMap(ShareLink.Target.init(rawValue:)),
+                makeDefault: arguments["make_default"] as? Bool ?? false)
+
         case "open_app":
             guard let appName = arguments["app_name"] as? String else { return nil }
             // Prefer the installed app; fall back to the website when no

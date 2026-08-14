@@ -274,3 +274,8 @@ Key terms are the names, brands and figures whose loss actually costs something 
 | model | WER | key terms kept | median |
 |---|---|---|---|
 | `whisper-large-v3 (current) + bias` | 11.9% | 70% | 345 ms |
+| 2026-08-14 15:01 UTC | `3700269` | openai | `gpt-4o-mini` | 75/81 (93%) | 0 (0%) | 2610 | 1187 ms |
+| 2026-08-14 15:03 UTC | `3700269` | openai | `gpt-4o-mini` | 74/81 (91%) | 0 (0%) | 2610 | 1221 ms |
+| 2026-08-14 15:15 UTC | `3700269+dirty` | openai | `gpt-4o-mini` | 75/81 (93%) | 0 (0%) | 2836 | 1104 ms |
+| 2026-08-14 15:18 UTC | `3700269+dirty` | openai | `gpt-4o-mini` | 76/81 (94%) | 0 (0%) | 2836 | 1205 ms |
+| 2026-08-14 15:21 UTC | `dd24987+dirty` | openai | `gpt-4o-mini` | 79/81 (98%) | 0 (0%) | 2836 | 1081 ms |

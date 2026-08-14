@@ -48,6 +48,12 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 # schema's. This is the only place the two are bridged.
 TOOL_TO_ACTION = {
     "open_app": ("openApp", {"app_name": "name"}),
+    # make_default is carried through as makeDefault so the test set can
+    # assert decision 7's "always". No URL key exists on purpose: the
+    # model never sees the page address (decision 2), so a URL appearing
+    # in a scored argument would mean the privacy line had moved.
+    "share_page": ("sharePage", {"recipient": "recipient", "note": "note",
+                                 "target": "target", "make_default": "makeDefault"}),
     "close_app": ("closeApp", {"app_name": "name"}),
     "find_file": ("findFile", {"query": "query", "folder": "folder", "subpath": "subpath"}),
     "open_folder": ("openFolder", {"folder": "folder", "subpath": "subpath"}),
@@ -178,6 +184,12 @@ def swift_helper(mode, stdin_text=""):
 
     parts = [
         (SRC / "AgentAction.swift").read_text(),
+        # ShareLink carries the Recipient/Target types AgentAction's
+        # sharePage case is built from. Added 2026-08-14 — the FIFTH time
+        # this list broke the same way, and the reason BACKLOG's
+        # --parse-actions migration exists: the compiler knows this graph
+        # and this list is a copy of it.
+        (SRC / "ShareLink.swift").read_text(),
         (SRC / "SettingsPaneCatalog.swift").read_text(),
         (SRC / "WebsiteCatalog.swift").read_text(),
         (SRC / "YouTubeSearch.swift").read_text(),

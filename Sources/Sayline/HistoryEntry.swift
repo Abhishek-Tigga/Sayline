@@ -1,5 +1,12 @@
 import Foundation
 
+/// Where history lives in UserDefaults. Here rather than in AppDelegate
+/// so `--dump-config` (which runs before any AppDelegate exists) reads
+/// the same key the app writes — one truth, no string copy to drift.
+enum HistoryStorage {
+    static let defaultsKey = "com.abhishektigga.sayline.history"
+}
+
 struct HistoryEntry: Codable, Identifiable, Equatable {
     let id: UUID
     let timestamp: Date

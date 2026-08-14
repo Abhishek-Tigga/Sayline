@@ -39,6 +39,13 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSUIElement: true
         NSMicrophoneUsageDescription: "Sayline needs microphone access to transcribe your speech into text."
+        # Asked on the first send to a named person, never at launch —
+        # the permission table in DESIGN-whatsapp-share.md. Without this
+        # key the first Contacts read terminates the app rather than
+        # prompting, which is a crash disguised as a permission bug.
+        NSContactsUsageDescription: "Sayline looks up the person you name when you share a page, so it can open the right WhatsApp chat. Contacts are read on your Mac and never sent anywhere."
+        # Reading the front browser's current tab is an Apple Event.
+        NSAppleEventsUsageDescription: "Sayline asks your browser for the page you are reading, so it can share that link when you ask."
         # Full access rather than write-only: cancelling a reminder by name
         # has to read the list to find a match.
         NSRemindersFullAccessUsageDescription: "Sayline needs access to Reminders so you can create and cancel them by voice."

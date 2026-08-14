@@ -95,9 +95,28 @@ enum HeadlessModes {
             // the two above: Clean now has a frozen test set and a model
             // A/B, and both would otherwise score a pasted copy.
             "cleanPrompt": TranscriptCleaner.cleanPrompt,
+            // The vocabulary glossary as production would send it right
+            // now, for `eval/transcription/run.py --bias app` — the
+            // acceptance run must score the real assembled list, not a
+            // simulated one. Built here from the same sources the app
+            // uses (dictionary file, Contacts if authorized, installed
+            // apps, the Settings words, stored history), headless.
+            "biasGlossary": headlessBiasGlossary() as Any,
         ]
         emit(payload)
         exit(0)
+    }
+
+    /// The same glossary the app builds at launch, assembled here
+    /// because `--dump-config` runs before the AppDelegate path that
+    /// normally triggers the rebuild. Reads the same stored history the
+    /// app reads, so ranking matches production.
+    private static func headlessBiasGlossary() -> String? {
+        let historyData = UserDefaults.standard
+            .data(forKey: HistoryStorage.defaultsKey) ?? Data()
+        let entries = (try? JSONDecoder().decode([HistoryEntry].self, from: historyData)) ?? []
+        VocabularyBiasBuilder.rebuild(historyText: entries.map(\.text).joined(separator: " "))
+        return VocabularyBiasBuilder.currentGlossary
     }
 
     /// Reads tool calls from stdin and prints what the app would actually
@@ -173,6 +192,20 @@ enum HeadlessModes {
 
     private static func describeParts(_ action: AgentAction) -> [String: Any] {
         switch action {
+        case .sharePage(let recipient, let note, let target, let makeDefault):
+            // The eval scores on these keys, so they are the contract the
+            // router test set is written against. No URL appears here for
+            // the same reason it never reaches the model — decision 2.
+            var parts: [String: Any] = ["action": "sharePage"]
+            switch recipient {
+            case .named(let who): parts["recipient"] = who
+            case .selfTarget:     parts["recipient"] = "self"
+            case .unnamed:        parts["recipient"] = "unnamed"
+            }
+            if let note { parts["note"] = note }
+            if let target { parts["target"] = target.rawValue }
+            if makeDefault { parts["makeDefault"] = true }
+            return parts
         case .openApp(let name): return ["action": "openApp", "name": name]
         case .closeApp(let name): return ["action": "closeApp", "name": name]
         case .findFile(let query, let folder, let subpath):

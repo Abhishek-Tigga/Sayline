@@ -5,6 +5,8 @@ struct SettingsView: View {
     @State private var apiKeyInput: String = KeychainStore.load() ?? ""
     @State private var apiKeySaved = false
     @State private var apiKeySaveFailed = false
+    @State private var myWords: String = UserDefaults.standard
+        .string(forKey: VocabularyBiasBuilder.myWordsDefaultsKey) ?? ""
 
 
     /// The only place the key is written, so the button and Return cannot
@@ -75,6 +77,22 @@ struct SettingsView: View {
 
                 Link("Get a free key at console.groq.com", destination: URL(string: "https://console.groq.com")!)
                     .font(.caption2)
+
+                // One plain field, comma-separated, per
+                // DESIGN-vocabulary-biasing.md decision 6. The glossary
+                // rebuilds on every keystroke — cheap (the sources are
+                // in memory) and simpler than debouncing correctly.
+                TextField("My words (names, brands, jargon — comma-separated)",
+                          text: $myWords)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: myWords) { _, newValue in
+                        UserDefaults.standard.set(newValue,
+                            forKey: VocabularyBiasBuilder.myWordsDefaultsKey)
+                        appDelegate.rebuildVocabularyBias()
+                    }
+                Text("Helps transcription hear your vocabulary — \"Designwell, Sayline, prepone\". About 150 words fit; your contacts and unusual app names are added automatically.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Hotkey") {

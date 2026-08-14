@@ -14,6 +14,9 @@ enum AgentExecutor {
     @discardableResult
     static func execute(_ action: AgentAction) -> Bool {
         switch action {
+        case .sharePage(let recipient, let note, let target, let makeDefault):
+            return SharePageExecutor.run(recipient: recipient, note: note,
+                                         target: target, makeDefault: makeDefault)
         case .openApp(let name):
             return openApp(named: name)
         case .closeApp(let name):
@@ -475,6 +478,12 @@ enum AgentExecutor {
 
     /// Same as `runAppleScript` but keeps the result. Used where the answer
     /// is the point rather than the side effect.
+    /// The same helper, visible to `PageCapture` so the share feature
+    /// does not grow a second AppleScript path.
+    static func appleScriptString(_ source: String) -> String? {
+        runAppleScriptReturningString(source)
+    }
+
     private static func runAppleScriptReturningString(_ source: String) -> String? {
         guard let script = NSAppleScript(source: source) else { return nil }
         var error: NSDictionary?

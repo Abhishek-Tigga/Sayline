@@ -1,948 +1,1062 @@
 {
-  "version": 1,
-  "created": "2026-08-09",
-  "about": "Frozen test set for the agent router. Written BEFORE any candidate implementation exists, so no arm can be tuned against it after the fact. Every case marked source 'live-log' is a verbatim transcript Whisper actually produced during real use on 2026-08-09 — including its mishearings ('doc' for 'dock', 'Closed' for 'Close'), which are real input the router must survive. Cases marked 'constructed' fill coverage gaps for actions that were never exercised live.",
-  "scoring": "Mechanical only. An arm passes a case when the produced action list matches `expect` on action name and on every argument listed. Arguments not listed are ignored. Never score by judging whether output 'looks reasonable'.",
-  "cases": [
-    {
-      "id": "open-app-safari",
-      "transcript": "Open Safari",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openApp",
-          "args": {
-            "name": "Safari"
-          }
-        }
-      ],
-      "guards": "Simplest happy path, verified working today. Any arm that breaks this is disqualified regardless of other scores."
-    },
-    {
-      "id": "open-app-finder",
-      "transcript": "Open Finder",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openApp",
-          "args": {
-            "name": "Finder"
-          }
-        }
-      ],
-      "guards": "Second app to catch a name-specific fluke."
-    },
-    {
-      "id": "open-app-preview",
-      "transcript": "Open preview.",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openApp",
-          "args": {
-            "name": "Preview"
-          }
-        }
-      ],
-      "guards": "Lowercase app name plus trailing period. Never got a clean run today (rate-limited every attempt), so genuinely unmeasured."
-    },
-    {
-      "id": "open-settings-app-itself",
-      "transcript": "Open Settings",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openApp",
-          "args": {
-            "name": "System Settings"
-          }
-        }
-      ],
-      "guards": "Debatable and important: 'open settings' with no pane named should open the System Settings app, NOT route to open_system_setting with a bogus pane. The model got this right live and only failed on malformed syntax. If an arm routes this to a pane lookup it will hit the no-match fallback and now do nothing at all — a real UX regression introduced 2026-08-09."
-    },
-    {
-      "id": "close-app-safari",
-      "transcript": "Close Safari",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "closeApp",
-          "args": {
-            "name": "Safari"
-          }
-        }
-      ],
-      "guards": "Verified working today after initially looking broken (it was rate limiting, not a bug)."
-    },
-    {
-      "id": "close-app-asr-noise",
-      "transcript": "Closed Safari",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "closeApp",
-          "args": {
-            "name": "Safari"
-          }
-        }
-      ],
-      "guards": "Whisper heard 'Closed' for 'Close'. Real ASR noise; the router should still read the intent."
-    },
-    {
-      "id": "find-file-resume",
-      "transcript": "Find my latest resume in downloads folder.",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "findFile",
-          "args": {
-            "query": "resume",
-            "folder": "Downloads"
-          }
-        }
-      ],
-      "guards": "Verified working today. Multi-argument extraction — the query must not swallow 'my latest' or 'folder'."
-    },
-    {
-      "id": "open-folder-downloads",
-      "transcript": "Open my downloads folder",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openFolder",
-          "args": {
-            "folder": "Downloads"
-          }
-        }
-      ],
-      "guards": "openFolder vs findFile is a genuine ambiguity — browsing a folder, not searching inside it."
-    },
-    {
-      "id": "settings-keyboard",
-      "transcript": "Open keyboard settings.",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Keyboard"
-          }
-        }
-      ],
-      "guards": "Verified working today, and only after the matcher fix — this exact phrase was a NO MATCH before 2026-08-09."
-    },
-    {
-      "id": "settings-screen-time-explicit",
-      "transcript": "Open Screen Time Settings",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Screen Time"
-          }
-        }
-      ],
-      "guards": "Worked live. Pair it with settings-screen-time-implicit below: same destination, different phrasing, only one of them malformed."
-    },
-    {
-      "id": "settings-screen-time-implicit",
-      "transcript": "Show my screen time.",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Screen Time"
-          }
-        }
-      ],
-      "guards": "The worst offender today: malformed tool call on every attempt including the higher-temperature retry, twice. If an arm fixes only one case, this is the one that matters. 'Show my X' phrasing without the word 'settings'."
-    },
-    {
-      "id": "settings-dock-asr-noise",
-      "transcript": "Open doc settings",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Desktop & Dock"
-          }
-        }
-      ],
-      "guards": "Whisper heard 'doc' for 'dock'. The model DID map it to 'Desktop & Dock' correctly live — then malformed the wrapper. Tests semantic mapping through ASR noise."
-    },
-    {
-      "id": "settings-general",
-      "transcript": "Open general settings.",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "About"
-          }
-        }
-      ],
-      "guards": "Debatable expectation, recorded deliberately: macOS has no General pane (verified — it is a sidebar category), so 'general' is aliased to About, the first pane inside it. If we later decide a different target is better, change it HERE first, then re-run. Never measured live — every attempt was rate-limited."
-    },
-    {
-      "id": "settings-wallpaper",
-      "transcript": "Change my wallpaper",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Wallpaper"
-          }
-        }
-      ],
-      "guards": "Intent phrased as an action, not as 'open X settings'. Wallpaper was one of the panes the old hardcoded enum could never reach."
-    },
-    {
-      "id": "settings-touch-id",
-      "transcript": "Open password settings",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Touch ID & Password"
-          }
-        }
-      ],
-      "guards": "User-confirmed rule: 'password settings' means the Touch ID & Password pane, NOT the standalone Passwords app. Regression guard on an explicit product decision."
-    },
-    {
-      "id": "settings-wifi-view",
-      "transcript": "Open Wi-Fi settings",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane": "Wi-Fi"
-          }
-        }
-      ],
-      "guards": "Must NOT become setWiFi. Viewing the pane vs toggling the radio — the pair with wifi-toggle-off below is the whole point."
-    },
-    {
-      "id": "wifi-toggle-off",
-      "transcript": "Turn off Wi-Fi",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "setWiFi",
-          "args": {
-            "enabled": false
-          }
-        }
-      ],
-      "guards": "Must NOT become openSystemSetting. Direct action takes precedence when a direction is stated."
-    },
-    {
-      "id": "settings-unknown-pane",
-      "transcript": "Open banana settings",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openSystemSettingsFallback"
-        }
-      ],
-      "guards": "KNOWN FAILING, deliberately. Two doors lead here. When the model punts to the Settings app, correctedSettingsPane now returns the visible fallback and this passes. When the model instead substitutes a real pane — 'banana' -> 'About', which is what it did on 2026-08-11 — nothing catches it. A rule that compared the model's pane against the spoken words did catch it, and also refused volume, brightness, dark mode, screensaver, microphone, camera, time zone and firewall, because the catalog lacks all of those and the right answers share no word with what was said. Nine real intents for one nonsense one; the rule was reverted. The durable fix is a synonym layer so the catalog resolves what people actually say, after which the comparison becomes safe. Until then this case stays red on purpose — see BACKLOG.md."
-    },
-    {
-      "id": "volume-mute",
-      "transcript": "Mute the volume",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "setVolume",
-          "args": {
-            "change": "Mute"
-          }
-        }
-      ],
-      "guards": "Enum argument extraction."
-    },
-    {
-      "id": "volume-up",
-      "transcript": "Turn the volume up",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "setVolume",
-          "args": {
-            "change": "Up"
-          }
-        }
-      ],
-      "guards": "Same tool, different enum value — catches an arm that always picks the first enum member."
-    },
-    {
-      "id": "dark-mode-on",
-      "transcript": "Switch to dark mode",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "setDarkMode",
-          "args": {
-            "enabled": true
-          }
-        }
-      ],
-      "guards": "Boolean argument. Must not route to an Appearance pane open."
-    },
-    {
-      "id": "lock-screen",
-      "transcript": "Lock my screen",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "lockScreen"
-        }
-      ],
-      "guards": "No-argument tool. Must not be confused with the Lock Screen settings pane."
-    },
-    {
-      "id": "empty-trash",
-      "transcript": "Empty the trash",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "emptyTrash"
-        }
-      ],
-      "guards": "No-argument tool, and the one irreversible action — a false positive here destroys data."
-    },
-    {
-      "id": "screenshot",
-      "transcript": "Take a screenshot",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "takeScreenshot"
-        }
-      ],
-      "guards": "No-argument tool."
-    },
-    {
-      "id": "query-battery",
-      "transcript": "What's my battery at",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "answerQuery",
-          "args": {
-            "query": "Battery"
-          }
-        }
-      ],
-      "guards": "Question, not command. Must reach answerQuery rather than any side-effecting tool."
-    },
-    {
-      "id": "query-storage",
-      "transcript": "How much storage do I have left",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "answerQuery",
-          "args": {
-            "query": "Storage"
-          }
-        }
-      ],
-      "guards": "Must NOT open the Storage settings pane — asking a question vs opening a pane is a real confusion risk now that Storage exists in the catalog."
-    },
-    {
-      "id": "query-now-playing",
-      "transcript": "What's playing right now",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "answerQuery",
-          "args": {
-            "query": "NowPlaying"
-          }
-        }
-      ],
-      "guards": "Query enum coverage."
-    },
-    {
-      "id": "multi-action",
-      "transcript": "Open Safari, then tell me my battery",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openApp",
-          "args": {
-            "name": "Safari"
-          }
-        },
-        {
-          "action": "answerQuery",
-          "args": {
-            "query": "Battery"
-          }
-        }
-      ],
-      "guards": "Two actions in one utterance, in order. Tool calling returns a native array; JSON mode needs our own array shape, so this is where arm B is most likely to differ."
-    },
-    {
-      "id": "out-of-scope-weather",
-      "transcript": "What's the weather tomorrow",
-      "source": "constructed",
-      "expect": [],
-      "guards": "Nothing matches — must return an empty action list, not force a bad fit into open_app. Tool calling gets this free via tool_choice auto; JSON mode needs an explicit empty-array convention in the prompt."
-    },
-    {
-      "id": "out-of-scope-email",
-      "transcript": "Check my email for anything from a recruiter",
-      "source": "constructed",
-      "expect": [],
-      "guards": "Plausible-sounding but genuinely unbuilt capability. Tempting for a model to map onto open_app('Mail'), which would be wrong — the user asked to search, not to launch."
-    },
-    {
-      "id": "web-open-plain",
-      "transcript": "open youtube",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "YouTube"
-          }
-        }
-      ],
-      "guards": "Bare open, no query, no flags. The simplest shape."
-    },
-    {
-      "id": "web-search-amazon",
-      "transcript": "Search for top rated iPhone 15 covers on Amazon",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Amazon"
-          }
-        }
-      ],
-      "guards": "Widened after three runs scored 68/66/69 with this case flipping twice. Since the tool trim the model sometimes answers a search by putting the results URL in page_url alongside site — the same page either way. That form is now collapsed back to site+query in parseAction, so production is identical; the harness does not run parseAction and cannot see it, which is the third time that blindness has cost a cycle. Both shapes are correct AT THE MODEL LAYER, which is the only layer this eval measures, so the case asserts the site and leaves the query to eval/catalog-checks, whose nine decomposition cases pin the rebuilt URL exactly."
-    },
-    {
-      "id": "web-search-person",
-      "transcript": "look up Pranav Hari on LinkedIn",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "LinkedIn",
-            "query": "Pranav Hari"
-          }
-        }
-      ],
-      "guards": "Person search. The whole query must land in `query`, not leak into `site`."
-    },
-    {
-      "id": "web-country-named",
-      "transcript": "Search for iPhone 15 Pro on Apple India website",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "apple.com/in/iphone"
-          }
-        }
-      ],
-      "guards": "Expectation corrected twice. First I expected site 'Apple India'; the model strips the country itself and region detection handles it. Then I expected search results; the model returns the iPhone 15 Pro product page, which is verified real and plainly better than Apple's own search. The lesson recorded rather than the guess."
-    },
-    {
-      "id": "web-play-flag",
-      "transcript": "play a Kendrick Lamar song on youtube",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "YouTube",
-            "play": true
-          }
-        }
-      ],
-      "guards": "play must be true here and absent for search — the verb is the only difference. Query wording is deliberately NOT scored: 'Kendrick Lamar' and 'Kendrick Lamar song' both work, and pinning the exact phrasing would fail on a difference that changes nothing."
-    },
-    {
-      "id": "web-search-not-play",
-      "transcript": "search lo-fi music on youtube",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "YouTube",
-            "play__absent": true
-          }
-        }
-      ],
-      "guards": "Same widening as web-search-amazon. What this case actually guards is that 'search' does not become playback, so `play` must stay absent — that assertion is kept and is the part worth protecting; the query form is covered by catalog-checks."
-    },
-    {
-      "id": "web-deeplink-apple",
-      "transcript": "open the iPhone page on Apple India",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "apple.com/in/iphone"
-          }
-        }
-      ],
-      "guards": "Asserts only on the URL. The site label is unused when a page_url validates, and the model returns 'Apple India' or 'Apple' interchangeably — both resolve correctly, so pinning the label made a passing behaviour look like a regression."
-    },
-    {
-      "id": "web-deeplink-notion",
-      "transcript": "show me Notion's pricing page",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Notion",
-            "page_url__contains": "notion.so/pricing"
-          }
-        }
-      ],
-      "guards": "NEW: same shape on a site with no search URL at all, where a deep link is the only way to be useful."
-    },
-    {
-      "id": "web-vertical-people",
-      "transcript": "look for people from Razorpay on LinkedIn",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "LinkedIn",
-            "vertical": "people"
-          }
-        }
-      ],
-      "guards": "The People tab, not the mixed All tab. Today this lands on /search/results/all/ which buries people under posts and companies."
-    },
-    {
-      "id": "web-vertical-people-role",
-      "transcript": "look for product managers from Razorpay on LinkedIn",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "LinkedIn",
-            "vertical": "people"
-          }
-        }
-      ],
-      "guards": "Role plus company. Same vertical as above — the difference is only the keywords, which is why query wording is not scored."
-    },
-    {
-      "id": "web-vertical-jobs",
-      "transcript": "find product manager jobs on LinkedIn",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "LinkedIn",
-            "vertical": "jobs"
-          }
-        }
-      ],
-      "guards": "Jobs is a different URL entirely (/jobs/search/), not a tab on the same one."
-    },
-    {
-      "id": "web-vertical-images",
-      "transcript": "show me images of golden retrievers",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Google",
-            "vertical": "images"
-          }
-        }
-      ],
-      "guards": "No site named and a vertical implied by the word images. Two inferences at once."
-    },
-    {
-      "id": "web-vertical-repos",
-      "transcript": "find swift concurrency repos on github",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "GitHub",
-            "vertical": "repositories"
-          }
-        }
-      ],
-      "guards": "GitHub defaults to a mixed result page; repositories is usually what is meant."
-    },
-    {
-      "id": "web-page-via-search-verb",
-      "transcript": "Search for iPhone page in Apple India website",
-      "source": "live-log",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "apple.com/in/iphone"
-          }
-        }
-      ],
-      "guards": "THE case that failed live while the eval passed. Verbatim transcript. The word 'search' must not stop it reaching the canonical page — routing on the verb rather than on whether a real page exists was the bug."
-    },
-    {
-      "id": "web-personal-orders",
-      "transcript": "show my Amazon orders",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "order"
-          }
-        }
-      ],
-      "guards": "Your own page on a site — a whole category missed until now. Orders, messages, subscriptions are canonical URLs that exist for every signed-in user."
-    },
-    {
-      "id": "web-personal-messages",
-      "transcript": "open my LinkedIn messages",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "messaging"
-          }
-        }
-      ],
-      "guards": "Same category, different site."
-    },
-    {
-      "id": "web-no-site-google",
-      "transcript": "what's the population of India",
-      "source": "constructed",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Google"
-          }
-        }
-      ],
-      "guards": "No site named. Agreed default is Google rather than refusing."
-    },
-    {
-      "id": "web-personal-linkedin-messages",
-      "transcript": "open my LinkedIn messages",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "linkedin.com/messaging"
-          }
-        }
-      ],
-      "guards": "Failed live: landed on LinkedIn search with 'my LinkedIn messages' as the keyword. The model had no page_url and no vertical matched, so it fell through to the ordinary search template."
-    },
-    {
-      "id": "web-personal-amazon-orders-region",
-      "transcript": "show my Amazon orders",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Amazon"
-          }
-        }
-      ],
-      "guards": "Asserts only that the model identifies the site. The URL is not its job — it cannot see the Mac's region, so it will always write amazon.com. Our own table supplies the region-correct path and overrides whatever URL the model offered. That half is covered by eval/catalog-checks, which tests code rather than a model. Expecting amazon.in here was asking the model for knowledge it does not have."
-    },
-    {
-      "id": "web-personal-youtube-subs",
-      "transcript": "open my YouTube subscriptions",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "page_url__contains": "youtube.com/feed/subscriptions"
-          }
-        }
-      ],
-      "guards": "YouTube has no regional variant, so this isolates the personal-page lookup from the region rewrite."
-    },
-    {
-      "id": "web-personal-not-personal",
-      "transcript": "search for wireless mouse on Amazon",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Amazon"
-          }
-        }
-      ],
-      "guards": "Negative case for the personal-page table. An ordinary product search must not be captured by it — the table matches only when the query reduces to a bare intent word like 'orders' or 'cart'."
-    },
-    {
-      "id": "reminder-with-time",
-      "transcript": "Remind me to call the bank at 4pm",
-      "expect": [
-        {
-          "action": "createReminder",
-          "args": {
-            "title__contains": "bank",
-            "due__present": true
-          }
-        }
-      ],
-      "guards": "The title must not carry the time. 'call the bank at 4pm' as a title makes a reminder that reads wrong forever, and the time is already in its own field."
-    },
-    {
-      "id": "reminder-no-time",
-      "transcript": "Remind me to call the bank",
-      "expect": [
-        {
-          "action": "createReminder",
-          "args": {
-            "title__contains": "bank",
-            "due__absent": true
-          }
-        }
-      ],
-      "guards": "The model must NOT invent a time. An invented due date is worse than none: the reminder fires at an hour nobody chose, and the follow-up question exists precisely to fill this in."
-    },
-    {
-      "id": "reminder-relative-time",
-      "transcript": "Remind me to submit the form tomorrow morning",
-      "expect": [
-        {
-          "action": "createReminder",
-          "args": {
-            "title__contains": "form",
-            "due__present": true
-          }
-        }
-      ],
-      "guards": "Relative phrasing only resolves because the current local time is in the system prompt. If this regresses, check that line is still being sent."
-    },
-    {
-      "id": "reminder-cancel-that",
-      "transcript": "Cancel that",
-      "expect": [
-        {
-          "action": "cancelReminder",
-          "args": {
-            "name__absent": true
-          }
-        }
-      ],
-      "guards": "No name means the one just created. A name invented here would send the coordinator searching for a reminder nobody mentioned."
-    },
-    {
-      "id": "reminder-cancel-named",
-      "transcript": "Cancel the dentist reminder",
-      "expect": [
-        {
-          "action": "cancelReminder",
-          "args": {
-            "name__contains": "dentist"
-          }
-        }
-      ],
-      "guards": "The word 'reminder' is noise and is stripped before matching, so it may or may not appear in the name — only 'dentist' matters."
-    },
-    {
-      "id": "reminder-not-a-reminder",
-      "transcript": "Remind me what my battery is at",
-      "expect": [
-        {
-          "action": "answerQuery",
-          "args": {
-            "query": "Battery"
-          }
-        }
-      ],
-      "guards": "'Remind me' used conversationally, not as a command. Creating a reminder titled 'what my battery is at' would be a confident misread of a question."
-    },
-    {
-      "id": "settings-volume-synonym",
-      "transcript": "Open volume settings",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane__contains": "sound"
-          }
-        }
-      ],
-      "guards": "The catalog has no pane called 'volume' — the model translates it to Sound and that is correct. Added after a rule was written that refused exactly this: it compared the model's pane against the spoken words and rejected anything with no shared root, which caught 'banana' and also broke volume, brightness, dark mode, screensaver, microphone, camera, time zone and firewall. Nine real intents for one nonsense one. The rule was reverted; this case exists so it cannot come back unnoticed."
-    },
-    {
-      "id": "settings-brightness-synonym",
-      "transcript": "Open brightness settings",
-      "expect": [
-        {
-          "action": "openSystemSetting",
-          "args": {
-            "pane__contains": "display"
-          }
-        }
-      ],
-      "guards": "Same class as settings-volume-synonym. 'brightness' is not in the catalog; Displays is the right answer and shares no word with what was said."
-    },
-    {
-      "id": "web-flipkart",
-      "transcript": "Search for Type-C headphone on Flipkart",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Flipkart",
-            "query__contains": "headphone"
-          }
-        }
-      ],
-      "guards": "Verbatim from a live session where it was refused. Correct behaviour for an unknown site, and a US-centric gap: the catalog had Amazon and no Flipkart while the user is in India. URL confirmed in a browser — curl gets 403 from every Indian retailer, so a 403 proves nothing."
-    },
-    {
-      "id": "web-meesho-misheard",
-      "transcript": "Search for sunglasses on Misho",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "Meesho",
-            "query__contains": "sunglasses"
-          }
-        }
-      ],
-      "guards": "'Misho' is what the transcriber produces for Meesho, and it is the verbatim live transcript. The model maps it back to Meesho by itself once the site is in the vocabulary; the alias covers the case where it passes the misheard spelling straight through instead. First written with a site__contains matcher of 'isho', which 'Misho' satisfies and 'Meesho' does not — the expectation was wrong, not the routing."
-    },
-    {
-      "id": "meeting-join",
-      "transcript": "Join my next meeting",
-      "expect": [
-        {
-          "action": "joinMeeting"
-        }
-      ],
-      "guards": "The headline command. Zero-parameter tool, so there is nothing to malform."
-    },
-    {
-      "id": "meeting-join-casual",
-      "transcript": "Hop on my call",
-      "expect": [
-        {
-          "action": "joinMeeting"
-        }
-      ],
-      "guards": "Phrasing variety. FastRoute covers the common wordings locally; this proves the model still handles the ones it does not."
-    },
-    {
-      "id": "meeting-next",
-      "transcript": "What's my next meeting",
-      "expect": [
-        {
-          "action": "whatsNextMeeting"
-        }
-      ],
-      "guards": "Reads the meeting back without joining it."
-    },
-    {
-      "id": "meeting-next-when",
-      "transcript": "When is my next call",
-      "expect": [
-        {
-          "action": "whatsNextMeeting"
-        }
-      ],
-      "guards": "Asks the same question about time rather than identity; same tool."
-    },
-    {
-      "id": "meeting-no-create",
-      "transcript": "Create a meeting tomorrow at 3",
-      "expect": [],
-      "guards": "MUST match nothing. Calendar writes are out of scope by an explicit design decision — a misheard word becomes a real event other people see. The danger is not a wrong meeting tool but an improvised create_reminder, which would silently turn a calendar request into a reminder."
-    },
-    {
-      "id": "meeting-no-cancel",
-      "transcript": "Cancel my next meeting",
-      "expect": [],
-      "guards": "MUST NOT route to cancel_reminder. Cancelling a meeting and cancelling a reminder are different destructive acts, and the reminder tool would happily search for a reminder named 'next meeting'."
-    },
-    {
-      "id": "meeting-no-list",
-      "transcript": "What meetings do I have today",
-      "expect": [
-        {
-          "action": "whatsNextMeeting"
-        }
-      ],
-      "guards": "DECISION REVERSED 2026-08-12, deliberately. The architecture had this declining rather than half-answering through next_meeting. Live experience overturned it: the wording that made the model refuse a list also made it refuse \"check my calendar\", which returned nothing at all and read as the feature being broken. Two attempts at wording that split the two failed in opposite directions. Answering with the next meeting is a partial answer to \"what do I have today\", and a partial answer beats silence — the person can see their calendar for the rest. The parked list surface is still parked; this is about not punishing an ordinary phrasing to protect a nicety."
-    },
-    {
-      "id": "meeting-not-a-meeting",
-      "transcript": "Remind me about the standup at 9am",
-      "expect": [
-        {
-          "action": "createReminder",
-          "args": {
-            "due__present": true
-          }
-        }
-      ],
-      "guards": "Contains meeting words but is a reminder. Guards the boundary from the other side — the meeting tools must not attract everything that mentions a standup."
-    },
-    {
-      "id": "web-play-in-youtube",
-      "transcript": "Play a lo-fi song in YouTube",
-      "expect": [
-        {
-          "action": "openWebsite",
-          "args": {
-            "site": "YouTube",
-            "play": true
-          }
-        }
-      ],
-      "guards": "Verbatim from a live failure. 'in YouTube' rather than 'on YouTube' — the model answered with a page_url of the YouTube homepage instead of site+query+play, so it opened the front page and played nothing. web-play-flag covers the 'on' phrasing and passed throughout, which is why nothing caught this."
-    },
-    {
-      "id": "web-play-generic",
-      "transcript": "play a song in youtube",
-      "expect": [],
-      "guards": "Declines, and that is accepted rather than desired. \"play a song\" names nothing to play — no artist, no genre, no title — so any choice would be invented. The phrasing that matters, \"play a lo-fi song in YouTube\", is covered by web-play-in-youtube and works. If this turns out to be common, the better answer is opening YouTube's music page rather than inventing a track, and that is a product decision nobody has made."
-    },
-    {
-      "id": "meeting-check-calendar",
-      "transcript": "Check my calendar",
-      "expect": [
-        {
-          "action": "whatsNextMeeting"
-        }
-      ],
-      "guards": "Live failure: answered nothing at all. The next_meeting description was tightened to refuse list-shaped questions after 'what meetings do I have today' half-answered — and that tightening reached too far, taking an ordinary way of asking what is next with it. The line has to reject a list without rejecting the question."
+ "version": 2,
+ "created": "2026-08-09",
+ "about": "Frozen test set for the agent router. Written BEFORE any candidate implementation exists, so no arm can be tuned against it after the fact. Every case marked source 'live-log' is a verbatim transcript Whisper actually produced during real use on 2026-08-09 — including its mishearings ('doc' for 'dock', 'Closed' for 'Close'), which are real input the router must survive. Cases marked 'constructed' fill coverage gaps for actions that were never exercised live.",
+ "scoring": "Mechanical only. An arm passes a case when the produced action list matches `expect` on action name and on every argument listed. Arguments not listed are ignored. Never score by judging whether output 'looks reasonable'.",
+ "cases": [
+  {
+   "id": "open-app-safari",
+   "transcript": "Open Safari",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openApp",
+     "args": {
+      "name": "Safari"
+     }
     }
-  ]
+   ],
+   "guards": "Simplest happy path, verified working today. Any arm that breaks this is disqualified regardless of other scores."
+  },
+  {
+   "id": "open-app-finder",
+   "transcript": "Open Finder",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openApp",
+     "args": {
+      "name": "Finder"
+     }
+    }
+   ],
+   "guards": "Second app to catch a name-specific fluke."
+  },
+  {
+   "id": "open-app-preview",
+   "transcript": "Open preview.",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openApp",
+     "args": {
+      "name": "Preview"
+     }
+    }
+   ],
+   "guards": "Lowercase app name plus trailing period. Never got a clean run today (rate-limited every attempt), so genuinely unmeasured."
+  },
+  {
+   "id": "open-settings-app-itself",
+   "transcript": "Open Settings",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openApp",
+     "args": {
+      "name": "System Settings"
+     }
+    }
+   ],
+   "guards": "Debatable and important: 'open settings' with no pane named should open the System Settings app, NOT route to open_system_setting with a bogus pane. The model got this right live and only failed on malformed syntax. If an arm routes this to a pane lookup it will hit the no-match fallback and now do nothing at all — a real UX regression introduced 2026-08-09."
+  },
+  {
+   "id": "close-app-safari",
+   "transcript": "Close Safari",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "closeApp",
+     "args": {
+      "name": "Safari"
+     }
+    }
+   ],
+   "guards": "Verified working today after initially looking broken (it was rate limiting, not a bug)."
+  },
+  {
+   "id": "close-app-asr-noise",
+   "transcript": "Closed Safari",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "closeApp",
+     "args": {
+      "name": "Safari"
+     }
+    }
+   ],
+   "guards": "Whisper heard 'Closed' for 'Close'. Real ASR noise; the router should still read the intent."
+  },
+  {
+   "id": "find-file-resume",
+   "transcript": "Find my latest resume in downloads folder.",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "findFile",
+     "args": {
+      "query": "resume",
+      "folder": "Downloads"
+     }
+    }
+   ],
+   "guards": "Verified working today. Multi-argument extraction — the query must not swallow 'my latest' or 'folder'."
+  },
+  {
+   "id": "open-folder-downloads",
+   "transcript": "Open my downloads folder",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openFolder",
+     "args": {
+      "folder": "Downloads"
+     }
+    }
+   ],
+   "guards": "openFolder vs findFile is a genuine ambiguity — browsing a folder, not searching inside it."
+  },
+  {
+   "id": "settings-keyboard",
+   "transcript": "Open keyboard settings.",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Keyboard"
+     }
+    }
+   ],
+   "guards": "Verified working today, and only after the matcher fix — this exact phrase was a NO MATCH before 2026-08-09."
+  },
+  {
+   "id": "settings-screen-time-explicit",
+   "transcript": "Open Screen Time Settings",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Screen Time"
+     }
+    }
+   ],
+   "guards": "Worked live. Pair it with settings-screen-time-implicit below: same destination, different phrasing, only one of them malformed."
+  },
+  {
+   "id": "settings-screen-time-implicit",
+   "transcript": "Show my screen time.",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Screen Time"
+     }
+    }
+   ],
+   "guards": "The worst offender today: malformed tool call on every attempt including the higher-temperature retry, twice. If an arm fixes only one case, this is the one that matters. 'Show my X' phrasing without the word 'settings'."
+  },
+  {
+   "id": "settings-dock-asr-noise",
+   "transcript": "Open doc settings",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Desktop & Dock"
+     }
+    }
+   ],
+   "guards": "Whisper heard 'doc' for 'dock'. The model DID map it to 'Desktop & Dock' correctly live — then malformed the wrapper. Tests semantic mapping through ASR noise."
+  },
+  {
+   "id": "settings-general",
+   "transcript": "Open general settings.",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "About"
+     }
+    }
+   ],
+   "guards": "Debatable expectation, recorded deliberately: macOS has no General pane (verified — it is a sidebar category), so 'general' is aliased to About, the first pane inside it. If we later decide a different target is better, change it HERE first, then re-run. Never measured live — every attempt was rate-limited."
+  },
+  {
+   "id": "settings-wallpaper",
+   "transcript": "Change my wallpaper",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Wallpaper"
+     }
+    }
+   ],
+   "guards": "Intent phrased as an action, not as 'open X settings'. Wallpaper was one of the panes the old hardcoded enum could never reach."
+  },
+  {
+   "id": "settings-touch-id",
+   "transcript": "Open password settings",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Touch ID & Password"
+     }
+    }
+   ],
+   "guards": "User-confirmed rule: 'password settings' means the Touch ID & Password pane, NOT the standalone Passwords app. Regression guard on an explicit product decision."
+  },
+  {
+   "id": "settings-wifi-view",
+   "transcript": "Open Wi-Fi settings",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane": "Wi-Fi"
+     }
+    }
+   ],
+   "guards": "Must NOT become setWiFi. Viewing the pane vs toggling the radio — the pair with wifi-toggle-off below is the whole point."
+  },
+  {
+   "id": "wifi-toggle-off",
+   "transcript": "Turn off Wi-Fi",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "setWiFi",
+     "args": {
+      "enabled": false
+     }
+    }
+   ],
+   "guards": "Must NOT become openSystemSetting. Direct action takes precedence when a direction is stated."
+  },
+  {
+   "id": "settings-unknown-pane",
+   "transcript": "Open banana settings",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openSystemSettingsFallback"
+    }
+   ],
+   "guards": "KNOWN FAILING, deliberately. Two doors lead here. When the model punts to the Settings app, correctedSettingsPane now returns the visible fallback and this passes. When the model instead substitutes a real pane — 'banana' -> 'About', which is what it did on 2026-08-11 — nothing catches it. A rule that compared the model's pane against the spoken words did catch it, and also refused volume, brightness, dark mode, screensaver, microphone, camera, time zone and firewall, because the catalog lacks all of those and the right answers share no word with what was said. Nine real intents for one nonsense one; the rule was reverted. The durable fix is a synonym layer so the catalog resolves what people actually say, after which the comparison becomes safe. Until then this case stays red on purpose — see BACKLOG.md."
+  },
+  {
+   "id": "volume-mute",
+   "transcript": "Mute the volume",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "setVolume",
+     "args": {
+      "change": "Mute"
+     }
+    }
+   ],
+   "guards": "Enum argument extraction."
+  },
+  {
+   "id": "volume-up",
+   "transcript": "Turn the volume up",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "setVolume",
+     "args": {
+      "change": "Up"
+     }
+    }
+   ],
+   "guards": "Same tool, different enum value — catches an arm that always picks the first enum member."
+  },
+  {
+   "id": "dark-mode-on",
+   "transcript": "Switch to dark mode",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "setDarkMode",
+     "args": {
+      "enabled": true
+     }
+    }
+   ],
+   "guards": "Boolean argument. Must not route to an Appearance pane open."
+  },
+  {
+   "id": "lock-screen",
+   "transcript": "Lock my screen",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "lockScreen"
+    }
+   ],
+   "guards": "No-argument tool. Must not be confused with the Lock Screen settings pane."
+  },
+  {
+   "id": "empty-trash",
+   "transcript": "Empty the trash",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "emptyTrash"
+    }
+   ],
+   "guards": "No-argument tool, and the one irreversible action — a false positive here destroys data."
+  },
+  {
+   "id": "screenshot",
+   "transcript": "Take a screenshot",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "takeScreenshot"
+    }
+   ],
+   "guards": "No-argument tool."
+  },
+  {
+   "id": "query-battery",
+   "transcript": "What's my battery at",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "answerQuery",
+     "args": {
+      "query": "Battery"
+     }
+    }
+   ],
+   "guards": "Question, not command. Must reach answerQuery rather than any side-effecting tool."
+  },
+  {
+   "id": "query-storage",
+   "transcript": "How much storage do I have left",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "answerQuery",
+     "args": {
+      "query": "Storage"
+     }
+    }
+   ],
+   "guards": "Must NOT open the Storage settings pane — asking a question vs opening a pane is a real confusion risk now that Storage exists in the catalog."
+  },
+  {
+   "id": "query-now-playing",
+   "transcript": "What's playing right now",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "answerQuery",
+     "args": {
+      "query": "NowPlaying"
+     }
+    }
+   ],
+   "guards": "Query enum coverage."
+  },
+  {
+   "id": "multi-action",
+   "transcript": "Open Safari, then tell me my battery",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openApp",
+     "args": {
+      "name": "Safari"
+     }
+    },
+    {
+     "action": "answerQuery",
+     "args": {
+      "query": "Battery"
+     }
+    }
+   ],
+   "guards": "Two actions in one utterance, in order. Tool calling returns a native array; JSON mode needs our own array shape, so this is where arm B is most likely to differ."
+  },
+  {
+   "id": "out-of-scope-weather",
+   "transcript": "What's the weather tomorrow",
+   "source": "constructed",
+   "expect": [],
+   "guards": "Nothing matches — must return an empty action list, not force a bad fit into open_app. Tool calling gets this free via tool_choice auto; JSON mode needs an explicit empty-array convention in the prompt."
+  },
+  {
+   "id": "out-of-scope-email",
+   "transcript": "Check my email for anything from a recruiter",
+   "source": "constructed",
+   "expect": [],
+   "guards": "Plausible-sounding but genuinely unbuilt capability. Tempting for a model to map onto open_app('Mail'), which would be wrong — the user asked to search, not to launch."
+  },
+  {
+   "id": "web-open-plain",
+   "transcript": "open youtube",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "YouTube"
+     }
+    }
+   ],
+   "guards": "Bare open, no query, no flags. The simplest shape."
+  },
+  {
+   "id": "web-search-amazon",
+   "transcript": "Search for top rated iPhone 15 covers on Amazon",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Amazon"
+     }
+    }
+   ],
+   "guards": "Widened after three runs scored 68/66/69 with this case flipping twice. Since the tool trim the model sometimes answers a search by putting the results URL in page_url alongside site — the same page either way. That form is now collapsed back to site+query in parseAction, so production is identical; the harness does not run parseAction and cannot see it, which is the third time that blindness has cost a cycle. Both shapes are correct AT THE MODEL LAYER, which is the only layer this eval measures, so the case asserts the site and leaves the query to eval/catalog-checks, whose nine decomposition cases pin the rebuilt URL exactly."
+  },
+  {
+   "id": "web-search-person",
+   "transcript": "look up Pranav Hari on LinkedIn",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "LinkedIn",
+      "query": "Pranav Hari"
+     }
+    }
+   ],
+   "guards": "Person search. The whole query must land in `query`, not leak into `site`."
+  },
+  {
+   "id": "web-country-named",
+   "transcript": "Search for iPhone 15 Pro on Apple India website",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "apple.com/in/iphone"
+     }
+    }
+   ],
+   "guards": "Expectation corrected twice. First I expected site 'Apple India'; the model strips the country itself and region detection handles it. Then I expected search results; the model returns the iPhone 15 Pro product page, which is verified real and plainly better than Apple's own search. The lesson recorded rather than the guess."
+  },
+  {
+   "id": "web-play-flag",
+   "transcript": "play a Kendrick Lamar song on youtube",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "YouTube",
+      "play": true
+     }
+    }
+   ],
+   "guards": "play must be true here and absent for search — the verb is the only difference. Query wording is deliberately NOT scored: 'Kendrick Lamar' and 'Kendrick Lamar song' both work, and pinning the exact phrasing would fail on a difference that changes nothing."
+  },
+  {
+   "id": "web-search-not-play",
+   "transcript": "search lo-fi music on youtube",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "YouTube",
+      "play__absent": true
+     }
+    }
+   ],
+   "guards": "Same widening as web-search-amazon. What this case actually guards is that 'search' does not become playback, so `play` must stay absent — that assertion is kept and is the part worth protecting; the query form is covered by catalog-checks."
+  },
+  {
+   "id": "web-deeplink-apple",
+   "transcript": "open the iPhone page on Apple India",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "apple.com/in/iphone"
+     }
+    }
+   ],
+   "guards": "Asserts only on the URL. The site label is unused when a page_url validates, and the model returns 'Apple India' or 'Apple' interchangeably — both resolve correctly, so pinning the label made a passing behaviour look like a regression."
+  },
+  {
+   "id": "web-deeplink-notion",
+   "transcript": "show me Notion's pricing page",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Notion",
+      "page_url__contains": "notion.so/pricing"
+     }
+    }
+   ],
+   "guards": "NEW: same shape on a site with no search URL at all, where a deep link is the only way to be useful."
+  },
+  {
+   "id": "web-vertical-people",
+   "transcript": "look for people from Razorpay on LinkedIn",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "LinkedIn",
+      "vertical": "people"
+     }
+    }
+   ],
+   "guards": "The People tab, not the mixed All tab. Today this lands on /search/results/all/ which buries people under posts and companies."
+  },
+  {
+   "id": "web-vertical-people-role",
+   "transcript": "look for product managers from Razorpay on LinkedIn",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "LinkedIn",
+      "vertical": "people"
+     }
+    }
+   ],
+   "guards": "Role plus company. Same vertical as above — the difference is only the keywords, which is why query wording is not scored."
+  },
+  {
+   "id": "web-vertical-jobs",
+   "transcript": "find product manager jobs on LinkedIn",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "LinkedIn",
+      "vertical": "jobs"
+     }
+    }
+   ],
+   "guards": "Jobs is a different URL entirely (/jobs/search/), not a tab on the same one."
+  },
+  {
+   "id": "web-vertical-images",
+   "transcript": "show me images of golden retrievers",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Google",
+      "vertical": "images"
+     }
+    }
+   ],
+   "guards": "No site named and a vertical implied by the word images. Two inferences at once."
+  },
+  {
+   "id": "web-vertical-repos",
+   "transcript": "find swift concurrency repos on github",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "GitHub",
+      "vertical": "repositories"
+     }
+    }
+   ],
+   "guards": "GitHub defaults to a mixed result page; repositories is usually what is meant."
+  },
+  {
+   "id": "web-page-via-search-verb",
+   "transcript": "Search for iPhone page in Apple India website",
+   "source": "live-log",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "apple.com/in/iphone"
+     }
+    }
+   ],
+   "guards": "THE case that failed live while the eval passed. Verbatim transcript. The word 'search' must not stop it reaching the canonical page — routing on the verb rather than on whether a real page exists was the bug."
+  },
+  {
+   "id": "web-personal-orders",
+   "transcript": "show my Amazon orders",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "order"
+     }
+    }
+   ],
+   "guards": "Your own page on a site — a whole category missed until now. Orders, messages, subscriptions are canonical URLs that exist for every signed-in user."
+  },
+  {
+   "id": "web-personal-messages",
+   "transcript": "open my LinkedIn messages",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "messaging"
+     }
+    }
+   ],
+   "guards": "Same category, different site."
+  },
+  {
+   "id": "web-no-site-google",
+   "transcript": "what's the population of India",
+   "source": "constructed",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Google"
+     }
+    }
+   ],
+   "guards": "No site named. Agreed default is Google rather than refusing."
+  },
+  {
+   "id": "web-personal-linkedin-messages",
+   "transcript": "open my LinkedIn messages",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "linkedin.com/messaging"
+     }
+    }
+   ],
+   "guards": "Failed live: landed on LinkedIn search with 'my LinkedIn messages' as the keyword. The model had no page_url and no vertical matched, so it fell through to the ordinary search template."
+  },
+  {
+   "id": "web-personal-amazon-orders-region",
+   "transcript": "show my Amazon orders",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Amazon"
+     }
+    }
+   ],
+   "guards": "Asserts only that the model identifies the site. The URL is not its job — it cannot see the Mac's region, so it will always write amazon.com. Our own table supplies the region-correct path and overrides whatever URL the model offered. That half is covered by eval/catalog-checks, which tests code rather than a model. Expecting amazon.in here was asking the model for knowledge it does not have."
+  },
+  {
+   "id": "web-personal-youtube-subs",
+   "transcript": "open my YouTube subscriptions",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "page_url__contains": "youtube.com/feed/subscriptions"
+     }
+    }
+   ],
+   "guards": "YouTube has no regional variant, so this isolates the personal-page lookup from the region rewrite."
+  },
+  {
+   "id": "web-personal-not-personal",
+   "transcript": "search for wireless mouse on Amazon",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Amazon"
+     }
+    }
+   ],
+   "guards": "Negative case for the personal-page table. An ordinary product search must not be captured by it — the table matches only when the query reduces to a bare intent word like 'orders' or 'cart'."
+  },
+  {
+   "id": "reminder-with-time",
+   "transcript": "Remind me to call the bank at 4pm",
+   "expect": [
+    {
+     "action": "createReminder",
+     "args": {
+      "title__contains": "bank",
+      "due__present": true
+     }
+    }
+   ],
+   "guards": "The title must not carry the time. 'call the bank at 4pm' as a title makes a reminder that reads wrong forever, and the time is already in its own field."
+  },
+  {
+   "id": "reminder-no-time",
+   "transcript": "Remind me to call the bank",
+   "expect": [
+    {
+     "action": "createReminder",
+     "args": {
+      "title__contains": "bank",
+      "due__absent": true
+     }
+    }
+   ],
+   "guards": "The model must NOT invent a time. An invented due date is worse than none: the reminder fires at an hour nobody chose, and the follow-up question exists precisely to fill this in."
+  },
+  {
+   "id": "reminder-relative-time",
+   "transcript": "Remind me to submit the form tomorrow morning",
+   "expect": [
+    {
+     "action": "createReminder",
+     "args": {
+      "title__contains": "form",
+      "due__present": true
+     }
+    }
+   ],
+   "guards": "Relative phrasing only resolves because the current local time is in the system prompt. If this regresses, check that line is still being sent."
+  },
+  {
+   "id": "reminder-cancel-that",
+   "transcript": "Cancel that",
+   "expect": [
+    {
+     "action": "cancelReminder",
+     "args": {
+      "name__absent": true
+     }
+    }
+   ],
+   "guards": "No name means the one just created. A name invented here would send the coordinator searching for a reminder nobody mentioned."
+  },
+  {
+   "id": "reminder-cancel-named",
+   "transcript": "Cancel the dentist reminder",
+   "expect": [
+    {
+     "action": "cancelReminder",
+     "args": {
+      "name__contains": "dentist"
+     }
+    }
+   ],
+   "guards": "The word 'reminder' is noise and is stripped before matching, so it may or may not appear in the name — only 'dentist' matters."
+  },
+  {
+   "id": "reminder-not-a-reminder",
+   "transcript": "Remind me what my battery is at",
+   "expect": [
+    {
+     "action": "answerQuery",
+     "args": {
+      "query": "Battery"
+     }
+    }
+   ],
+   "guards": "'Remind me' used conversationally, not as a command. Creating a reminder titled 'what my battery is at' would be a confident misread of a question."
+  },
+  {
+   "id": "settings-volume-synonym",
+   "transcript": "Open volume settings",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane__contains": "sound"
+     }
+    }
+   ],
+   "guards": "The catalog has no pane called 'volume' — the model translates it to Sound and that is correct. Added after a rule was written that refused exactly this: it compared the model's pane against the spoken words and rejected anything with no shared root, which caught 'banana' and also broke volume, brightness, dark mode, screensaver, microphone, camera, time zone and firewall. Nine real intents for one nonsense one. The rule was reverted; this case exists so it cannot come back unnoticed."
+  },
+  {
+   "id": "settings-brightness-synonym",
+   "transcript": "Open brightness settings",
+   "expect": [
+    {
+     "action": "openSystemSetting",
+     "args": {
+      "pane__contains": "display"
+     }
+    }
+   ],
+   "guards": "Same class as settings-volume-synonym. 'brightness' is not in the catalog; Displays is the right answer and shares no word with what was said."
+  },
+  {
+   "id": "web-flipkart",
+   "transcript": "Search for Type-C headphone on Flipkart",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Flipkart",
+      "query__contains": "headphone"
+     }
+    }
+   ],
+   "guards": "Verbatim from a live session where it was refused. Correct behaviour for an unknown site, and a US-centric gap: the catalog had Amazon and no Flipkart while the user is in India. URL confirmed in a browser — curl gets 403 from every Indian retailer, so a 403 proves nothing."
+  },
+  {
+   "id": "web-meesho-misheard",
+   "transcript": "Search for sunglasses on Misho",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "Meesho",
+      "query__contains": "sunglasses"
+     }
+    }
+   ],
+   "guards": "'Misho' is what the transcriber produces for Meesho, and it is the verbatim live transcript. The model maps it back to Meesho by itself once the site is in the vocabulary; the alias covers the case where it passes the misheard spelling straight through instead. First written with a site__contains matcher of 'isho', which 'Misho' satisfies and 'Meesho' does not — the expectation was wrong, not the routing."
+  },
+  {
+   "id": "meeting-join",
+   "transcript": "Join my next meeting",
+   "expect": [
+    {
+     "action": "joinMeeting"
+    }
+   ],
+   "guards": "The headline command. Zero-parameter tool, so there is nothing to malform."
+  },
+  {
+   "id": "meeting-join-casual",
+   "transcript": "Hop on my call",
+   "expect": [
+    {
+     "action": "joinMeeting"
+    }
+   ],
+   "guards": "Phrasing variety. FastRoute covers the common wordings locally; this proves the model still handles the ones it does not."
+  },
+  {
+   "id": "meeting-next",
+   "transcript": "What's my next meeting",
+   "expect": [
+    {
+     "action": "whatsNextMeeting"
+    }
+   ],
+   "guards": "Reads the meeting back without joining it."
+  },
+  {
+   "id": "meeting-next-when",
+   "transcript": "When is my next call",
+   "expect": [
+    {
+     "action": "whatsNextMeeting"
+    }
+   ],
+   "guards": "Asks the same question about time rather than identity; same tool."
+  },
+  {
+   "id": "meeting-no-create",
+   "transcript": "Create a meeting tomorrow at 3",
+   "expect": [],
+   "guards": "MUST match nothing. Calendar writes are out of scope by an explicit design decision — a misheard word becomes a real event other people see. The danger is not a wrong meeting tool but an improvised create_reminder, which would silently turn a calendar request into a reminder."
+  },
+  {
+   "id": "meeting-no-cancel",
+   "transcript": "Cancel my next meeting",
+   "expect": [],
+   "guards": "MUST NOT route to cancel_reminder. Cancelling a meeting and cancelling a reminder are different destructive acts, and the reminder tool would happily search for a reminder named 'next meeting'."
+  },
+  {
+   "id": "meeting-no-list",
+   "transcript": "What meetings do I have today",
+   "expect": [
+    {
+     "action": "whatsNextMeeting"
+    }
+   ],
+   "guards": "DECISION REVERSED 2026-08-12, deliberately. The architecture had this declining rather than half-answering through next_meeting. Live experience overturned it: the wording that made the model refuse a list also made it refuse \"check my calendar\", which returned nothing at all and read as the feature being broken. Two attempts at wording that split the two failed in opposite directions. Answering with the next meeting is a partial answer to \"what do I have today\", and a partial answer beats silence — the person can see their calendar for the rest. The parked list surface is still parked; this is about not punishing an ordinary phrasing to protect a nicety."
+  },
+  {
+   "id": "meeting-not-a-meeting",
+   "transcript": "Remind me about the standup at 9am",
+   "expect": [
+    {
+     "action": "createReminder",
+     "args": {
+      "due__present": true
+     }
+    }
+   ],
+   "guards": "Contains meeting words but is a reminder. Guards the boundary from the other side — the meeting tools must not attract everything that mentions a standup."
+  },
+  {
+   "id": "web-play-in-youtube",
+   "transcript": "Play a lo-fi song in YouTube",
+   "expect": [
+    {
+     "action": "openWebsite",
+     "args": {
+      "site": "YouTube",
+      "play": true
+     }
+    }
+   ],
+   "guards": "Verbatim from a live failure. 'in YouTube' rather than 'on YouTube' — the model answered with a page_url of the YouTube homepage instead of site+query+play, so it opened the front page and played nothing. web-play-flag covers the 'on' phrasing and passed throughout, which is why nothing caught this."
+  },
+  {
+   "id": "web-play-generic",
+   "transcript": "play a song in youtube",
+   "expect": [],
+   "guards": "Declines, and that is accepted rather than desired. \"play a song\" names nothing to play — no artist, no genre, no title — so any choice would be invented. The phrasing that matters, \"play a lo-fi song in YouTube\", is covered by web-play-in-youtube and works. If this turns out to be common, the better answer is opening YouTube's music page rather than inventing a track, and that is a product decision nobody has made."
+  },
+  {
+   "id": "meeting-check-calendar",
+   "transcript": "Check my calendar",
+   "expect": [
+    {
+     "action": "whatsNextMeeting"
+    }
+   ],
+   "guards": "Live failure: answered nothing at all. The next_meeting description was tightened to refuse list-shaped questions after 'what meetings do I have today' half-answered — and that tightening reached too far, taking an ordinary way of asking what is next with it. The line has to reject a list without rejecting the question."
+  },
+  {
+   "id": "share-named-with-note",
+   "transcript": "send this to Priya, tell her this is the pricing article I mentioned",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "Priya"
+     }
+    }
+   ],
+   "guards": "The headline case from DESIGN-whatsapp-share.md. The note is scored loosely — its wording is the model's, its recipient is not. The URL must NOT appear in any argument: decision 2 keeps it out of the prompt entirely, so the model has no way to emit one."
+  },
+  {
+   "id": "share-named-bare",
+   "transcript": "send this to Rohan",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "Rohan"
+     }
+    }
+   ],
+   "guards": "Decision 8 — bare send with no channel word still routes to WhatsApp, because it is the only named-person target in v1 and decision 4 makes a wrong route harmless."
+  },
+  {
+   "id": "share-self-whatsapp",
+   "transcript": "save this to my WhatsApp",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "self",
+      "target": "whatsapp"
+     }
+    }
+   ],
+   "guards": "Self send with an explicit target. Explicit words beat the stored default (decision 7)."
+  },
+  {
+   "id": "share-unnamed",
+   "transcript": "share this",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "recipient": "unnamed"
+     }
+    }
+   ],
+   "guards": "No recipient and no target — the app asks WhatsApp-or-AirDrop (decision 7). The router's job is only to recognise it as a share."
+  },
+  {
+   "id": "share-explicit-airdrop",
+   "transcript": "AirDrop this to my phone",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "target": "airdrop"
+     }
+    }
+   ],
+   "guards": "Explicit target. Decision 6 — AirDrop is self/unnamed only, which the app enforces; the router only carries the spoken target."
+  },
+  {
+   "id": "share-default-always",
+   "transcript": "share this on WhatsApp, always",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "sharePage",
+     "args": {
+      "target": "whatsapp",
+      "makeDefault": true
+     }
+    }
+   ],
+   "guards": "Decision 7's one-breath default. \"always\" sets the standing choice; without it the answer is for this send only."
+  },
+  {
+   "id": "share-negative-email-send",
+   "transcript": "send this email to Priya",
+   "source": "design-doc",
+   "expect": [],
+   "guards": "MUST NOT become a page share. Note: the design words this as 'in Mail context', but the router receives only the transcript (route(transcript), no AppContext), so app context cannot be expressed in a test case. The discriminating signal here is the word 'email', which is what this case actually tests. Gap recorded in review/LEDGER.md."
+  },
+  {
+   "id": "share-negative-open-whatsapp",
+   "transcript": "open WhatsApp",
+   "source": "design-doc",
+   "expect": [
+    {
+     "action": "openApp",
+     "args": {
+      "name": "WhatsApp"
+     }
+    }
+   ],
+   "guards": "Must stay openApp. Naming the app is not asking to share a page — the regression this guards is a new tool stealing an existing one's cases."
+  },
+  {
+   "id": "share-negative-send-message",
+   "transcript": "send Priya a message saying I'll be late",
+   "source": "design-doc",
+   "expect": [],
+   "guards": "Messaging a person is not sharing the page. v1 has no send-a-message tool, so the correct answer is no action rather than a share with an invented note."
+  }
+ ]
 }

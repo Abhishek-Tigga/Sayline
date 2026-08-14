@@ -70,6 +70,12 @@ final class GroqTranscriber: Transcriber {
         // Forcing English removes that failure mode outright, no
         // latency cost.
         appendField(name: "language", value: "en")
+        // The vocabulary hint (DESIGN-vocabulary-biasing.md). Absent
+        // entirely when there is nothing to send — fail open, never
+        // block: a biasing failure must not cost a dictation.
+        if let glossary = VocabularyBiasBuilder.currentGlossary {
+            appendField(name: "prompt", value: glossary)
+        }
 
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)

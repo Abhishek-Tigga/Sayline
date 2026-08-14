@@ -6836,3 +6836,98 @@ Opus's, and only after running something.
 command (Space during hold — the space must not appear in the focused
 app). Check `~/Library/Logs/Sayline/sayline.log` for "listen-only" at
 start and no unexpected disables after both.
+
+---
+
+### BUILD · Share the current page — router and deterministic core land; delivery is unverified
+2026-08-14 · Opus · `claimed-fixed`, with an explicit not-done list
+
+Built against `DESIGN-whatsapp-share.md` and
+`review/FABLE-PROMPT-whatsapp-share.md`.
+
+### A hole in the design, surfaced rather than improvised around
+
+The prompt requires a negative case: *"send this email to Priya" in Mail
+context must not become a share*. **The router cannot express it.** It is
+called as `route(transcript)` — one string, no `AppContext` — so the model
+sees identical input in Mail and in Safari. The case is in the test set
+worded from the transcript alone, because the discriminating signal is the
+word "email", and its `guards` field records why. Giving the router app
+context is a design change with its own privacy surface; it was not
+smuggled into a build commit.
+
+### What was built
+
+**Router.** Nine test cases first, then the tool. `share_page` emits
+recipient / note / target / make_default and **no URL** — decision 2 means
+the model never receives the page address, so the case has nowhere to put
+one. `AgentAction.sharePage` carries the same four, with a comment saying
+that a URL field appearing there would mean the privacy line had moved.
+
+**Deterministic core** (`ShareLink.swift`, pure Foundation) with
+`eval/whatsapp-checks` — 33 cases. Recipient resolution, mobile-label
+preference, the two-Priyas and two-numbers ambiguities, missing country
+code, and encoding: emoji, newlines, and the one that matters —
+`urlQueryAllowed` would leave `&` and `?` intact and a shared link
+carrying `?utm=a&b=c` would split into extra parameters and lose its tail.
+Name matching is whole-name-part, never substring, so "Ann" cannot match
+"Joanna" — the wrong-recipient failure is the worst this feature has.
+
+**Capture at the agent flag** (`PageCapture`, `SharePageState`), per
+decision 3 — on the Space chord, not hotkey-down, so a plain dictation
+fires no Apple Event. Cleared at the start of every hold. Safari and
+Chromium dialects; Firefox and non-browsers fail with the design's
+messages. **The log records the host only**, not the URL: the log file is
+meant to be handed over.
+
+**Delivery** (`SharePageExecutor`): Contacts read locally, `whatsapp://`
+with `wa.me` fallback, AirDrop via `NSSharingService`, self-number and
+default-target storage. Prefill only — no path constructs a send.
+
+### Numbers
+
+```
+router eval        before  75/81 (93%)   after  79/81 (98%)
+prompt+tools       3320 tokens -> 3604 (+284, +8.6%)
+suites             11/11 green (whatsapp-checks is new, 33 cases)
+work-mode calib    14/15, unchanged
+```
+
+Two cases still fail, both the barest phrasings — "send this to Rohan"
+and "share this" — and they are **unstable across runs**: the same build
+scored 76, then 79, on consecutive runs at the same settings. The
+instability is worth more attention than the two failures; a tool
+description change should be measured over repeated runs, not one.
+
+### Not done, and not claimed
+
+- **Nothing was tested by hand.** Step 8 of the prompt — a real send per
+  browser, the Firefox and non-browser failures, the two-match follow-up
+  live, "always" persisting — is untouched. Delivery opens WhatsApp with
+  the user's account and sends Apple Events to their browser; that is
+  theirs to run, not mine to trigger unasked.
+- **The follow-up questions are not wired to `FollowUp`.** The executor
+  returns the question text in `lastMessage` and returns false; nothing
+  yet asks it, waits, or applies the answer. So the two-match case, the
+  country-code case, the first-time WhatsApp-or-AirDrop question and the
+  self-number capture all currently fail visibly instead of asking. This
+  is the largest gap and it is decision 5's mechanism, so it should be
+  the next commit.
+- **No Settings control** for "Share links via: Ask / WhatsApp /
+  AirDrop" (decision 7). The stored value exists and is read; nothing
+  displays or edits it.
+- Per-contact country-code persistence is not implemented.
+
+### One more instance of a known class
+
+`eval/run_eval.py`'s source-compiled helper keeps a hand-maintained file
+list; it broke on `ShareLink.swift` — the **fifth** time. The
+`fastroute-checks` compile line broke the same way, because `AgentAction`
+now depends on `ShareLink`. Both fixed here, both in this commit per the
+add-a-suite rule, and both are the argument for BACKLOG's
+`--parse-actions` migration.
+
+Verification suggestions: re-run the eval three times and see whether the
+94–98% spread reproduces; check that no `share_page` argument ever
+carries a URL; confirm by hand that a plain dictation fires no Apple
+Event at the browser.
