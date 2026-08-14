@@ -196,6 +196,73 @@ final class WorkModeCleaner {
         }
     }
 
+    /// Three worked examples, shown to the model before the transcript.
+    ///
+    /// **These are the user's own writing** — three of the fifteen rewrites
+    /// they pasted in taste round 1 as "what I actually wanted", copied
+    /// character-for-character from `eval/work-mode/ideals-normalized.json`
+    /// with one edit: em-dashes replaced, because an example teaches every
+    /// tic it contains and the em-dash is banned two rules above.
+    ///
+    /// **Shipped on the user's blind verdict, against the scorer's.** The
+    /// mechanical taste scorer rejected few-shots twice, most recently at
+    /// eight points behind on its sendable proxy. A blind A/B over six
+    /// fresh dictations — randomized assignment, key sealed until the
+    /// verdicts were in — went 4–0 to this arm with two honest ties, and
+    /// the user's reasons named real differences: the bare prompt deleted a
+    /// spoken "Good morning everyone" (decapitation, taste round 1's
+    /// failure #1) and lost a colon and a comma the examples carry. The
+    /// bare arm also broke a fact the examples arm did not, promoting "I
+    /// would like to hand it over" to "I will".
+    ///
+    /// Cost: +49% input tokens, and measured 195 ms FASTER in wall clock on
+    /// the six (1778 ms vs 1973 ms median) — examples appear to shorten the
+    /// model's search rather than lengthen it. See `review/LEDGER.md`, and
+    /// the disclosed randomization defect there before treating 4–0 as six
+    /// independent trials.
+    ///
+    /// One set for every context, exactly as tested. Splitting them by
+    /// context would ship a configuration nothing measured.
+    static let examples: [(spoken: String, written: String)] = [
+        // E1 — the email shell, bad news in the first line.
+        ("hi Nikhil, so um about the integration timeline, look I have to be straight with you, the March date isn't going to happen, we found a data issue on our side that needs maybe two more weeks, um the new realistic date is mid April, I know that's not what you wanted to hear, happy to get on a call this week if that helps",
+         """
+         Hi Nikhil,
+
+         I wanted to be upfront about the integration timeline, the March date is no longer realistic. We found a data issue on our side that will likely take another two weeks to resolve.
+
+         The new realistic target is mid-April. I know that's not what you were hoping to hear, and I'm happy to get on a call this week to discuss it if helpful.
+
+         Best,
+         Abhishek
+         """),
+        // T4 — chat register: the opener survives, the position stays theirs.
+        ("so heads up, um the vendor sandbox went down this morning and their support says forty eight hours, which honestly kills our Thursday demo, I think we either fake the vendor responses for the demo or we push it, I'd rather fake it, wanted you to know now not Wednesday night",
+         """
+         Heads up, the vendor sandbox went down this morning, and their support says it could take ~48 hours. That pretty much kills our Thursday demo.
+
+         I think we have two options: mock the vendor responses for the demo or push it. I'd lean towards mocking them so we can still do the demo.
+
+         Wanted to flag it now rather than Wednesday night.
+         """),
+        // E4 — the counted list, as a numbered list with an intro line.
+        ("hi so the weekly update, um three things really, the launch prep is on track, QA finishes Wednesday and we're go for Tuesday, second thing the hiring loop, we did four onsites, two strong yes candidates, I'll send the debrief separately, and third, the thing I'm worried about, the vendor contract renewal is stuck with legal and if it slips past Friday it starts blocking the roadmap work, that one needs your help",
+         """
+         Weekly update, three things:
+
+         1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.
+         2. Hiring: We did 4 onsites and have 2 strong yes candidates. I'll send the debrief separately.
+         3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work. This one needs your help.
+         """),
+    ]
+
+    /// The examples as chat messages, in the order the API wants them.
+    private static var exampleMessages: [[String: String]] {
+        examples.flatMap { [["role": "user", "content": $0.spoken],
+                            ["role": "assistant", "content": $0.written
+                                .trimmingCharacters(in: .whitespacesAndNewlines)]] }
+    }
+
     /// The exact system message a rewrite would receive, minus the pinned
     /// facts (which are per-utterance). Exposed for `--dump-config` so the
     /// eval reads the shipping prompt instead of a copy.
@@ -236,7 +303,9 @@ final class WorkModeCleaner {
             .joined(separator: "\n\n")
 
         let first = try await withTimeout(Self.timeout) {
-            try await self.ask(system: system, messages: [["role": "user", "content": raw]])
+            try await self.ask(system: system,
+                               messages: Self.exampleMessages
+                                   + [["role": "user", "content": raw]])
         }
         let firstViolations = FactGuard.verify(raw: raw, rewrite: first, context: context)
         if firstViolations.isEmpty {
@@ -250,7 +319,7 @@ final class WorkModeCleaner {
             + firstViolations.map(\.kind).joined(separator: ", "))
         let why = firstViolations.map(\.explanation).joined(separator: "; ")
         let retry = try await withTimeout(Self.timeout) {
-            try await self.ask(system: system, messages: [
+            try await self.ask(system: system, messages: Self.exampleMessages + [
             ["role": "user", "content": raw],
             ["role": "assistant", "content": first],
             ["role": "user", "content":

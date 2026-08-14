@@ -70,10 +70,34 @@ def _load_prompt(context="workPrompt"):
 SYSTEM = _load_prompt()
 
 
-# Few-shot examples, empty unless --shots. Module-level so `rewrite` keeps
-# one message-building path: an arm that assembles its payload differently
-# from the arm it is compared against is not a comparison.
-EXAMPLES = []
+def _load_examples():
+    """The few-shot examples, read from the binary like the prompt is.
+
+    They ship as of 2026-08-14 (the user's blind A/B, 4-0), so they are part
+    of every production request and the default here is ON. Reading them
+    from `--dump-config` rather than rebuilding them from `ideals-*.json`
+    keeps one copy: the eval's old `--shots` arm built a *different* set
+    (N2/N1/E1) from the one that shipped (E1/T4/E4), which would now score
+    a payload production never sends.
+    """
+    apps = sorted(
+        pathlib.Path.home().glob(
+            "Library/Developer/Xcode/DerivedData/Sayline-*/Build/Products/Debug/Sayline.app"),
+        key=lambda p: p.stat().st_mtime, reverse=True)
+    out = subprocess.run([str(apps[0] / "Contents/MacOS/Sayline"), "--dump-config"],
+                         capture_output=True, text=True)
+    config = json.loads(out.stdout)
+    if "workExamples" not in config:
+        sys.exit("binary is older than this harness — no 'workExamples' in --dump-config")
+    return [m for e in config["workExamples"]
+            for m in ({"role": "user", "content": e["spoken"]},
+                      {"role": "assistant", "content": e["written"]})]
+
+
+# Module-level so `rewrite` keeps one message-building path: an arm that
+# assembles its payload differently from the arm it is compared against is
+# not a comparison.
+EXAMPLES = _load_examples()
 
 
 def rewrite(model, url, key, raw, pinned, correction=None):
@@ -139,15 +163,19 @@ def main():
     # Fable's consequence ruling, 2026-08-14: the first few-shot rejection
     # was unsound because every extra failure was `longer-than-speech`, the
     # class the ceiling ruling reclassified. Re-run on the full 31.
-    ap.add_argument("--shots", action="store_true",
-                    help="prepend the few-shot examples from the ideals")
+    # The examples now ship, so the default arm includes them. `--bare`
+    # drops them, which is the only thing left worth measuring separately:
+    # it is the control the A/B was run against.
+    ap.add_argument("--bare", action="store_true",
+                    help="drop the shipping few-shot examples (pre-2026-08-14 control)")
     args = ap.parse_args()
 
-    if args.shots:
-        import taste_run
-        globals()["EXAMPLES"] = taste_run.shots()
-        print(f"few-shot arm: {len(EXAMPLES)//2} examples, "
-              f"~{sum(len(m['content']) for m in EXAMPLES)//4} extra tokens")
+    if args.bare:
+        globals()["EXAMPLES"] = []
+        print("bare arm: examples dropped")
+    else:
+        print(f"shipping arm: {len(EXAMPLES)//2} examples, "
+              f"~{sum(len(m['content']) for m in EXAMPLES)//4} tokens")
 
     cases = json.loads(TRANSCRIPTS.read_text())
     print(f"{len(cases)} transcripts "

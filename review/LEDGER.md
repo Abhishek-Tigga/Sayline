@@ -6147,3 +6147,270 @@ no punctuation. Any future number or format rule should take at least one
 case from `~/Library/Logs/Sayline/sayline.log` before it is called done.
 
 Ran: 9/9 suites green, build clean.
+
+---
+
+## WORK MODE · Blind A/B RESULT — few-shots win 4–0, the user overrules the scorer
+2026-08-14 · Fable · user-tested, `claimed-fixed`, one methodology defect disclosed
+
+Six fresh transcripts the user dictated after the round opened. Verdicts
+exported to file, then the key was opened. Result against the rule written
+down before any transcript ran:
+
+```
+pair  A was    B was      picked   winner
+AB1   BARE     FEW-SHOT   B        FEW-SHOT
+AB2   BARE     FEW-SHOT   B        FEW-SHOT
+AB3   BARE     FEW-SHOT   tie      TIE
+AB4   BARE     FEW-SHOT   B        FEW-SHOT
+AB5   BARE     FEW-SHOT   tie      TIE
+AB6   BARE     FEW-SHOT   B        FEW-SHOT
+
+few-shot 4   bare 0   tie 2
+```
+
+**Pre-committed bar met: ≥4 of 6 to the few-shot side. Few-shots ship.**
+And per the same pre-commitment, recorded permanently: **user judgment
+overrules the mechanical taste scorer on taste questions.** The scorer
+rejected few-shots twice, most recently at "8 points behind on the
+sendable proxy". The user, blind, picked them four times out of four
+decided pairs and never once picked bare. The scorer was measuring
+something else.
+
+### METHODOLOGY DEFECT, disclosed rather than buried
+**`SystemRandom` put BARE in position A on all six pairs.** Probability
+1/64 (~1.6%). Position and arm were perfectly correlated, so the blind
+did not do the job it was built to do: the user picked "B" every time
+they picked at all, and a pure position bias would produce this exact
+result. The randomization was correct; the draw was not.
+
+**What rescues it is the notes, and only the notes.** The user wrote
+substantive reasons, and each one describes a real, verifiable difference
+in the text — so they were reading content, not counting positions:
+
+- AB6: *"Option A completely kills the Good Morning Everyone text and this
+  starts from Thank you all for joining today. Which is not good."*
+  Verified: bare's output begins "Thank you all for joining"; the spoken
+  "Good morning everyone" is gone. Few-shot keeps it. **This is
+  decapitation — failure pattern #1 from taste round 1 — reproduced live
+  by the bare prompt on an unseen transcript.**
+- AB4: *"colon after quick weekly update and there is a comma after thanks
+  before everyone."* Verified exactly: bare `Quick weekly update.` /
+  `Thanks everyone.`; few-shot `Quick weekly update:` / `Thanks,
+  everyone.`
+- AB2: *"Better structure, better pacing, and overall better words."*
+- AB3, AB5: *"Both are the same"* — and they nearly are. The honest ties
+  are themselves evidence against blanket position bias: a user picking
+  by position picks, they do not stop to call two versions identical.
+
+The defect is real and the result stands, but it stands **on the notes,
+not on the tally**. Anyone re-reading this should treat the 4–0 as
+corroborated-by-reasons rather than as six independent blind trials.
+Fix for the next round, cheap and obvious: force a balanced assignment
+(three of each position, shuffled) instead of six independent coin flips.
+
+### The fact column, which has precedence over taste
+Round-2 pre-ruling: any invented fact fails the round regardless of taste.
+**One violation, and it is on the BARE arm** — AB6, `invented-commitment`:
+the user said "I *would like to* hand it over to the team"; bare wrote
+"I *will* hand it over". A hedge promoted to a commitment. Few-shot wrote
+"I'll hand it over" and the guard passed it (the contraction of the same
+commitment; arguable, and noted). **Zero violations on the few-shot arm
+across all six.** The arm the user chose is also the arm that broke
+nothing.
+
+### Latency — the pre-committed bar is breached by BOTH arms
+```
+             rewrite median    total release->text (+0.41s transcription)
+BARE            1973 ms                 ~2.38 s
+FEW-SHOT        1778 ms                 ~2.19 s
+tokens (mean)   bare 970  ·  few-shot 1445   (+49%)
+```
+**Few-shots are FASTER than bare here**, so the trim-to-two-examples
+clause does not apply — it exists to stop few-shots buying taste with
+latency, and they did not. But the ≤1.5 s bar fails on both arms, so it
+cannot be used to reject few-shots without also rejecting the incumbent.
+
+The cause is input length, not the prompt: these are real dictations of
+150+ words where the 31-transcript set averages far less. AB3 (26 words)
+came back in 921/1168 ms; AB1 and AB2 (151/154 words) took 2.3–3.1 s.
+**Recorded as an open item in its own right: work-mode latency scales
+with dictation length and long dictations are ~2.4 s today, well over the
+~1.5 s target, on the shipping configuration.** That is a pre-existing
+condition this round measured rather than caused, and it is the honest
+answer to "a new feature must not make the system slower" — this one made
+it 195 ms faster.
+
+### Ship list
+1. **Few-shots ship** — E1, T4, E4 from `ideals-normalized.json`, the
+   user's own text, paired with their round-1 scripts. Cost +49% input
+   tokens, measured faster in wall clock on this set.
+2. **Open, from the winner's own defect (AB1).** The user's note on the
+   version they *picked*: *"Hey Sarah, hope your week is going okay is in
+   the same line whereas the standard is you write Hey Sarah, then leave a
+   paragraph, then start."* Correct — the greeting should be its own line
+   with a blank line after. The E1 few-shot has exactly that shape and the
+   model still merged it here. Prompt-rule work, not a few-shot failure.
+3. Open: latency on long dictations (above).
+4. Open, unchanged: sign-off renders inline, wants deterministic
+   post-processing.
+
+Ran: `blind_ab.py` over six unseen transcripts, both arms, temperature 0,
+guard-verified per pair; key sealed until verdicts were exported; every
+user note checked against the actual output text.
+
+Not verified by me: whether the four picks would survive a balanced
+assignment. Only a re-run answers that, and the notes are the reason I am
+not calling for one.
+
+---
+
+### WORK MODE · Few-shots built and shipped; the harness now reads them from the binary
+2026-08-14 · Fable · `claimed-fixed`
+
+Implementing the A/B verdict. `WorkModeCleaner.examples` holds the three
+user rewrites (E1, T4, E4) as spoken→written pairs, sent as chat turns
+before the transcript on **both** the first attempt and the corrective
+retry — the retry had to be included or a rescued rewrite would come from
+a different configuration than the one that was judged.
+
+**One set for every context, exactly as tested.** Splitting them by
+context (email examples for email, chat for chat) is the obvious
+refinement and was deliberately not done: nothing measured it, and the
+blind result covers the undivided set.
+
+**The eval reads the examples from `--dump-config`, not from the JSON.**
+This mattered more than it looks. `run.py --shots` built its examples from
+`taste_run.SHOT_IDS` = **N2, N1, E1** — the set chosen for the *scorer's*
+rounds. Production now ships **E1, T4, E4**. Left alone, every future
+"few-shot arm" measurement would have scored a payload production never
+sends, which is this repo's second-copy-of-one-truth failure arriving for
+the fifth time and the first time as a *list* rather than a string. The
+flag is now `--bare` (drop them) and the default is the shipping config.
+
+**`taste_run.py` is now stale and is flagged, not fixed.** Its `SHOT_IDS`
+and its hold-out logic still describe the old three, and its `--shots` arm
+no longer corresponds to anything shipped. It is also structurally
+compromised for scoring the shipping config: E1, T4 and E4 are both
+examples *and* calibration cases, so any run over the 18 scripts now hands
+the model three of its own answers. Fixing it means deciding what the
+scorer is *for* now that the user has overruled it, which is a bigger
+question than this entry. Recorded so the next session does not trust a
+number from it.
+
+**Measured, shipping config, 31 transcripts, gpt-4.1-mini:**
+```
+                broke  rescued  fallback  median
+without examples  13%     100%       0%   1013ms
+WITH examples      10%     100%       0%   1026ms   <- shipping
+```
+Examples *reduced* the violation rate, restoring the 10% that the two
+prompt-rule edits had cost. Latency unchanged within noise. Calibration
+14/15 with the one argued residual, exit 0. `factguard-checks`,
+`meeting-checks`, `scope-checks` green.
+
+**Not measured and worth saying:** the calibration set cannot judge this
+change. Three of its fifteen cases are now in the prompt, so the standing
+"expect 15/15" rule no longer means what it meant — it would be scoring
+the model's ability to copy. The rolling held-out protocol already
+anticipated this shape of problem; the six A/B transcripts are the current
+held-out set and they graduate into calibration only after one full cycle.
+
+App rebuilt and **relaunched** (17:16 binary, 17:19 process) — per the
+stale-build trap recorded earlier today, a rebuild alone would have left
+the user dictating against the old configuration.
+
+Open, unchanged: greeting-on-its-own-line (the user's note on the winning
+AB1 output), inline sign-off, and work-mode latency scaling with dictation
+length (~2.4 s on 150-word holds).
+
+---
+
+## FULL READ-ONLY REVIEW · Instruments, git state, dead code, simplicity (Fable, 2026-08-14)
+
+User-requested, role-swap declared: Fable reviews and will fix; Opus
+verifies the fixes. Read-only this pass; fixes batched after in-flight
+work commits.
+
+### Instruments — the "are metrics on point" question: YES, structurally
+### sound, two gaps
+All three LLM harnesses (router, work-mode, clean-mode) read the
+production prompt from the **built binary** via `--dump-config`, with
+version guards that refuse to run against a stale binary. The
+copy-drift class that flipped three decisions this week is closed at
+every harness. Calibration sets present and versioned
+(`ideals.json`/`-normalized`, clean round baselines); verifier/validator
+sub-suites exist. The uncommitted work-mode changes go further (examples
+read from the binary). Gaps:
+1. **CLAUDE.md documents 7 check suites; 12 exist.** Undocumented:
+   media-checks, scope-checks, speech-pattern-checks, cleanup-checks,
+   plus the work-mode/verifier and clean-mode/validator runners. A
+   fresh session runs what the doc lists — five suites would silently
+   not run. Doc fix, mine.
+2. The A/B session's shipped work is **uncommitted** (7 files) and the
+   branch is **21 commits unpushed**. Not a defect — but the state must
+   land before my fix batch, and the session that built it should
+   commit it.
+
+### Dictation-loss recheck: PASS — the open item closes
+The work→Clean→raw chain is implemented: a thrown rewrite error is
+caught, Clean's parallel task value inserts, and if Clean is also down
+the raw transcript stands — never nothing. Parallel Clean confirmed
+landed. The post-workmode review's "must-verify" item is now verified
+by reading the landed code.
+
+### Git state — what the user asked about
+- Everything real lives on `ui-speech-back`: **177 commits ahead of
+  main**; main is ~5 days stale. `ui-pill-redesign` and
+  `ui-redesign-v4` are both fully merged in.
+- **Recommendation: after in-flight work commits, merge ui-speech-back
+  → main** (it is the de-facto main; even Opus's prompts call it that),
+  push, and then delete the merged/dead locals: `ui-pill-redesign`,
+  `ui-redesign-v3`, `ui-redesign-v4` (merged), `ui-redesign`,
+  `ui-redesign-v2` (explicitly broken/parked, superseded by v4 — the
+  noise the user sensed).
+
+### Dead code and stale temporaries, ranked
+1. `FactGuard`'s duplicate `.formalityUpgrade` switch arm — flagged in
+   two prior reviews, still present; one diagnostic string unreachable.
+2. `FloatingIndicatorWindow`'s leak-probe (`IndicatorPanel`
+   created/dealloc counters) — obsolete: the leak was disproven and
+   the freeze root-caused elsewhere (audio-queue deadlock). Delete.
+3. `panel.hasShadow = false // temporarily disabled to test...` —
+   stale "temporary"; the pill shipped its own look. Decide and make
+   permanent with an honest comment, or restore.
+4. `--preview-pill` scaffolding (StatusPill/RecordingIndicatorView/
+   MenuBar) — its own comment says "delete before release"; the v4
+   pill is adopted. Delete candidate.
+5. AudioRecorder's `[mic]` "temporary diagnostics" — the bug they
+   hunted is long solved, but they once saved a session and cost
+   little: KEEP, retitle from temporary to permanent diagnostics.
+6. Kept deliberately, not noise (so nobody re-flags them): the parked
+   voice-processing path (recorded exit decision, one flag from
+   return), the unwired sentence-novelty gate in FactGuard (recorded
+   rejection with revival conditions), the `#if DEBUG` follow-up
+   harness.
+
+### Simplicity, without touching business logic
+- **`FactGuard` is now 1,551 lines — the largest file in the app** and
+  the one calling itself dumb code. Well-MARKed, but extraction,
+  verification, retraction waivers, and ~180 lines of spoken-number
+  parsing live in one file. Proposed: a pure 3-way split (FactGuard
+  core / FactWaivers / SpokenNumbers), no logic changes, suites green
+  before and after, all compile lists updated in the same commit (the
+  F2 class). This is a move, not a rewrite — business logic untouched
+  by construction.
+- Standing B-list items (AppDelegate dictation-Task triplets,
+  SpokenText consolidation, CalendarScope inversion, APIKeyProvider
+  cache trio) remain valid and remain parked — not part of this batch.
+
+### The fix batch (mine, pending in-flight commits), in order
+1. CLAUDE.md suite documentation (gap 1).
+2. formalityUpgrade dupe; leak-probe deletion; hasShadow decision;
+   [mic] retitle; preview-pill scaffolding removal.
+3. Branch hygiene + the main merge (with the user at the wheel for the
+   merge itself).
+4. The FactGuard 3-way split, last, in its own commit, suites proving
+   equivalence.
+Opus verifies the batch per the role swap. Nothing here touches
+routing, guard logic, prompts, or any measured behavior.

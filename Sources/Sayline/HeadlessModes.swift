@@ -53,6 +53,14 @@ enum HeadlessModes {
             // through the whole taste rebuild.
             "workPrompt": WorkModeCleaner.promptForContext(.general, signOffName: ""),
             "workPromptEmail": WorkModeCleaner.promptForContext(.email, signOffName: "Abhishek"),
+            // The few-shot examples, for the same reason as the prompts
+            // above: they are now part of every request, so a harness that
+            // reads only the system prompt scores a payload production does
+            // not send.
+            "workExamples": WorkModeCleaner.examples.map {
+                ["spoken": $0.spoken, "written": $0.written
+                    .trimmingCharacters(in: .whitespacesAndNewlines)]
+            },
             // Clean's prompt, for `eval/clean-mode/run.py`. Same reason as
             // the two above: Clean now has a frozen test set and a model
             // A/B, and both would otherwise score a pasted copy.

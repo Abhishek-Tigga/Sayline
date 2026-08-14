@@ -248,3 +248,11 @@ attempt.
 | model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
 |---|---|---|---|---|---|---|
 | `gpt-4.1-mini` | 3/10 | 1/21 | 1 | 100% | 0% | 1013 ms |
+
+### Work mode model bake-off — 2026-08-14 17:18
+
+31 transcripts, temperature 0, scored by FactGuard.
+
+| model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
+|---|---|---|---|---|---|---|
+| `gpt-4.1-mini` | 2/10 | 1/21 | 1 | 100% | 0% | 1026 ms |
