@@ -7034,3 +7034,60 @@ family as "assert on the payload, not the envelope."
 **For Opus:** everything in the previous entry's checklist stands, plus:
 respect the partial-run flag, and space runs out — the free tier
 rate-limits after ~8 full runs in an hour.
+
+---
+
+### BUILD · Share the current page — the follow-up questions are wired
+2026-08-14 · Opus · `claimed-fixed`
+
+Closes the gap the previous entry called the largest: four questions that
+existed only as text on a failure.
+
+**Shape.** `SharePageExecutor.run` no longer returns `Bool`. It returns a
+`Step` — `.opened`, `.failed(message)`, or `.ask(question, detail,
+choices, resume)` where `resume` takes what the user said and returns
+another `Step`. The executor never touches a window; `AgentTurn.runShare`
+drives the chain, so every question in this feature is asked by the same
+machinery as every other question in the app.
+
+Recursive by design: an answer may produce another question — two Priyas,
+then a missing country code — and each is a separate question with its
+own timeout rather than a wizard with no exit.
+
+**The four, and what silence does in each.**
+- **Two matches** → "Which Priya?" with both names as quick choices. The
+  answer is **re-resolved through the same matching rule** rather than
+  indexed by position, so a surname answers correctly. An answer that
+  still matches two, or none, sends nothing.
+- **No country code** → asked once, stored **per contact**, per the
+  failure table.
+- **WhatsApp or AirDrop** (first unnamed send) → and "always" spoken in
+  the same breath writes the default, which is decision 7's one-breath
+  rule now actually reachable by voice.
+- **Self number** → asked once, refused unless it carries a country code,
+  then stored.
+
+Timeout or silence returns `.failed("")`, and the driver turns an empty
+message into "Nothing shared" rather than an error. Silence gets silence:
+decision 5 says a timeout does nothing, and scolding someone for choosing
+nothing would make the question decorative.
+
+**Ran:** 12/12 suites green (`whatsapp-checks` now 42 cases, +9 for the
+answer paths — narrowing by surname, by full name, the still-ambiguous
+answer, the no-match answer, and the country-code and self-number
+normalisations). Build green, app launches, work-mode calibration 14/15
+unchanged.
+
+**One correction to the previous entry's suite count.** It said 11/11.
+There are 12, and `bias-checks` prints "PASS — vocabulary bias ladder
+holds" rather than "all passed", so a regex sweep that greps for the
+usual phrase silently miscounts it. The suite is fine; the sweep was
+wrong. Worth knowing before someone trusts a scripted count.
+
+**Still not done, unchanged from the previous entry:** nothing tested by
+hand — a real send per browser, the Firefox and non-browser failures, the
+two-match follow-up live, "always" persisting — and no Settings control
+for the default target. Both need the user's machine and accounts.
+
+`AgentExecutor.execute`'s `.sharePage` arm now logs and returns false: a
+`Bool` cannot ask a question, and no non-interactive caller shares today.
