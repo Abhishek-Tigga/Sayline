@@ -6526,3 +6526,98 @@ sketched, and today is evidence for it rather than a hypothetical.
 
 Ran: `--fm-check` live before and after the language change,
 `eval/fm-checks/run.py` 8/8, build clean.
+
+---
+
+### EXPERIMENT · Apple on-device Foundation Model: both arms CLOSE
+2026-08-14 · Opus · `claimed-fixed`
+
+**This ran because the user asked for work mode to be measured rather
+than assumed to fail. It did fail — but the number is decisive instead of
+a guess, and one of the two things that went wrong was our harness, which
+an assumption would never have surfaced. The call to measure was right.**
+
+macOS 26.3, Apple Silicon, model resident. No production default changed.
+
+### Clean arm — CLOSE
+
+```
+workstream           8B      Apple FM
+punctuation         6/7        3/7
+grammar policy      7/7        7/7
+numbers + times     5/5        5/5
+self-correction     7/7        5/7
+TOTAL              25/26      20/26
+
+latency          283 ms median / 411 ms p90     <- lock is 500 ms p90
+                 980 ms median / 2466 ms p90
+refusals         0/18
+```
+
+Fails the score bar and misses the speed lock by roughly 5x at p90.
+
+### Work arm — CLOSE
+
+```
+                    4.1-mini    Apple FM
+broke a fact            10%         70%
+retry rescued          100%          9%
+ends in fallback         0%         64%
+median latency       1071ms      3540ms
+p90                       —      4253ms
+taste (13 scripts)   13/13        4/13
+refusals              0/31         0/31
+```
+
+### The three findings worth keeping
+
+**1. Refusals never happened.** The experiment was designed around a
+guardrail-refusal class, on the theory that Apple's model might decline
+or moralise on ordinary work text. **Zero refusals across 49 calls, both
+arms.** The predicted failure mode simply is not there; the actual one is
+accuracy.
+
+**2. The failure is facts, not taste.** The dominant violation is
+invented content — greetings and names the speaker never said ("Hi,",
+"Hi Team,"), plus invented numbers. On I1 it answered conversationally
+("Sure, here's a revised version of your message:"), which is the
+cleanup-prompt failure class this project fixed in 2024 reappearing in a
+different model. That shape is the useful part: a future OS model needs
+to stop inventing, not to write better — and the guard already catches
+it, which is why 64% ended as fallback rather than as wrong text
+reaching the user.
+
+**3. Our declared deviation was tested, not assumed.** Work mode sends
+its three examples as chat turns; this API has none, so they were folded
+into the instructions — and the model reproduced one verbatim in place of
+the transcript (S1 came back as the weekly-update example). The control
+arm `--fm-work-plain` removes them: **90% broke, 83% fallback — worse.**
+The examples were helping. The loss belongs to the model, and saying so
+required running the control rather than waving at the caveat.
+
+### One harness bug, found mid-run and fixed
+
+The first work arm reported 24 of 31 as `exceededContextWindowSize`.
+`LanguageModelSession` is stateful — every `respond` appends to its
+transcript — and one session was shared across the batch, so it was
+measuring accumulated context, not the model. A session per utterance,
+matching how production treats each dictation, fixed it: 0 context errors
+after. The first Clean run is void for the same reason and its numbers
+appear nowhere above.
+
+Warm-up is negligible (4–6 ms) because `prewarm` runs after the model is
+already resident; the cost that matters is per-call, and it is the whole
+problem.
+
+### Decision, by the pre-committed rules
+
+**Clean: CLOSE.** Below the 8B on score, ~5x over the speed lock.
+**Work: CLOSE.** Seven times the fact-break rate, three times the
+latency, taste at 30% against 100%.
+
+Neither revives without a new OS model version. The availability,
+diagnosis and batch plumbing stay — they cost nothing idle and make the
+re-measurement one command when macOS 27 ships.
+
+Ran: both arms after the session fix, the no-examples control, 8/8 on
+`eval/fm-checks/run.py`, suites green.

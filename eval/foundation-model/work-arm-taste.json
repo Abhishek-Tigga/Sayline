@@ -1,0 +1,80 @@
+[
+ {
+  "id": "T1",
+  "raw": "so I saw your comment on the ticket and um, look, I get the reasoning but I don't think caching is the fix here, like the numbers are wrong BEFORE they hit the cache, I checked yesterday, so caching would just make wrong numbers faster, um can we look at the aggregation query first, that's my bet",
+  "rewrite": "Hi,\n\nI understand your concerns about caching, but I believe the issue lies with the aggregation query rather than caching itself.\n\nBefore yesterday, the numbers were incorrect, and caching would only speed up the display of these wrong numbers. I suggest we focus on reviewing and refining the aggregation query first.\n\nBest,\n[Your Name]",
+  "ms": 4602.941989898682
+ },
+ {
+  "id": "T2",
+  "raw": "quick status on the payments migration, so we're basically done with the read path, um the write path is trickier than we thought because of the retry logic, honestly I'd say seventy percent overall, and I don't want to promise Friday, Monday is realistic",
+  "rewrite": "Quick status on the payments migration: We're done with the read path, but the write path is trickier due to retry logic. Overall, we're at 70 percent completion. I don't want to promise Friday; Monday is more realistic.",
+  "ms": 2051.0209798812866
+ },
+ {
+  "id": "T3",
+  "raw": "hey um sorry to ping you on this again but I'm blocked on the API keys thing, I know you're slammed, whenever you get like ten minutes today could you approve the request, it's the last thing between us and the staging deploy",
+  "rewrite": "Hi,\n\nSorry to ping you again. I'm blocked on the API keys issue. I know you're busy, but could you please approve the request whenever you have ten minutes today? It's the last thing between us and the staging deploy.\n\nBest,\n[Your Name]",
+  "ms": 3652.1670818328857
+ },
+ {
+  "id": "T4",
+  "raw": "so heads up, um the vendor sandbox went down this morning and their support says forty eight hours, which honestly kills our Thursday demo, I think we either fake the vendor responses for the demo or we push it, I'd rather fake it, wanted you to know now not Wednesday night",
+  "rewrite": "Heads up, the vendor sandbox went down this morning, and their support says it could take ~48 hours. That pretty much kills our Thursday demo.\n\nI think we have two options: mock the vendor responses for the demo or push it. I'd lean towards mocking them so we can still do the demo.\n\nWanted to flag it now rather than Wednesday night.",
+  "ms": 3739.7499084472656
+ },
+ {
+  "id": "E2",
+  "raw": "hi thanks for thinking of us for the webinar, um honestly this quarter is just not possible, we're heads down on a launch, I don't want to half commit and then flake, maybe ping us again in the summer",
+  "rewrite": "Hi, thanks for thinking of us for the webinar. Honestly, this quarter is just not possible. We're heads down on a launch, and I don't want to half commit and then flake. Maybe ping us again in the summer.",
+  "ms": 3341.9400453567505
+ },
+ {
+  "id": "E3",
+  "raw": "hi just floating this back up, um I sent the invoice details two weeks back and I know things get buried, we'd really like to close this out before month end, let me know if anything's missing from our side",
+  "rewrite": "Hi,\n\nJust floating this back up. I sent the invoice details two weeks ago, and I know things get buried. We'd really like to close this out before month-end. Let me know if anything's missing from our side.",
+  "ms": 1906.8329334259033
+ },
+ {
+  "id": "E4",
+  "raw": "hi so the weekly update, um three things really, the launch prep is on track, QA finishes Wednesday and we're go for Tuesday, second thing the hiring loop, we did four onsites, two strong yes candidates, I'll send the debrief separately, and third, the thing I'm worried about, the vendor contract renewal is stuck with legal and if it slips past Friday it starts blocking the roadmap work, that one needs your help",
+  "rewrite": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates. I'll send the debrief separately.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work. This one needs your help.",
+  "ms": 2359.387993812561
+ },
+ {
+  "id": "N3",
+  "raw": "hi quick correction on my last mail, um I said the invoice was forty five thousand, it's actually forty seven five, my mistake, the PO number stays the same, nothing else changes",
+  "rewrite": "Hi,\n\nQuick correction on my last mail: I mentioned the invoice was $45,000, but it's actually $47,500. My mistake. The PO number stays the same, and nothing else changes.\n\nBest,\n[Your Name]",
+  "ms": 3401.8579721450806
+ },
+ {
+  "id": "N4",
+  "raw": "just want to say um the way Sneha handled that outage call yesterday was really something, she kept everyone calm, had the rollback ready before anyone asked, honestly we got lucky she was on call, worth a shoutout in the all hands I think",
+  "rewrite": "Sneha's handling of the outage call yesterday was exceptional. She kept everyone calm and had the rollback ready before anyone asked. It was fortunate that she was on call, and she deserves a shoutout in the all-hands meeting.",
+  "ms": 2017.158031463623
+ },
+ {
+  "id": "S1",
+  "raw": "okay decisions from the design review, three things, one we're going with the tabbed layout, two dark mode ships in the same release not after, three the settings page moves to v2, that's it",
+  "rewrite": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+  "ms": 3974.8589992523193
+ },
+ {
+  "id": "S2",
+  "raw": "can we move the retro to Thursday, wait no hold on, Thursday is the town hall, okay Friday, let's do Friday afternoon, um after three works best",
+  "rewrite": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Friday, and we're still good for Thursday afternoon.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+  "ms": 3921.525001525879
+ },
+ {
+  "id": "S3",
+  "raw": "hi so I looked at the proposal, um most of it works for us, the only sticking point is the support SLA, four hours feels tight for our team size, would eight hours be acceptable on your side, that's really the only open thing",
+  "rewrite": "Hi,\n\nI looked at the proposal, and most of it works for us. The only sticking point is the support SLA. Four hours feels tight for our team size. Would eight hours be acceptable on your side? That's really the only open thing.\n\nBest,\n[Your Name]",
+  "ms": 3442.2829151153564
+ },
+ {
+  "id": "I1",
+  "raw": "hey um can we prepone the client call to eleven, the afternoon slot clashes with the town hall, and also please do share the deck before, whoever has the latest version kindly do the needful",
+  "rewrite": "Sure, here's a revised version of your message:\n\n---\n\nHi Team,\n\nCould we prepone the client call to 11 AM this afternoon? The afternoon slot clashes with the town hall. Also, please share the latest deck version with whoever has it.\n\nBest,\n[Your Name]",
+  "ms": 3847.196936607361
+ }
+]

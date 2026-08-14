@@ -33,7 +33,7 @@ enum HeadlessModes {
             parseActions()
         case "--work-rewrite":
             workRewrite(arguments: arguments)
-        case "--fm-check", "--fm-clean", "--fm-work":
+        case "--fm-check", "--fm-clean", "--fm-work", "--fm-work-plain":
             // Measurement modes for the on-device model experiment. Gated
             // at runtime as well as compile time: the binary must still
             // launch on a Mac that has neither.
@@ -52,6 +52,7 @@ enum HeadlessModes {
                     }
                     exit(0)
                 case "--fm-clean": foundationModelBatch(work: false)
+                case "--fm-work-plain": foundationModelBatch(work: true, examples: false)
                 default:           foundationModelBatch(work: true)
                 }
             } else {
@@ -553,7 +554,7 @@ extension HeadlessModes {
     /// prompt, `FactGuard.verify`, one corrective retry, fallback —
     /// because those semantics live in the binary and reproducing them in
     /// Python is the copy-drift failure this project has paid for twice.
-    static func foundationModelBatch(work: Bool) {
+    static func foundationModelBatch(work: Bool, examples: Bool = true) {
         let availability = foundationModelAvailability()
         guard availability["available"] as? Bool == true else {
             emit(["fatal": "foundation model unavailable", "availability": availability])
@@ -561,7 +562,18 @@ extension HeadlessModes {
         }
 
         let instructions: String
-        if work {
+        if work && !examples {
+            // The control for this file's one declared deviation.
+            //
+            // Production sends the three worked examples as alternating
+            // user/assistant turns; this API has no assistant turn, so
+            // they are folded into the instructions as text — and the
+            // model then reproduced one of them verbatim in place of the
+            // transcript (S1). This arm removes them, so a work-mode loss
+            // can be attributed to the model rather than to the shape of
+            // the harness.
+            instructions = WorkModeCleaner.promptForContext(.general, signOffName: "")
+        } else if work {
             let examples = WorkModeCleaner.examples.map {
                 "Spoken:\n\($0.spoken)\n\nWritten:\n\($0.written.trimmingCharacters(in: .whitespacesAndNewlines))"
             }.joined(separator: "\n\n---\n\n")
@@ -571,14 +583,26 @@ extension HeadlessModes {
             instructions = TranscriptCleaner.cleanPrompt
         }
 
-        let session = LanguageModelSession(instructions: instructions)
+        // A session per utterance, NOT one session for the batch.
+        //
+        // `LanguageModelSession` is stateful: every `respond` appends to
+        // its transcript, so a shared session accumulates every previous
+        // dictation. The first version of this file shared one, and 24 of
+        // 31 work transcripts failed with `exceededContextWindowSize` —
+        // a number that measured the harness, not the model. Production
+        // treats each utterance independently, so the measurement must
+        // too.
+        func newSession() -> LanguageModelSession {
+            LanguageModelSession(instructions: instructions)
+        }
 
         // On-device models pay a load cost on first use. Measured
         // separately so it does not smear across the per-call
         // distribution, and reported, because a cold first dictation is
-        // what a user would actually feel.
+        // what a user would actually feel. The model stays resident after
+        // this, so later sessions do not repay it.
         let warmStart = Date()
-        session.prewarm()
+        newSession().prewarm()
         let warmup = Date().timeIntervalSince(warmStart) * 1000
 
         var lines: [(id: String, raw: String)] = []
@@ -596,6 +620,7 @@ extension HeadlessModes {
                 let started = Date()
                 var payload: [String: Any] = ["id": entry.id]
 
+                let session = newSession()
                 if work {
                     let pinned = FactGuard.promptBlock(for: FactGuard.extract(from: entry.raw))
                     let prompt = pinned.isEmpty ? entry.raw

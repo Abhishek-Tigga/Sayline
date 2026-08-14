@@ -1,0 +1,555 @@
+{
+ "rows": [
+  {
+   "firstBroke": [
+    "day",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-unit"
+   ],
+   "firstCall": true,
+   "id": "real-1",
+   "ms": 4065.3430223464966,
+   "out": "Hi Rohan,\n\nThanks for letting me know. I'm thinking we can move the design review to Friday morning around 11 AM. Does that work for you, or is Friday too late?\n\nBest,\n[Your Name]",
+   "outcome": "fellBack",
+   "violations": [
+    "day",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-unit"
+   ]
+  },
+  {
+   "firstBroke": [
+    "invented-number",
+    "invented-unit",
+    "longer-than-speech",
+    "formality-upgrade"
+   ],
+   "id": "real-2",
+   "ms": 3858.8309288024902,
+   "out": "Hi, thanks for sending this over. So I went through the dock and honestly, I don't think we should commit to the March deadline yet. The backend work is maybe 60% done at best. Let's discuss the sync tomorrow before we reply to them.",
+   "outcome": "rescued"
+  },
+  {
+   "firstBroke": [
+    "unit",
+    "invented-unit"
+   ],
+   "id": "real-3",
+   "ms": 3582.9110145568848,
+   "out": "The progress bar for uploading files larger than 25 megabytes on Chrome reaches 99% and remains stuck indefinitely without any error message. It's likely that the timeout on the upload is causing this issue, although I haven't tested it on Safari yet.",
+   "outcome": "fellBack",
+   "violations": [
+    "unit",
+    "invented-unit"
+   ]
+  },
+  {
+   "id": "real-4",
+   "ms": 2114.158034324646,
+   "out": "Quick recap from the stand-up: Ankit is handling the payment flow changes, Sneha is working on the dashboard redesign, and the analytic migration task needs to be assigned this week as it's been pending since two sprints.",
+   "outcome": "rewritten"
+  },
+  {
+   "firstBroke": [
+    "negation-added",
+    "question-lost",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "real-5",
+   "ms": 4253.070950508118,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.\n\nDemo on Monday afternoon, not Thursday.",
+   "outcome": "fellBack",
+   "violations": [
+    "negation-added",
+    "question-lost",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "real-6",
+   "ms": 4483.176946640015,
+   "out": "Weekly update, three things:\n\n1. Onboarding remap: At about 70%. The email verification piece turned out messier than expected. Realistically, we should aim for the end of next week, not this week.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal.",
+   "outcome": "fellBack",
+   "violations": [
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "longer-than-speech"
+   ],
+   "id": "real-7",
+   "ms": 4035.3680849075317,
+   "out": "Hi Team,\n\nI wanted to touch base on the price page. I reviewed the new copy and, while I understand marketing's desire to remove the free tier mention, I'm hesitant to do so. I believe it's important to keep it until we're actually talking to sales.\n\nNegations: 2",
+   "outcome": "fellBack",
+   "violations": [
+    "negation",
+    "invented-name",
+    "invented-number",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "number",
+    "number",
+    "unit",
+    "negation-added",
+    "invented-number",
+    "invented-month",
+    "invented-month",
+    "invented-relative-time",
+    "invented-unit",
+    "longer-than-speech"
+   ],
+   "id": "real-8",
+   "ms": 4091.4580821990967,
+   "out": "Hi,\n\nI wanted to be upfront about the integration timeline, the March date is no longer realistic. We found a data issue on our side that will likely take another two weeks to resolve.\n\nThe new realistic target is mid-April. I know that's not what you were hoping to hear, and I'm happy to get on a call this week to discuss it if helpful.\n\nBest,\nAbhishek",
+   "outcome": "fellBack",
+   "violations": [
+    "number",
+    "number",
+    "unit",
+    "negation-added",
+    "invented-number",
+    "invented-month",
+    "invented-month",
+    "invented-relative-time",
+    "invented-unit",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "unit",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "invented-commitment"
+   ],
+   "id": "real-9",
+   "ms": 3805.448055267334,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+   "outcome": "fellBack",
+   "violations": [
+    "unit",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day"
+   ]
+  },
+  {
+   "firstBroke": [
+    "number",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-unit"
+   ],
+   "id": "real-10",
+   "ms": 3388.767957687378,
+   "out": "Hi Mira's team,\n\nI've updated the invite to 245 PM, as they asked to move it from 4:30 PM. Please also add Karen this time, as he wasn't on the last one.\n\nBest,\n[Your Name]",
+   "outcome": "fellBack",
+   "violations": [
+    "number",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-unit"
+   ]
+  },
+  {
+   "firstBroke": [
+    "month",
+    "month",
+    "month",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "made-1",
+   "ms": 3798.187017440796,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+   "outcome": "fellBack",
+   "violations": [
+    "month",
+    "month",
+    "month",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "id": "made-2",
+   "ms": 1661.102056503296,
+   "out": "The export is coming out at 400 megs, which is way too big for email. We need to compress it or split it into two files.",
+   "outcome": "rewritten"
+  },
+  {
+   "firstBroke": [
+    "number",
+    "invented-number",
+    "invented-month",
+    "invented-month",
+    "invented-unit",
+    "longer-than-speech"
+   ],
+   "id": "made-3",
+   "ms": 3953.273057937622,
+   "out": "Hi,\n\nI wanted to be upfront about the integration timeline, the March date is no longer realistic. We found a data issue on our side that will likely take another two weeks to resolve.\n\nThe new realistic target is mid-April. I know that's not what you were hoping to hear, and I'm happy to get on a call this week to discuss it if helpful.\n\nBest,\nAbhishek",
+   "outcome": "fellBack",
+   "violations": [
+    "number",
+    "invented-number",
+    "invented-month",
+    "invented-month",
+    "invented-unit",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "id": "made-4",
+   "ms": 1678.5589456558228,
+   "out": "I'm not saying we shouldn't do it now. There's a difference, and I think the team is conflating the two.",
+   "outcome": "rewritten"
+  },
+  {
+   "firstBroke": [
+    "name",
+    "name",
+    "invented-name",
+    "invented-day",
+    "longer-than-speech"
+   ],
+   "id": "made-5",
+   "ms": 3224.640965461731,
+   "out": "Weekly update, two things:\n\n1. Release: The release has to wait unless Meera can cover the QA piece. She's already stretched.\n2. Blocker: The vendor contract renewal is stuck with Legal.",
+   "outcome": "fellBack",
+   "violations": [
+    "name",
+    "name",
+    "invented-name",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "made-6",
+   "ms": 4366.302967071533,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.\n\nThe 12th is a holiday, so nothing will get signed off anyway.",
+   "outcome": "fellBack",
+   "violations": [
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "made-7",
+   "ms": 3807.9999685287476,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+   "outcome": "fellBack",
+   "violations": [
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "id": "made-8",
+   "ms": 1714.1939401626587,
+   "out": "The quote came in at 120,000 rupees, which is over budget by about 20 percent. I want to push back before we sign.",
+   "outcome": "rewritten"
+  },
+  {
+   "id": "made-9",
+   "ms": 1549.015998840332,
+   "out": "Standup moved to 9:45 from 10, giving us the room before the sales team takes it.",
+   "outcome": "rewritten"
+  },
+  {
+   "id": "made-10",
+   "ms": 1562.667965888977,
+   "out": "Conversion dropped from 4.2% to 3.1% after the redesign, which is not what we expected at all.",
+   "outcome": "rewritten"
+  },
+  {
+   "firstBroke": [
+    "longer-than-speech"
+   ],
+   "id": "made-11",
+   "ms": 3238.5830879211426,
+   "out": "Quick update on the pilot: We're at 80% completion. Rohan finished the backend on Tuesday, and the front end is two more days away. So, the demo is expected to wrap up by the end of next week.",
+   "outcome": "fellBack",
+   "violations": [
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "made-12",
+   "ms": 3938.9970302581787,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Wednesday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+   "outcome": "fellBack",
+   "violations": [
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "invented-day",
+    "invented-day",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "negation",
+    "question-lost",
+    "invented-name",
+    "longer-than-speech"
+   ],
+   "id": "made-13",
+   "ms": 3540.2870178222656,
+   "out": "Yes, we still need the Friday sync. The async updates are valuable, but the Friday sync ensures alignment and coordination across all teams, especially with the vendor contract renewal stuck with Legal. It's crucial to address any potential roadblocks before Friday to keep the roadmap on track.",
+   "outcome": "fellBack",
+   "violations": [
+    "negation",
+    "question-lost",
+    "invented-name",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "number",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-month",
+    "longer-than-speech"
+   ],
+   "id": "made-14",
+   "ms": 7403.478980064392,
+   "out": "I'm sorry to hear about your experience with the checkout process. It's important to address this issue promptly to ensure a smoother experience for all users.\n\nTo resolve this problem, we recommend the following steps:\n\n1. **Check for Browser Extensions:** Some browser extensions may interfere with the checkout process. Try disabling any extensions that might be causing conflicts.\n\n2. **Clear Cache and Cookies:** Clearing your browser's cache and cookies can help resolve any temporary issues that might be affecting the checkout.\n\n3. **Try a Different Browser:** If possible, try completing the checkout process in a different browser to see if the issue persists.\n\n4. **Contact Support:** If none of the above steps work, please reach out to our support team for further assistance.\n\nThank you for bringing this to our attention. We're committed to improving our services and ensuring a seamless experience for all users.",
+   "outcome": "fellBack",
+   "violations": [
+    "number",
+    "negation",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-name",
+    "invented-month",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "id": "made-15",
+   "ms": 1864.385962486267,
+   "out": "Three things blocking us:\n\n1. API keys aren't provisioned.\n2. Legal hasn't signed off on the terms.\n3. We still don't have staging access.",
+   "outcome": "rewritten"
+  },
+  {
+   "firstBroke": [
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "longer-than-speech",
+    "invented-commitment"
+   ],
+   "id": "style-1",
+   "ms": 3790.7609939575195,
+   "out": "Weekly update, three things:\n\n1. Launch prep: On track. QA wraps Thursday, and we're still good for Tuesday.\n2. Hiring: We did 4 onsites and have 2 strong yes candidates.\n3. Blocker: The vendor contract renewal is stuck with Legal. If it slips past Friday, it starts blocking roadmap work.",
+   "outcome": "fellBack",
+   "violations": [
+    "invented-name",
+    "invented-name",
+    "invented-number",
+    "invented-number",
+    "invented-number",
+    "invented-day",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "invented-number",
+    "longer-than-speech",
+    "formality-upgrade"
+   ],
+   "id": "style-2",
+   "ms": 2903.650999069214,
+   "out": "I understand your concerns about the new pricing copy. Marketing has their reasons, but I don't want to remove the free tier mention.",
+   "outcome": "rescued"
+  },
+  {
+   "id": "style-3",
+   "ms": 1598.5779762268066,
+   "out": "Three reasons:\n\n1. The quote.\n2. The timeline.\n3. Nobody asked for it.",
+   "outcome": "rewritten"
+  },
+  {
+   "id": "style-4",
+   "ms": 1686.0929727554321,
+   "out": "The backend isn't done, I'd say 60% at best. I don't think we should commit to March yet.",
+   "outcome": "rewritten"
+  },
+  {
+   "firstBroke": [
+    "invented-name",
+    "longer-than-speech"
+   ],
+   "id": "style-5",
+   "ms": 3171.8510389328003,
+   "out": "Sure, here's the revised response:\n\n---\n\nHi Finance,\n\nCould you please approve the invoice when you get a chance? It needs to be done before the 30th.\n\nThanks,\n[Your Name]",
+   "outcome": "fellBack",
+   "violations": [
+    "invented-name",
+    "longer-than-speech"
+   ]
+  },
+  {
+   "firstBroke": [
+    "longer-than-speech"
+   ],
+   "id": "style-6",
+   "ms": 2492.210030555725,
+   "out": "I've been going back and forth on this all morning but honestly I think we should just park it this quarter.\n\ntiming: morning, this quarter",
+   "outcome": "fellBack",
+   "violations": [
+    "longer-than-speech"
+   ]
+  }
+ ],
+ "summary": {
+  "count": 31,
+  "summary": true,
+  "warmupMs": 4.080057144165039
+ }
+}
