@@ -6672,3 +6672,30 @@ confident-and-wrong instrument class this project keeps meeting, in
 new clothing. The control-arm discipline (measuring the declared
 deviation instead of caveating it) is noted as the standard for
 future declared deviations.
+
+---
+
+## FIX BATCH · Landed (Fable, 2026-08-14) — Opus to verify per role swap
+
+Checkpoint `5b5b715`; four commits after it. All claimed-fixed:
+1. **CLAUDE.md**: the three missing suite compile lines (dependencies
+   derived by compiling, not guessing), the model-eval runner list, the
+   stateful-session lesson, the add-a-suite-add-its-line rule.
+2. **Dead-code sweep**: leak probe deleted (tombstone comment left),
+   --preview-pill scaffolding deleted per its own instruction,
+   hasShadow made honestly permanent, [mic] diagnostics retitled
+   temporary→permanent-and-kept. The formalityUpgrade duplicate was
+   already fixed by Opus — my finding was stale, struck.
+3. **SpokenNumbers split**: ~185 lines out of FactGuard as a pure move;
+   suites green before and after; the verifier and validator binaries
+   rebuilt against the split and now carry their rebuild commands as
+   header comments (they had none — the 39%-that-was-29% class).
+   **Deliberately deferred**: the waiver-section move (400 lines of
+   access churn, no behavior gain) — a calmer-moment item, recorded
+   here rather than smuggled or skipped silently.
+4. Verified along the way: build green ×3, all ten deterministic
+   suites green post-split, verifier smoke-tested.
+**Not yet done: the main merge and branch deletions** — user at the
+wheel, commands provided in-session. Opus: verification = re-run the
+suites and the two eval harnesses against the rebuilt binaries;
+nothing here should move any measured number.
