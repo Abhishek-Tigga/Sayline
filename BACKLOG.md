@@ -880,6 +880,18 @@ cause is outside the process and the listen-only change is still correct but
 for a different reason. Either way the next freeze produces evidence instead
 of another theory.
 
+## Vocabulary biasing: no rebuild on a mid-session Contacts grant (2026-08-14)
+
+Observed live: Contacts was granted at ~21:47, and the glossary stayed
+apps-only (22 entries) until the next launch picked the names up (48).
+`CNContactStoreDidChange` did not fire on the grant itself. Parked
+because the workaround is one relaunch, once per install, and every
+trigger considered so far is worse: polling wastes work forever,
+rebuild-per-hold violates decision 5's spirit, and hooking the share
+executor crosses a file boundary for a one-time event. Unparks if
+onboarding lands (grant flows through it, rebuild hooks there) or a
+clean grant notification shows up.
+
 ## Vocabulary biasing: the local (WhisperKit) arm sends no hint (2026-08-14)
 
 **Parked as a known deviation from design decision 4 ("one list,
