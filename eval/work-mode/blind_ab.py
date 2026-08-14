@@ -63,8 +63,17 @@ def shots():
     return out
 
 
+REGISTERS = {"email": "workPromptEmail", "chat": "workPromptChat",
+             "general": "workPrompt"}
+
+
 def build_messages(case, examples):
-    base = PROMPTS["workPromptEmail"] if case["channel"] == "Email" else PROMPTS["workPrompt"]
+    # Context per case, matching where the message is actually going —
+    # three of the six were dictated into a Claude window standing in for
+    # Slack, so the detected context would understate them. The register
+    # is not cosmetic: it decides greetings, sentence completeness, and
+    # (until today) whether a numbered list survived at all.
+    base = PROMPTS[REGISTERS[case["context"]]]
     pinned = harness.pinned_block(case["raw"])
     system = base if not pinned else f"{base}\n{pinned}"
     return ([{"role": "system", "content": system}] + examples

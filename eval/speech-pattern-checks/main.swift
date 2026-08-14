@@ -80,6 +80,17 @@ eq("a year is not a thousands group", "in 2024 15 people joined",
 eq("a non-number phrase is left alone", "a thousand apologies",
    "a thousand apologies")
 
+// Verbatim from the log, 2026-08-14 — E1 failed live because the eval
+// had only ever been given the spelled-out form.
+eq("the live form: digits, with the article",
+   "the budget is 47 and a half thousand", "the budget is 47,500")
+eq("the live form: digits, article dropped",
+   "the budget is 47 and half thousand", "the budget is 47,500")
+eq("the whole logged sentence",
+   "The call moved from 430 to 245 and the budget is 47 and a half thousand.",
+   "The call moved from 4:30 to 2:45 and the budget is 47,500.")
+eq("digits with a plain scale", "release 40 thousand", "release 40,000")
+
 print("\nclock times — ruled in 2026-08-14")
 eq("spoken time after a cue", "the call moved from four thirty to two forty five",
    "the call moved from 4:30 to 2:45")

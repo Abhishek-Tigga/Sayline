@@ -1,0 +1,44 @@
+[
+ {
+  "id": "AB1",
+  "context": "email",
+  "channel": "Email · asking for something, with a deadline",
+  "raw": "hey sarah uh hope your week is going okay so i was looking at the slides for the q3 review meeting and like i noticed we are still missing the final conversation breakdown from your end can you uh send those updated numbers over because well uh the thing is the leadership sink got moved so i basically need to finalize the whole deck before tomorrow uh say around 4 pm if you could like get the data to me by tomorrow 1 pm at least that would give me enough time to you know plug everything into the chart and review it also uh if the regional spirit aren't totally done yet just send whatever raw draft you have right now instead of waiting let me know if that works or if we need to jump on a quick five minute calls to align on this thanks best regards abhishek",
+  "dictated": "2026-08-14 16:38:09"
+ },
+ {
+  "id": "AB2",
+  "context": "email",
+  "channel": "Email · saying no / pushing back",
+  "raw": "Hey Alex, so I got your note about trying to squeeze in the new export to PDF feature for the client before next week's release. And honestly I don't think we can make that happen right now. Like we looked at the current backlog and the dev team is already you know completely maxed out with the database migration stuff. Which is already super risky if we delay it. If we pull someone off to build this report right now, it will definitely delay the core launch date which we can't really afford to How about we table this for the next sprint instead or you know as a temporary workaround maybe we can just manually pull the csv dump for them this friday if they really need those numbers urgently let me look let me know what you think or if we need to chat more about this on a stand up tomorrow",
+  "dictated": "2026-08-14 16:54:26"
+ },
+ {
+  "id": "AB3",
+  "context": "chat",
+  "channel": "Slack · flagging something broken",
+  "raw": "team heads up prod builds are failing on CI since like 10 minutes ago please hold off all merges until we fix the pipeline runner okay",
+  "dictated": "2026-08-14 16:56:13"
+ },
+ {
+  "id": "AB4",
+  "context": "chat",
+  "channel": "Slack · weekly update, counted points",
+  "raw": "Hey team, quick weekly update. First, we launched the new checkout flow. Yay! Second, the reporting bug is fully fixed and verified. And third, just as a reminder that sprint planning is, you know, move to Monday 11am instead of Friday. Thanks everyone.",
+  "dictated": "2026-08-14 16:57:22"
+ },
+ {
+  "id": "AB5",
+  "context": "chat",
+  "channel": "Slack · answering a question, with a caveat",
+  "raw": "hey yeah so to answer your question about the api rate limits basically yes we do support up to 100 requests per second for standard tier but anything about that will just throw a 429 error and like for the sandbox environment credentials you ask for you can actually you know find them right in settings tabs under API keys let me know if that makes sense or if you need me to resend the invite link",
+  "dictated": "2026-08-14 16:58:24"
+ },
+ {
+  "id": "AB6",
+  "context": "general",
+  "channel": "Free choice · meeting opening",
+  "raw": "Good morning everyone. Thank you all for taking the time to join today's quarterly strategy sync. So, as we look at our overall operational performance for the last quarter, I think it's, well, it is fair to say that we have made some really significant progress across our core business initiative. However, looking at the pipeline data from the past month, there are clearly a few efficiencies bottlenecks that we definitely need to address before we move into Q4. Particularly, you know, around cross-functional alignment between our product delivery timelines and the go-to-market rollout schedules. so the main objective of our discussion today is to well pinpoint those exact friction points realign our primary objectives and establish a very clear measurable action plan for the rest of the year i would like to hand it over to the team now so we can walk through the deck thanks",
+  "dictated": "2026-08-14 17:02:26"
+ }
+]

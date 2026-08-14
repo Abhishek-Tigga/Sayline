@@ -143,7 +143,15 @@ enum SpeechPatterns {
         // match and hands back "budget is forty seven", `spokenValue`
         // rejects it, and the rule silently never fires — safe, and
         // useless. Alternation cannot over-reach.
-        let num = (tens.keys.sorted() + units.keys.sorted()).joined(separator: "|")
+        // Digits belong in this alternation as much as the words do.
+        // Whisper writes the figure, not the spelling: the live E1 failure
+        // was "47 and a half thousand", and the eval had only ever been
+        // fed "forty seven and a half thousand". `spokenValue` already
+        // accepted digits; the pattern that finds candidates did not, so
+        // the rule never saw them. Exactly the gap CLAUDE.md warns about
+        // — the eval sends clean text, the app gets what the transcriber
+        // heard.
+        let num = (tens.keys.sorted() + units.keys.sorted()).joined(separator: "|") + "|\\d{1,3}"
         let run = "(?:\(num))(?:[\\s-](?:\(num))){0,3}"
         let scales = "thousand|lakh|crore|million"
 
@@ -152,14 +160,14 @@ enum SpeechPatterns {
         // the 8B started producing once the prompt grew. Handled here
         // rather than argued with in the prompt, for the reason the whole
         // file exists.
-        out = replace(out, "(?i)\\b(\(run))\\s+(\(scales))\\s+and\\s+a\\s+half\\b") { m in
+        out = replace(out, "(?i)\\b(\(run))\\s+(\(scales))\\s+and\\s+(?:a\\s+)?half\\b") { m in
             guard let base = spokenValue(m[1]), let scale = scaleValue(m[2].lowercased())
             else { return m[0] }
             return group(base * scale + scale / 2)
         }
 
         // "forty seven and a half thousand" → 47,500
-        out = replace(out, "(?i)\\b(\(run))\\s+and\\s+a\\s+half\\s+(\(scales))\\b") { m in
+        out = replace(out, "(?i)\\b(\(run))\\s+and\\s+(?:a\\s+)?half\\s+(\(scales))\\b") { m in
             guard let base = spokenValue(m[1]), let scale = scaleValue(m[2].lowercased())
             else { return m[0] }
             return group(base * scale + scale / 2)

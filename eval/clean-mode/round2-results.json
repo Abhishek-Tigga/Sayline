@@ -1,0 +1,27 @@
+{
+  "round": "clean-2",
+  "date": "2026-08-14",
+  "score": "13/16 marked (D2,F1 unrun; E2 unmarked)",
+  "baseline": "4/17",
+  "passes": [
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "B1",
+    "B2",
+    "B3",
+    "B4",
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5"
+  ],
+  "fails": {
+    "D1": "punctuation debris + transcription (created->activated)",
+    "D3": "identifier mangling, mostly transcription; flaky across runs",
+    "E1": "'47 and a half thousand' unnormalized \u2014 claimed-fixed item failed live; eval tested spoken-word form, Whisper emits mixed digit form"
+  },
+  "note": "landed texts in localStorage key clean2 and the user's export file; C-group all five frozen outcomes landed exactly"
+}

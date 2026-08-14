@@ -1,0 +1,150 @@
+<!doctype html><meta charset="utf-8">
+<title>Work mode blind A/B</title>
+<style>
+ body{font:15px/1.5 -apple-system,sans-serif;max-width:880px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+ .pair{border:1px solid #ddd;border-radius:8px;padding:1rem 1.2rem;margin:1.5rem 0}
+ .raw{color:#666;font-style:italic;border-left:3px solid #ccc;padding-left:.8rem;margin:.5rem 0 1rem}
+ .versions{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+ .v{background:#f7f7f7;border-radius:6px;padding:.8rem;white-space:pre-wrap}
+ .v h3{margin:0 0 .5rem;font-size:13px;color:#888;text-transform:uppercase}
+ .verdict{margin-top:.8rem}
+ .verdict label{margin-right:1.2rem;cursor:pointer}
+ textarea{width:100%;margin-top:.5rem;font:13px/1.4 -apple-system,sans-serif}
+ #export{position:sticky;bottom:1rem;padding:.6rem 1.4rem;font-size:15px;cursor:pointer}
+ @media(max-width:700px){.versions{grid-template-columns:1fr}}
+</style>
+<h1>Work mode blind A/B</h1>
+<p>For each pair: which version would you actually send? Judge at the
+send-without-editing bar. A note on why is worth more than the pick alone.
+<b>Export when done</b> — the button writes a file; marks in the page are
+lost if the tab closes.</p>
+<div class="pair"><h2>AB1 · Email · asking for something, with a deadline</h2>
+<div class="raw">hey sarah uh hope your week is going okay so i was looking at the slides for the q3 review meeting and like i noticed we are still missing the final conversation breakdown from your end can you uh send those updated numbers over because well uh the thing is the leadership sink got moved so i basically need to finalize the whole deck before tomorrow uh say around 4 pm if you could like get the data to me by tomorrow 1 pm at least that would give me enough time to you know plug everything into the chart and review it also uh if the regional spirit aren't totally done yet just send whatever raw draft you have right now instead of waiting let me know if that works or if we need to jump on a quick five minute calls to align on this thanks best regards abhishek</div>
+<div class="versions">
+ <div class="v"><h3>Version A</h3>Hey Sarah, hope your week is going okay. I was looking at the slides for the Q3 review meeting and noticed we are still missing the final conversation breakdown from your end. Can you send those updated numbers over? The leadership sync got moved, so I need to finalize the whole deck before tomorrow around 4 pm. If you could get the data to me by tomorrow 1 pm at least, that would give me enough time to plug everything into the chart and review it.
+
+Also, if the regional spirit aren't totally done yet, just send whatever raw draft you have now instead of waiting. Let me know if that works or if we need to jump on a quick five-minute call to align on this. Thanks, best regards, Abhishek.</div>
+ <div class="v"><h3>Version B</h3>Hey Sarah, hope your week is going okay.
+
+I noticed we're still missing the final conversation breakdown from your end for the Q3 review meeting slides. Can you send those updated numbers over? The leadership sync got moved, so I need to finalize the whole deck before tomorrow around 4 pm. If you could get the data to me by 1 pm tomorrow, that would give me enough time to plug everything into the chart and review it.
+
+If the regional splits aren't totally done yet, just send whatever raw draft you have now instead of waiting. Let me know if that works or if we need to jump on a quick five-minute call to align on this.
+
+Thanks,  
+Best regards,  
+Abhishek</div>
+</div>
+<div class="verdict">
+ <label><input type="radio" name="v-AB1" value="A"> A</label>
+ <label><input type="radio" name="v-AB1" value="B"> B</label>
+ <label><input type="radio" name="v-AB1" value="tie"> Can't pick / both fine</label>
+ <textarea id="note-AB1" rows="2" placeholder="why (optional but valuable)"></textarea>
+</div></div><div class="pair"><h2>AB2 · Email · saying no / pushing back</h2>
+<div class="raw">Hey Alex, so I got your note about trying to squeeze in the new export to PDF feature for the client before next week's release. And honestly I don't think we can make that happen right now. Like we looked at the current backlog and the dev team is already you know completely maxed out with the database migration stuff. Which is already super risky if we delay it. If we pull someone off to build this report right now, it will definitely delay the core launch date which we can't really afford to How about we table this for the next sprint instead or you know as a temporary workaround maybe we can just manually pull the csv dump for them this friday if they really need those numbers urgently let me look let me know what you think or if we need to chat more about this on a stand up tomorrow</div>
+<div class="versions">
+ <div class="v"><h3>Version A</h3>Hey Alex, I got your note about trying to squeeze in the new export to PDF feature for the client before next week's release. I don't think we can make that happen right now.
+
+We looked at the current backlog and the dev team is already completely maxed out with the database migration, which is already risky if delayed. If we pull someone off to build this report now, it will definitely delay the core launch date, which we can't afford.
+
+How about we table this for the next sprint? As a temporary workaround, we can manually pull the CSV dump for them this Friday if they really need those numbers urgently. Let me know what you think or if we need to chat more about this on a stand-up tomorrow.</div>
+ <div class="v"><h3>Version B</h3>Hey Alex,
+
+I got your note about trying to squeeze in the new export to PDF feature before next week's release. Honestly, I don't think we can make that happen right now. The dev team is already maxed out with the database migration, which is risky enough if delayed.
+
+If we pull someone off to build this report now, it will definitely delay the core launch date, which we can't afford. How about we table this for the next sprint? As a temporary workaround, we can manually pull the CSV dump for them this Friday if they really need the numbers urgently.
+
+Let me know what you think or if we need to chat more about this on the stand-up tomorrow.</div>
+</div>
+<div class="verdict">
+ <label><input type="radio" name="v-AB2" value="A"> A</label>
+ <label><input type="radio" name="v-AB2" value="B"> B</label>
+ <label><input type="radio" name="v-AB2" value="tie"> Can't pick / both fine</label>
+ <textarea id="note-AB2" rows="2" placeholder="why (optional but valuable)"></textarea>
+</div></div><div class="pair"><h2>AB3 · Slack · flagging something broken</h2>
+<div class="raw">team heads up prod builds are failing on CI since like 10 minutes ago please hold off all merges until we fix the pipeline runner okay</div>
+<div class="versions">
+ <div class="v"><h3>Version A</h3>Team heads up, prod builds have been failing on CI for about 10 minutes. Please hold off all merges until we fix the pipeline runner.</div>
+ <div class="v"><h3>Version B</h3>Team heads up, prod builds have been failing on CI for about 10 minutes. Please hold off all merges until we fix the pipeline runner.</div>
+</div>
+<div class="verdict">
+ <label><input type="radio" name="v-AB3" value="A"> A</label>
+ <label><input type="radio" name="v-AB3" value="B"> B</label>
+ <label><input type="radio" name="v-AB3" value="tie"> Can't pick / both fine</label>
+ <textarea id="note-AB3" rows="2" placeholder="why (optional but valuable)"></textarea>
+</div></div><div class="pair"><h2>AB4 · Slack · weekly update, counted points</h2>
+<div class="raw">Hey team, quick weekly update. First, we launched the new checkout flow. Yay! Second, the reporting bug is fully fixed and verified. And third, just as a reminder that sprint planning is, you know, move to Monday 11am instead of Friday. Thanks everyone.</div>
+<div class="versions">
+ <div class="v"><h3>Version A</h3>Quick weekly update. 
+
+1. We launched the new checkout flow.  
+2. The reporting bug is fully fixed and verified.  
+3. Sprint planning is moved to Monday 11am instead of Friday.  
+
+Thanks everyone.</div>
+ <div class="v"><h3>Version B</h3>Quick weekly update:
+
+1. We launched the new checkout flow.
+2. The reporting bug is fully fixed and verified.
+3. Sprint planning is moved to Monday at 11am instead of Friday.
+
+Thanks, everyone.</div>
+</div>
+<div class="verdict">
+ <label><input type="radio" name="v-AB4" value="A"> A</label>
+ <label><input type="radio" name="v-AB4" value="B"> B</label>
+ <label><input type="radio" name="v-AB4" value="tie"> Can't pick / both fine</label>
+ <textarea id="note-AB4" rows="2" placeholder="why (optional but valuable)"></textarea>
+</div></div><div class="pair"><h2>AB5 · Slack · answering a question, with a caveat</h2>
+<div class="raw">hey yeah so to answer your question about the api rate limits basically yes we do support up to 100 requests per second for standard tier but anything about that will just throw a 429 error and like for the sandbox environment credentials you ask for you can actually you know find them right in settings tabs under API keys let me know if that makes sense or if you need me to resend the invite link</div>
+<div class="versions">
+ <div class="v"><h3>Version A</h3>To answer your question about the API rate limits: yes, we support up to 100 requests per second for the standard tier. Anything above that will throw a 429 error.
+
+For the sandbox environment credentials, you can find them in the settings tab under API keys. Let me know if that makes sense or if you need me to resend the invite link.</div>
+ <div class="v"><h3>Version B</h3>To answer your question about the API rate limits: yes, we support up to 100 requests per second for the standard tier. Anything above that will throw a 429 error.
+
+For the sandbox environment credentials, you can find them in the settings tab under API keys. Let me know if that makes sense or if you need me to resend the invite link.</div>
+</div>
+<div class="verdict">
+ <label><input type="radio" name="v-AB5" value="A"> A</label>
+ <label><input type="radio" name="v-AB5" value="B"> B</label>
+ <label><input type="radio" name="v-AB5" value="tie"> Can't pick / both fine</label>
+ <textarea id="note-AB5" rows="2" placeholder="why (optional but valuable)"></textarea>
+</div></div><div class="pair"><h2>AB6 · Free choice · meeting opening</h2>
+<div class="raw">Good morning everyone. Thank you all for taking the time to join today's quarterly strategy sync. So, as we look at our overall operational performance for the last quarter, I think it's, well, it is fair to say that we have made some really significant progress across our core business initiative. However, looking at the pipeline data from the past month, there are clearly a few efficiencies bottlenecks that we definitely need to address before we move into Q4. Particularly, you know, around cross-functional alignment between our product delivery timelines and the go-to-market rollout schedules. so the main objective of our discussion today is to well pinpoint those exact friction points realign our primary objectives and establish a very clear measurable action plan for the rest of the year i would like to hand it over to the team now so we can walk through the deck thanks</div>
+<div class="versions">
+ <div class="v"><h3>Version A</h3>Thank you all for joining today's quarterly strategy sync. We have made significant progress across our core business initiatives last quarter. However, the pipeline data from the past month shows some efficiency bottlenecks we need to address before Q4, especially around cross-functional alignment between product delivery timelines and go-to-market rollout schedules.
+
+The main objective today is to pinpoint those friction points, realign our primary objectives, and establish a clear, measurable action plan for the rest of the year. I will hand it over to the team now to walk through the deck. Thanks.</div>
+ <div class="v"><h3>Version B</h3>Good morning everyone. Thank you for joining today's quarterly strategy sync.
+
+We have made significant progress across our core business initiatives last quarter. However, the pipeline data from the past month shows some efficiency bottlenecks we need to address before Q4, especially around cross-functional alignment between product delivery timelines and go-to-market rollout schedules.
+
+The main objective today is to pinpoint those friction points, realign our primary objectives, and establish a clear, measurable action plan for the rest of the year. I’ll hand it over to the team now to walk through the deck. Thanks.</div>
+</div>
+<div class="verdict">
+ <label><input type="radio" name="v-AB6" value="A"> A</label>
+ <label><input type="radio" name="v-AB6" value="B"> B</label>
+ <label><input type="radio" name="v-AB6" value="tie"> Can't pick / both fine</label>
+ <textarea id="note-AB6" rows="2" placeholder="why (optional but valuable)"></textarea>
+</div></div>
+<button id="export">Export verdicts</button>
+<script>
+const pairs = ["AB1", "AB2", "AB3", "AB4", "AB5", "AB6"];
+let dirty = false;
+document.addEventListener('change', () => dirty = true);
+window.addEventListener('beforeunload', e => { if (dirty) e.preventDefault(); });
+document.getElementById('export').onclick = () => {
+  const out = {};
+  for (const id of pairs) {
+    const pick = document.querySelector(`input[name="v-${id}"]:checked`);
+    out[id] = { pick: pick ? pick.value : null,
+                note: document.querySelector(`#note-${id}`).value };
+  }
+  const blob = new Blob([JSON.stringify(out, null, 1)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ab-verdicts.json';
+  a.click();
+  dirty = false;
+};
+</script>

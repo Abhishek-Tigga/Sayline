@@ -1,0 +1,128 @@
+{
+ "model": "gpt-4.1-mini",
+ "median_ms": {
+  "bare": 1972.9757504999998,
+  "shots": 1778.4057499999992
+ },
+ "pairs": [
+  {
+   "id": "AB1",
+   "A": "bare",
+   "B": "shots",
+   "arms": {
+    "bare": {
+     "text": "Hey Sarah, hope your week is going okay. I was looking at the slides for the Q3 review meeting and noticed we are still missing the final conversation breakdown from your end. Can you send those updated numbers over? The leadership sync got moved, so I need to finalize the whole deck before tomorrow around 4 pm. If you could get the data to me by tomorrow 1 pm at least, that would give me enough time to plug everything into the chart and review it.\n\nAlso, if the regional spirit aren't totally done yet, just send whatever raw draft you have now instead of waiting. Let me know if that works or if we need to jump on a quick five-minute call to align on this. Thanks, best regards, Abhishek.",
+     "ms": 3141.6287079999997,
+     "prompt_tokens": 1037,
+     "violations": []
+    },
+    "shots": {
+     "text": "Hey Sarah, hope your week is going okay.\n\nI noticed we're still missing the final conversation breakdown from your end for the Q3 review meeting slides. Can you send those updated numbers over? The leadership sync got moved, so I need to finalize the whole deck before tomorrow around 4 pm. If you could get the data to me by 1 pm tomorrow, that would give me enough time to plug everything into the chart and review it.\n\nIf the regional splits aren't totally done yet, just send whatever raw draft you have now instead of waiting. Let me know if that works or if we need to jump on a quick five-minute call to align on this.\n\nThanks,  \nBest regards,  \nAbhishek",
+     "ms": 2289.950875,
+     "prompt_tokens": 1512,
+     "violations": []
+    }
+   }
+  },
+  {
+   "id": "AB2",
+   "A": "bare",
+   "B": "shots",
+   "arms": {
+    "bare": {
+     "text": "Hey Alex, I got your note about trying to squeeze in the new export to PDF feature for the client before next week's release. I don't think we can make that happen right now.\n\nWe looked at the current backlog and the dev team is already completely maxed out with the database migration, which is already risky if delayed. If we pull someone off to build this report now, it will definitely delay the core launch date, which we can't afford.\n\nHow about we table this for the next sprint? As a temporary workaround, we can manually pull the CSV dump for them this Friday if they really need those numbers urgently. Let me know what you think or if we need to chat more about this on a stand-up tomorrow.",
+     "ms": 2419.322167,
+     "prompt_tokens": 1034,
+     "violations": []
+    },
+    "shots": {
+     "text": "Hey Alex,\n\nI got your note about trying to squeeze in the new export to PDF feature before next week's release. Honestly, I don't think we can make that happen right now. The dev team is already maxed out with the database migration, which is risky enough if delayed.\n\nIf we pull someone off to build this report now, it will definitely delay the core launch date, which we can't afford. How about we table this for the next sprint? As a temporary workaround, we can manually pull the CSV dump for them this Friday if they really need the numbers urgently.\n\nLet me know what you think or if we need to chat more about this on the stand-up tomorrow.",
+     "ms": 2761.734499999999,
+     "prompt_tokens": 1509,
+     "violations": []
+    }
+   }
+  },
+  {
+   "id": "AB3",
+   "A": "bare",
+   "B": "shots",
+   "arms": {
+    "bare": {
+     "text": "Team heads up, prod builds have been failing on CI for about 10 minutes. Please hold off all merges until we fix the pipeline runner.",
+     "ms": 921.248499999999,
+     "prompt_tokens": 880,
+     "violations": []
+    },
+    "shots": {
+     "text": "Team heads up, prod builds have been failing on CI for about 10 minutes. Please hold off all merges until we fix the pipeline runner.",
+     "ms": 1167.9159170000003,
+     "prompt_tokens": 1355,
+     "violations": []
+    }
+   }
+  },
+  {
+   "id": "AB4",
+   "A": "bare",
+   "B": "shots",
+   "arms": {
+    "bare": {
+     "text": "Quick weekly update. \n\n1. We launched the new checkout flow.  \n2. The reporting bug is fully fixed and verified.  \n3. Sprint planning is moved to Monday 11am instead of Friday.  \n\nThanks everyone.",
+     "ms": 1464.1047910000004,
+     "prompt_tokens": 924,
+     "violations": []
+    },
+    "shots": {
+     "text": "Quick weekly update:\n\n1. We launched the new checkout flow.\n2. The reporting bug is fully fixed and verified.\n3. Sprint planning is moved to Monday at 11am instead of Friday.\n\nThanks, everyone.",
+     "ms": 1051.503833,
+     "prompt_tokens": 1399,
+     "violations": []
+    }
+   }
+  },
+  {
+   "id": "AB5",
+   "A": "bare",
+   "B": "shots",
+   "arms": {
+    "bare": {
+     "text": "To answer your question about the API rate limits: yes, we support up to 100 requests per second for the standard tier. Anything above that will throw a 429 error.\n\nFor the sandbox environment credentials, you can find them in the settings tab under API keys. Let me know if that makes sense or if you need me to resend the invite link.",
+     "ms": 1811.0959589999993,
+     "prompt_tokens": 931,
+     "violations": []
+    },
+    "shots": {
+     "text": "To answer your question about the API rate limits: yes, we support up to 100 requests per second for the standard tier. Anything above that will throw a 429 error.\n\nFor the sandbox environment credentials, you can find them in the settings tab under API keys. Let me know if that makes sense or if you need me to resend the invite link.",
+     "ms": 1560.1732499999982,
+     "prompt_tokens": 1406,
+     "violations": []
+    }
+   }
+  },
+  {
+   "id": "AB6",
+   "A": "bare",
+   "B": "shots",
+   "arms": {
+    "bare": {
+     "text": "Thank you all for joining today's quarterly strategy sync. We have made significant progress across our core business initiatives last quarter. However, the pipeline data from the past month shows some efficiency bottlenecks we need to address before Q4, especially around cross-functional alignment between product delivery timelines and go-to-market rollout schedules.\n\nThe main objective today is to pinpoint those friction points, realign our primary objectives, and establish a clear, measurable action plan for the rest of the year. I will hand it over to the team now to walk through the deck. Thanks.",
+     "ms": 2134.8555420000002,
+     "prompt_tokens": 1012,
+     "violations": [
+      {
+       "detail": "it added a commitment that was never spoken (\"i will\")",
+       "kind": "invented-commitment"
+      }
+     ]
+    },
+    "shots": {
+     "text": "Good morning everyone. Thank you for joining today's quarterly strategy sync.\n\nWe have made significant progress across our core business initiatives last quarter. However, the pipeline data from the past month shows some efficiency bottlenecks we need to address before Q4, especially around cross-functional alignment between product delivery timelines and go-to-market rollout schedules.\n\nThe main objective today is to pinpoint those friction points, realign our primary objectives, and establish a clear, measurable action plan for the rest of the year. I’ll hand it over to the team now to walk through the deck. Thanks.",
+     "ms": 1996.6382500000002,
+     "prompt_tokens": 1487,
+     "violations": []
+    }
+   }
+  }
+ ]
+}

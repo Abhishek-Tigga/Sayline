@@ -5949,3 +5949,201 @@ recorded in the C-group tripwire remains measured-ineffective regardless
 of this decision, and that finding is still Fable's to rule on. So is
 whether the 70B — which lost the model A/B on p90 latency alone, by
 52 ms, and is the plausible fix for A3 — is worth reopening.
+
+---
+
+## CLEAN MODE · Self-correction cost — the two open items ruled (Fable, 2026-08-14)
+
+The user's ruling (keep, accept A3's cost) stands and closes the main
+question. The two items left to me:
+
+### 1 · The tripwire process point: adopted as a standing rule, and the
+### error was mine
+The ineffective retreat was my authorship: I wrote "delete the two
+reason-judgment lines" — a *mechanism* — on the unverified assumption
+that those lines drove aggressive deletion. Measurement shows the base
+resolution instruction is the cause; my retreat lever never reached it.
+Same failure family as the instrument errors this week: a causal claim
+shipped without being exercised. **Standing rule from here: tripwires
+are written as OUTCOMES, not mechanisms.** ("A3 keeps 'No rush,
+just checking' intact" — not "delete lines X and Y.") A suggested
+mechanism may ride along, but it is marked unverified unless it was
+actually measured to reach the cause at write-time. Whoever trips the
+wire owns finding a mechanism that works. Opus's judgment call — not
+pulling a trigger whose conditions had not fired, using a lever
+measured to do nothing, and recording instead — was exactly right and
+is the behavior the ledger exists to produce.
+
+### 2 · The 70B revisit: declined, no test needed
+The offered A3-on-70B test fails the decide-by-measurement test in the
+other direction: **no result could change the decision.** Even if the
+70B holds "No rush", it measured *worse* on punctuation overall (6/8
+vs the 8B's 7/8 — A3's own workstream), breached the p90 lock (552ms
+vs 500), and carries Groq's rate caps. Reopening a settled speed lock
+to buy back one comma-class, with a model that loses the surrounding
+workstream, is a bad trade at any A3 result — so the test would be
+motion, not information. The lock stands; the 8B stays; A3's untidy
+class is the recorded, user-accepted cost. If the vocabulary of
+"no"-opening softeners grows beyond this one class in live use, that
+is new evidence and reopens the question properly.
+
+### Owned corrections, both against my round-1 analysis
+1. **My punctuation diagnosis was wrong.** I called it small-model
+   behavior and made the model A/B the headline; the cause was our own
+   validator's `smooth()` deleting commas before lowercase words —
+   fed the user's expected output, the validator stripped the user's
+   own commas. Opus found it by feeding the instrument its target,
+   which is the calibration rule doing its job. The A/B then inverted
+   my prediction (8B wins). Diagnosis from symptoms without
+   instrument-checking first — my miss, twice named as a standing
+   habit, still missed.
+2. 12/26 → 25/26 against the user's expecteds, with the speed lock
+   held at 283ms median, is the strongest single-session result this
+   project has produced. Recorded as claimed; the user's Clean round 2
+   (page already updated) is the live verification when they choose to
+   run it.
+
+---
+
+### WORK MODE · A live email exposed a stale-build trap and killed a sign-off "fix" on its control
+2026-08-14 · Fable · `claimed-fixed`
+
+The user dictated a real email into Gmail and asked whether it worked.
+Three findings, in ascending order of how nearly they were mis-reported.
+
+**1. Gmail detection: confirmed again, live.** `16:37:00 focused app ->
+Google Chrome ... Gmail ... -> context: email`, work mode flagged, output
+inserted, no fallback. The detection question is now closed twice over.
+
+**2. The output dropped the spoken sign-off, and the prompt was innocent.**
+The user ended with "thanks best regards abhishek"; the landed text ended
+"Thanks." — the sign-off gone. That is exactly what the closing-line rule
+added hours earlier exists to prevent, so it read as the second failure of
+that rule in one session.
+
+It was not. Re-running the same transcript through the built prompt kept
+the sign-off, twice. **The running app was started at 15:04:12; the binary
+carrying the fixes was built at 16:18:27.** The user had been dictating
+against a pre-fix build for the whole session, and every conclusion drawn
+from live output in that window is about the old prompt.
+
+Worth stating as a standing hazard, because it is invisible from both
+ends: this project's habit is to verify by *running the app*, CLAUDE.md
+says "build succeeded is not verification" — but a rebuild does not
+relaunch a menu-bar agent, so the app under the user's fingers can silently
+be older than the binary the eval harness reads. The eval and the live app
+disagreeing is the *symptom*, and the natural reading of that disagreement
+is "the fix does not work in production", which is precisely backwards.
+Checked with `ps -o lstart=` against the binary mtime; app relaunched.
+
+**3. A sign-off formatting fix was written, tested, and rejected by its
+control.** With the fix live the sign-off survives but lands inline —
+"...to align on this. Thanks, best regards, Abhishek." — where every user
+ideal has the closing and the name on their own lines. The obvious
+addition to the email register ("keep their words but set them as an email
+sign-off: blank line, closing on its own line, name on the next") was
+tried:
+
+```
+case                        current            variant
+spoken sign-off (live)      inline, correct    3 clumsy lines:
+                                               "Thanks," / "Best regards" / "Abhishek"
+NO sign-off spoken (E1)     clean              INVENTED one, and emitted
+                                               the literal placeholder
+                                               "[Your Name]" — guard fired
+                                               invented-name
+```
+
+**Rejected.** It degrades the case it targets and fabricates a sign-off on
+the case it was not aimed at, including a placeholder string that would
+have gone into a real email to a real client. Inline-but-lossless beats
+formatted-but-inventing. The control earned its place here: run only the
+positive case and this ships.
+
+The residual — sign-off renders inline rather than as a block — is
+recorded as cosmetic and open. If it is worth fixing it wants deterministic
+post-processing (detect a trailing closing + name, split to two lines),
+not another instruction, for the reason above.
+
+**Transcription pile, from this one email:** "conversion breakdown" →
+"conversation breakdown", "regional split" → "regional spirit",
+"leadership sync" → "leadership sink" (the rewrite silently corrected the
+last one to "sync", which is the model repairing a mishear — benign here,
+but it is the same mechanism as inventing, and only luck separates them).
+Two of the three survive into the sent email as nonsense.
+
+Ran: the live transcript through the built prompt ×2 (sign-off kept both
+times), the variant against a positive and a negative case, binary
+`--dump-config` asserted to carry both of today's rules, app relaunched
+and verified on the new build.
+
+---
+
+## CLEAN MODE · Round 2 results (user-tested, Fable recording, 2026-08-14)
+
+**13/16 pass, up from 4/17 at baseline.** D2 and F1 unrun, E2 unmarked.
+Extracted to `eval/clean-mode/round2-results.json`.
+
+**What held live:** all four punctuation cases (A3 landed fully correct
+— "No rush, just checking." — the accepted untidy-cost did not even
+bite this run; worth asking Opus why, pleasantly); the entire grammar
+policy table (B 4/4 — fixes applied, protected phrases kept); **all
+five frozen C-outcomes exactly** — aggressive C1, minimal C2, reason-
+kept C3, both controls untouched. Scoped self-correction is
+user-verified live.
+
+**The three fails:**
+- E1 — **a claimed-fixed item failed live.** "47 and a half thousand"
+  landed unnormalized; the numbers workstream claimed 5/5. Likely
+  cause: the eval fed spoken words ("forty seven and a half thousand")
+  while Whisper live emits the mixed form ("47 and a half thousand"),
+  which the normalizer misses. Clear repro for Opus; also route to the
+  eval-vs-live gap file: the harness should test Whisper's actual
+  output forms, not idealized spoken forms.
+- D1, D3 — dominated by transcription (created→activated again,
+  .swift→.shift, fillers→filters, identifier splitting), with D1 also
+  showing punctuation debris ("No wait!"). Mostly the vocabulary fix's
+  pile, which is now the single biggest quality lever left in Clean.
+- A4 passed leniently with mishears (docs→"dock", sandbox→"soundbox")
+  and a missing colon — same pile.
+
+**User verdicts to carry:** the C-group trade was worth it (A3 didn't
+even pay its price this run); D3 "first go didn't work, second did" —
+flakiness note for the identifier class.
+
+---
+
+### CLEAN · E1 failed live: the eval fed word-forms, Whisper emits digits
+2026-08-14 · Opus · `claimed-fixed`
+
+Reported by the user from a live hold, logged by Fable. "47 and a half
+thousand" did not normalize. Cause, and it is mine: the pattern that
+finds number candidates was built from the spelled-out lexicon only —
+"forty", "seven" — with no digits in the alternation. `spokenValue`
+already accepted digits; nothing ever handed it any. The eval had only
+ever been given "forty seven and a half thousand", so it passed while the
+app failed.
+
+This is the gap CLAUDE.md names in the "By hand" section — *the eval sends
+clean text; the app gets whatever the transcriber heard* — and it is now
+the second time this week that reading the raw log settled a Clean
+question the eval could not (D1 was the first).
+
+Fixed: digits join the alternation, and the article is optional, because
+the log carries both "47 and a half thousand" and "47 and half thousand".
+Four new suite cases taken verbatim from the log rather than invented,
+including the whole logged sentence end to end:
+
+```
+"The call moved from 430 to 245 and the budget is 47 and a half thousand."
+-> "The call moved from 4:30 to 2:45 and the budget is 47,500."
+```
+
+**Standing correction to how this file's transcripts are chosen:** the 19
+frozen in `eval/clean-mode/transcripts.json` came from the checklist,
+where the scripts are written the way a person types them. Real Whisper
+output is a different distribution — digits for figures, "430" for times,
+no punctuation. Any future number or format rule should take at least one
+case from `~/Library/Logs/Sayline/sayline.log` before it is called done.
+
+Ran: 9/9 suites green, build clean.
