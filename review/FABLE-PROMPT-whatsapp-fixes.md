@@ -84,6 +84,27 @@ then have the user search Contacts.app for the missing Ashutosh —
 whether the card exists and whether it carries a phone number decides
 which mechanism this was.
 
+## 6 · The last fallback should be WhatsApp's own picker, not a dictated number
+
+The user's Mac had TWO "My Card" entries, and macOS's chosen me-card
+was the EMPTY one — they had to type their own number in by hand and
+correctly point out that no normal user does this. Your region-code
+completion (landed in f3ea0f6) fixes the filled-local-number case;
+the truly-empty case still falls back to asking the user to dictate a
+phone number by voice, which is the most mishearable utterance in the
+product.
+
+Better final rung: `whatsapp://send?text=<message>` with **no phone
+parameter** opens WhatsApp with the message staged and WhatsApp's own
+chat picker up — "Message Yourself" sits at the top, one click,
+zero numbers involved, nothing to mishear, and decision 4 still holds
+(the user clicks the chat and then Enter). Chain becomes: me-card
+international → me-card local + region → **number-less picker**. The
+voice ask can be deleted outright — the picker beats it in every
+case, including the first-run one. If the picker route works in a
+live test, also drop `sharePageSelfNumber` storage: one less copy of
+a phone number on disk.
+
 ## Also known, not yours
 
 - Glossary doesn't rebuild on a Contacts *grant* mid-session (needs a
