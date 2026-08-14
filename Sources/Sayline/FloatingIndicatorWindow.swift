@@ -120,9 +120,21 @@ final class FloatingIndicatorWindow {
     /// used for agent outcomes that previously had no visible feedback
     /// at all (no match found, app not found, request declined).
     func flashMessage(_ text: String, duration: TimeInterval = 1.6) {
+        // `setNotice` is what actually draws it. Setting `state` alone shows
+        // an empty panel: no view reads `state`, so the text went nowhere.
+        //
+        // This is how agent answers were lost. The pipeline worked end to
+        // end — "agent answered -> Storage: 22 GB free of 245 GB" is in the
+        // log, and the panel was shown for 4.5s — but the panel had nothing
+        // in it except the pill. Broken on 2026-08-07 in af41551, which
+        // removed the comparison scaffolding and with it the only code that
+        // rendered a text state. Found 2026-08-14, when the user asked why
+        // a storage query never answered.
+        viewModel.setNotice(text)
         show(state: .message(text))
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
             guard let self, self.viewModel.state == .message(text) else { return }
+            self.viewModel.setNotice(nil)
             self.hide()
         }
     }
