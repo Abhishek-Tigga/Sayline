@@ -62,6 +62,8 @@ enum HeadlessModes {
             let seconds = arguments.count > 2 ? Double(arguments[2]) ?? 3 : 3
             let holds = arguments.count > 3 ? Int(arguments[3]) ?? 1 : 1
             selftestCapture(seconds: seconds, holds: holds)
+        case "--selftest-hotkey":
+            selftestHotkey()
         default:
             return
         }
@@ -410,6 +412,108 @@ extension HeadlessModes {
         print(failures == 0
               ? "PASS — every hold met the contract (first-of-session < 900ms, warm < 150ms)"
               : "FAIL — \(failures) hold(s) broke the contract")
+        exit(failures == 0 ? 0 : 1)
+    }
+
+    /// Proves the two-tap hotkey path end to end without a human at the
+    /// keyboard: posts synthetic modifier and key events at the HID level
+    /// and asserts the gesture callbacks fire, the hold-scoped active tap
+    /// appears at hotkey-down, and — the invariant that matters — it is
+    /// gone again after hotkey-up. "While idle, Sayline holds nothing" is
+    /// asserted here, not assumed, because a leftover tap is invisible to
+    /// whoever caused it.
+    ///
+    /// Run with no other Sayline instance alive (`pkill -x Sayline`
+    /// first): the posted events are real session events, and a running
+    /// app would treat the synthetic hold as a genuine dictation. Don't
+    /// type during the ~4 seconds it runs, for the same reason.
+    ///
+    /// Needs Accessibility (tap creation and event posting both).
+    /// Mandatory after any `HotkeyManager` or `EventTap` change.
+    static func selftestHotkey() {
+        // Callbacks land on the tap thread while assertions read from
+        // this one, so the counts go through a lock rather than trusting
+        // the sleeps to double as memory barriers.
+        final class Tally {
+            private let lock = NSLock()
+            private var counts: [String: Int] = [:]
+            func bump(_ key: String) { lock.lock(); counts[key, default: 0] += 1; lock.unlock() }
+            func count(_ key: String) -> Int { lock.lock(); defer { lock.unlock() }; return counts[key] ?? 0 }
+        }
+        let tally = Tally()
+
+        let manager = HotkeyManager() // default hotkey: Right Option (vk 61)
+        manager.onHotkeyDown = { tally.bump("down") }
+        manager.onHotkeyUp = { tally.bump("up") }
+        manager.onAgentModeRequested = { tally.bump("agent") }
+        manager.onWorkModeHold = { tally.bump("work") }
+        manager.onEscapePressed = { tally.bump("escape") }
+
+        guard manager.start() else {
+            print("FAIL — tap did not install. Is Accessibility granted to this binary?")
+            exit(2)
+        }
+        Thread.sleep(forTimeInterval: 0.3)
+
+        /// Keyboard events carry their key in the keycode field; modifier
+        /// presses arrive as `.flagsChanged`, so the type is overridden
+        /// for those and the flags carry the pressed/released state.
+        func post(_ key: Int64, down: Bool, flags: CGEventFlags, asFlagsChanged: Bool = false) {
+            guard let event = CGEvent(keyboardEventSource: nil,
+                                      virtualKey: CGKeyCode(key), keyDown: down) else {
+                print("FAIL — could not create a synthetic event")
+                exit(2)
+            }
+            if asFlagsChanged { event.type = .flagsChanged }
+            event.flags = flags
+            event.post(tap: .cghidEventTap)
+        }
+
+        var failures = 0
+        func expect(_ ok: Bool, _ what: String) {
+            print((ok ? "  ok   " : "  FAIL ") + what)
+            if !ok { failures += 1 }
+        }
+
+        // Two full gestures, because per-hold state (the agent/work
+        // once-per-hold guards) only proves itself on the second pass.
+        for hold in 1...2 {
+            post(61, down: true, flags: .maskAlternate, asFlagsChanged: true)
+            Thread.sleep(forTimeInterval: 0.35)
+            expect(tally.count("down") == hold, "hold \(hold): hotkey-down fired")
+            expect(manager.holdTapIsInstalled, "hold \(hold): active Space tap installed for the hold")
+
+            // Space twice, because keyboards auto-repeat: the request
+            // must fire exactly once per hold.
+            post(49, down: true, flags: .maskAlternate)
+            post(49, down: true, flags: .maskAlternate)
+            Thread.sleep(forTimeInterval: 0.35)
+            expect(tally.count("agent") == hold, "hold \(hold): agent request fired exactly once")
+            post(49, down: false, flags: .maskAlternate)
+
+            // Right Command mid-hold flips the hold to Work.
+            post(54, down: true, flags: [.maskAlternate, .maskCommand], asFlagsChanged: true)
+            Thread.sleep(forTimeInterval: 0.35)
+            expect(tally.count("work") == hold, "hold \(hold): work mode fired")
+            post(54, down: false, flags: .maskAlternate, asFlagsChanged: true)
+
+            post(61, down: false, flags: [], asFlagsChanged: true)
+            Thread.sleep(forTimeInterval: 0.35)
+            expect(tally.count("up") == hold, "hold \(hold): hotkey-up fired")
+            expect(!manager.holdTapIsInstalled, "hold \(hold): active tap gone after the hold — idle holds nothing")
+        }
+
+        // Escape while idle: observed, never consumed.
+        post(53, down: true, flags: [])
+        post(53, down: false, flags: [])
+        Thread.sleep(forTimeInterval: 0.35)
+        expect(tally.count("escape") >= 1, "escape observed while idle")
+
+        manager.stop()
+        Thread.sleep(forTimeInterval: 0.5)
+        print(failures == 0
+              ? "PASS — 2 holds through both taps; the active tap never outlived its hold"
+              : "FAIL — \(failures) assertion(s) failed")
         exit(failures == 0 ? 0 : 1)
     }
 }

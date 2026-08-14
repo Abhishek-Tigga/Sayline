@@ -2,8 +2,28 @@ import Carbon
 import Cocoa
 
 /// Watches for a chosen modifier key (see HotkeyOption) being held
-/// down/released, system-wide, via a low-level CGEventTap. Requires
-/// Accessibility permission to be granted before `start()` will succeed.
+/// down/released, system-wide. Requires Accessibility permission to be
+/// granted before `start()` will succeed.
+///
+/// **Two taps since 2026-08-14 — the freeze fix.** macOS holds keyboard
+/// delivery for an active (`.defaultTap`) tap until its callback
+/// answers, and disables the tap when it decides the answer is too slow;
+/// our polite re-enable then put the same tap straight back in the
+/// keyboard's path, converting one hiccup into a sustained freeze. That
+/// loop is the best surviving explanation for every observed freeze
+/// (four incidents, three disproven theories — review/LEDGER.md).
+///
+/// So the permanent tap is now **listen-only**: it receives a copy of
+/// events after delivery, nothing ever waits on it, and however slow its
+/// callback gets, the keyboard cannot freeze because of it. The failure
+/// mode is removed, not made rarer.
+///
+/// The only thing that ever needed an active tap is swallowing Space
+/// during a hold so it isn't typed while dictating. A tiny active tap
+/// (keyDown only) is created at hotkey-down and torn down at hotkey-up:
+/// the freeze surface shrinks from all day to the seconds a hold lasts,
+/// and "while idle, Sayline holds nothing" now covers the dangerous tap
+/// kind too. `Sayline --selftest-hotkey` asserts both halves.
 final class HotkeyManager {
     private static let agentModeKeyCode: Int64 = 49 // kVK_Space
     /// Work mode: hold the hotkey and press Right Command.
@@ -25,8 +45,13 @@ final class HotkeyManager {
     /// hotkey" doesn't require recreating the tap.
     var hotkeyOption: HotkeyOption = .rightOption
 
-    private var eventTap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    /// The always-on listen-only tap: gesture detection, never blocking.
+    private var permanentTap: EventTap?
+    /// The hold-scoped active tap: exists only between hotkey-down and
+    /// hotkey-up, solely so Space can be swallowed while dictating.
+    /// `nil` whenever no hold is in progress — asserted by the selftest,
+    /// because a leftover is invisible to whoever caused it.
+    private var holdTap: EventTap?
     /// The tap gets its own thread and run loop. It used to live on the
     /// main run loop, which meant every tap callback queued behind
     /// whatever the main thread was doing — including the synchronous
@@ -37,7 +62,9 @@ final class HotkeyManager {
     /// held input *is* a system-wide freeze: observed live 2026-08-09,
     /// three times in ~3 hours, with six timeout events logged in one
     /// 65-second window. On a dedicated thread the callback answers
-    /// immediately no matter what the app is doing.
+    /// immediately no matter what the app is doing. (The listen-only
+    /// split removes the holding-input half of that story; the dedicated
+    /// thread stays because the *hold* tap is active and does block.)
     private var tapThread: Thread?
     private var tapDidInstall = false
     /// Set by the callback, acted on by the thread loop — see
@@ -55,81 +82,15 @@ final class HotkeyManager {
     /// So the breaker's disable happens exactly once, off the callback.
     private var hasTurnedTapOff = false
 
-    // MARK: - Tap health
-    //
-    // All tap-thread only: written in the callback, read in
-    // `reenableTapIfSafe` and `noteDisable`, both of which run on that same
-    // thread. No locking, and none should be added without checking that
-    // still holds.
-    //
-    // These exist because `tapDisabledByTimeout` means "your callback took
-    // too long" and this project has never known what its callback cost or
-    // how stale its events were. Two days of freeze analysis rested on a
-    // measurement of the main thread, which is neither of those things.
-    private var callbackCount = 0
-    private var lastCallbackMillis = 0.0
-    private var worstCallbackMillis = 0.0
-    private var lastDeliveryLagMillis = 0.0
-    private var worstDeliveryLagMillis = 0.0
-    private var lastLagWarning = Date.distantPast
-
-    /// Mach ticks to nanoseconds. Computed once; the ratio never changes
-    /// for the life of the process.
-    private static let machTimebase: mach_timebase_info_data_t = {
-        var info = mach_timebase_info_data_t()
-        mach_timebase_info(&info)
-        return info
-    }()
-
-    /// One line describing how well the tap is being serviced, for any log
-    /// that needs it. Cheap enough to build on a disable.
-    private var tapHealth: String {
-        String(format: "callback last %.1fms worst %.1fms over %d events; "
-                     + "delivery lag last %.0fms worst %.0fms",
-               lastCallbackMillis, worstCallbackMillis, callbackCount,
-               lastDeliveryLagMillis, worstDeliveryLagMillis)
-    }
-
-    /// Records what one callback cost, and how stale the event already was
-    /// when it arrived.
-    ///
-    /// The lag is the interesting half. Fable's mechanism candidate is that
-    /// macOS holds keyboard events for an active tap that is slow to
-    /// service, and disables the tap once delivery backs up. If that is
-    /// right, lag climbs before a disable — so this number should be rising
-    /// in the seconds before the next freeze, and flat if the cause is
-    /// outside this process.
-    fileprivate func recordDelivery(event: CGEvent, spentNanos: UInt64) {
-        let spent = Double(spentNanos) / 1_000_000
-        callbackCount += 1
-        lastCallbackMillis = spent
-        worstCallbackMillis = max(worstCallbackMillis, spent)
-
-        let timebase = Self.machTimebase
-        let now = mach_absolute_time()
-        let created = event.timestamp
-        guard timebase.denom != 0, now > created else { return }
-        let lag = Double(now - created) * Double(timebase.numer)
-                / Double(timebase.denom) / 1_000_000
-        lastDeliveryLagMillis = lag
-        worstDeliveryLagMillis = max(worstDeliveryLagMillis, lag)
-
-        // Rate-limited: a backed-up queue produces many late events at
-        // once, and a log line per event would itself slow the callback
-        // down — turning the diagnostic into the disease.
-        if lag > 250, Date().timeIntervalSince(lastLagWarning) > 5 {
-            lastLagWarning = Date()
-            SaylineLog.log(String(format:
-                "event arrived %.0fms late — delivery is backing up (%@)", lag, StallWatchdog.shared.snapshot))
-        }
-    }
     /// Fired when the breaker trips, so the app can tell the user their
     /// hotkey is gone and why.
     var onTapGaveUp: (() -> Void)?
     private var isHotkeyActive = false
     /// Guards against keyboard auto-repeat: holding Space sends many
     /// rapid keyDown events, not just one, so without this we'd fire
-    /// onAgentModeRequested (and log) dozens of times per hold.
+    /// onAgentModeRequested (and log) dozens of times per hold. Shared
+    /// by the hold tap and the listen-only fallback path, so the request
+    /// fires once no matter which tap sees Space first.
     private var agentModeAlreadyRequestedThisHold = false
     private var workModeAlreadyRequestedThisHold = false
 
@@ -156,8 +117,14 @@ final class HotkeyManager {
     /// than consumed: the panel never becomes key window, so this tap is
     /// the only way to hear the key at all — but swallowing it would eat a
     /// press the app underneath may be waiting for. Dismissing our overlay
-    /// is not worth breaking someone's dialog.
+    /// is not worth breaking someone's dialog. (The listen-only tap could
+    /// not consume it anyway — the policy and the mechanism now agree.)
     var onEscapePressed: (() -> Void)?
+
+    /// Whether the hold-scoped active tap currently exists. For
+    /// `--selftest-hotkey`, which asserts it appears during a hold and —
+    /// the half that matters — is gone once the hold ends.
+    var holdTapIsInstalled: Bool { holdTap?.isInstalled ?? false }
 
     /// Spins up the tap thread and waits briefly for it to report whether
     /// the tap was created, so callers keep the synchronous success/failure
@@ -189,7 +156,7 @@ final class HotkeyManager {
                 slices += 1
                 if slices == 20 {
                     SaylineLog.log("tap instrumentation live — " + StallWatchdog.shared.snapshot
-                                   + "; " + self.tapHealth)
+                                   + "; " + (self.permanentTap?.health ?? "no tap"))
                 }
                 self.reenableTapIfSafe()
                 // This thread wakes every 250ms anyway, so it is the
@@ -217,38 +184,29 @@ final class HotkeyManager {
     private func installTap() -> Bool {
         let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
             | CGEventMask(1 << CGEventType.keyDown.rawValue)
-        let selfPointer = Unmanaged.passUnretained(self).toOpaque()
-
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: { _, type, event, refcon in
-                guard let refcon else { return Unmanaged.passUnretained(event) }
-                let manager = Unmanaged<HotkeyManager>.fromOpaque(refcon).takeUnretainedValue()
-                // Measured around every callback, because the number macOS
-                // acts on is how long we take to answer. `tapDisabledByTimeout`
-                // canonically means "your callback took too long", and this
-                // project has never once known what its callback cost.
-                let began = DispatchTime.now().uptimeNanoseconds
-                let result = manager.handle(event: event, type: type)
-                manager.recordDelivery(event: event,
-                                       spentNanos: DispatchTime.now().uptimeNanoseconds - began)
-                return result
-            },
-            userInfo: selfPointer
-        ) else {
+        let tap = EventTap(label: "hotkey", options: .listenOnly, mask: mask) {
+            [weak self] type, event in
+            guard let self else { return Unmanaged.passUnretained(event) }
+            return self.handle(event: event, type: type)
+        }
+        tap.onDisabled = { [weak self] type in
+            guard let self else { return }
+            // Both threads' states go on this line, plus what the callback
+            // has actually been costing. Earlier versions logged the main
+            // thread alone and concluded from "main ok" that the refusal
+            // came from outside the process — a conclusion the measurement
+            // could not support, because the tap thread was never watched.
+            SaylineLog.log("event tap was disabled by the system (\(type.rawValue)) — "
+                           + StallWatchdog.shared.snapshot + "; "
+                           + (self.permanentTap?.health ?? "no tap"))
+            self.noteDisable()
+        }
+        guard tap.install() else {
             SaylineLog.log("failed to create event tap — is Accessibility permission granted?")
             return false
         }
-
-        eventTap = tap
-        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
-        runLoopSource = source
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        SaylineLog.log("hotkey listener started on its own thread (hold \(hotkeyOption.displayName))")
+        permanentTap = tap
+        SaylineLog.log("hotkey listener started listen-only on its own thread (hold \(hotkeyOption.displayName))")
         return true
     }
 
@@ -257,19 +215,59 @@ final class HotkeyManager {
         tapThread = nil
     }
 
-    /// Runs on the tap thread as its run loop exits, so the source is
-    /// removed from the same run loop it was added to.
+    /// Runs on the tap thread as its run loop exits, so the sources are
+    /// removed from the same run loop they were added to.
     private func uninstallTap() {
-        if let tap = eventTap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-        }
-        if let source = runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
-        }
-        eventTap = nil
-        runLoopSource = nil
+        removeHoldTap()
+        permanentTap?.uninstall()
+        permanentTap = nil
         tapDidInstall = false
     }
+
+    // MARK: - The hold-scoped active tap
+
+    /// The one active (`.defaultTap`) tap left in the app, alive only
+    /// while a hold is in progress. Its sole job is swallowing Space so
+    /// it isn't typed while dictating — the single thing a listen-only
+    /// tap cannot do. Created here on the tap thread (this runs inside
+    /// the permanent tap's callback), so both taps' callbacks share one
+    /// run loop and the gesture state needs no locking.
+    private func installHoldTap() {
+        guard holdTap == nil, !tappedOut else { return }
+        let tap = EventTap(label: "hold", options: .defaultTap,
+                           mask: CGEventMask(1 << CGEventType.keyDown.rawValue)) {
+            [weak self] type, event in
+            guard let self, type == .keyDown,
+                  event.getIntegerValueField(.keyboardEventKeycode) == Self.agentModeKeyCode
+            else { return Unmanaged.passUnretained(event) }
+            self.requestAgentMode()
+            return nil // swallow Space while dictating so it isn't typed
+        }
+        tap.onDisabled = { type in
+            // No re-enable machinery, deliberately: this tap dies with
+            // the hold and the next hold gets a fresh one. Worst case for
+            // one hold is an unswallowed Space. Fighting the system over
+            // an active tap is the exact behavior the freeze fix removed.
+            SaylineLog.log("hold tap disabled by the system (\(type.rawValue)) mid-hold — "
+                           + "Space may reach the app until the hold ends")
+        }
+        if tap.install() {
+            holdTap = tap
+        } else {
+            // Fail open: dictation and agent mode both still work through
+            // the listen-only tap — see the fallback in `handle`. Only
+            // the swallow is lost, and one stray space beats a dead
+            // feature.
+            SaylineLog.log("hold tap failed to install — Space will not be swallowed this hold")
+        }
+    }
+
+    private func removeHoldTap() {
+        holdTap?.uninstall()
+        holdTap = nil
+    }
+
+    // MARK: - Disable policy (permanent tap)
 
     /// Stops fighting when the system keeps rejecting us.
     ///
@@ -278,15 +276,12 @@ final class HotkeyManager {
     /// explicitly did not cover. Seven disables in 96 seconds, and a user
     /// whose keyboard stopped working until the app was killed.
     ///
-    /// The cause is still unknown after three disproven theories. What is
-    /// known is the shape: when macOS starts repeatedly timing this tap
-    /// out, re-enabling it is how the app stays in the input path while
-    /// the system is trying to remove it. So it stops.
-    ///
-    /// A dead hotkey is a bad outcome. A dead keyboard is a much worse
-    /// one, and the person cannot even quit the app to fix it. Given an
-    /// unexplained failure that harms the machine, giving up loudly beats
-    /// persisting quietly.
+    /// Since the listen-only split, re-enabling this tap can no longer
+    /// harm the keyboard — the stakes have dropped from "dead keyboard"
+    /// to "dead hotkey". The breaker stays anyway: the cause of the
+    /// disables is still unknown (review/LEDGER.md, OPEN), and while it
+    /// is, a system that keeps rejecting us is telling us something we
+    /// don't understand. Giving up loudly still beats persisting quietly.
     private func noteDisable() {
         // Already given up. Every line below must not run twice.
         //
@@ -316,6 +311,10 @@ final class HotkeyManager {
         guard recentDisables.count < 4 else {
             tappedOut = true
             tapNeedsReenable = false
+            // The active tap must not outlive the decision to stand down.
+            // This runs on the tap thread (disable events arrive in the
+            // callback), so the teardown is on the right run loop.
+            removeHoldTap()
             // NOT disabled here. `reenableTapIfSafe` on the tap thread
             // owns every call to `tapEnable`, so the disable cannot
             // re-enter this callback.
@@ -334,19 +333,21 @@ final class HotkeyManager {
     /// while Secure Input Mode is on, a password field owns the keyboard
     /// and we stay out of its way entirely; and even afterwards, attempts
     /// are spaced so a persistent failure cannot become a tight loop
-    /// against the window server.
+    /// against the window server. Both matter less now that this tap is
+    /// listen-only — nothing waits on it — but the policy is kept until
+    /// the disables themselves are explained.
     private func reenableTapIfSafe() {
-        // The one place `tapEnable` is called, so a disable can never
-        // re-enter the callback that asked for it.
+        // The one place `tapEnable` is called for the permanent tap, so a
+        // disable can never re-enter the callback that asked for it.
         if tappedOut {
-            if let eventTap, !hasTurnedTapOff {
+            if let permanentTap, !hasTurnedTapOff {
                 hasTurnedTapOff = true
-                CGEvent.tapEnable(tap: eventTap, enable: false)
+                permanentTap.disable()
                 SaylineLog.log("event tap switched off on the tap thread")
             }
             return
         }
-        guard tapNeedsReenable, let eventTap else { return }
+        guard tapNeedsReenable, let permanentTap else { return }
 
         if IsSecureEventInputEnabled() {
             if !loggedSecureInputWait {
@@ -362,23 +363,17 @@ final class HotkeyManager {
 
         // Proof of life before re-arming.
         //
-        // Fable's mechanism candidate: macOS disables a tap that is slow to
-        // service, and a prompt re-enable puts the same slow tap straight
-        // back in the keyboard's path — turning one hiccup into a sustained
-        // freeze. Re-enabling is only safe if there is reason to believe the
-        // next callback will be answered promptly.
-        //
-        // The main thread is the check that matters, because the callback
-        // hands work to it. Re-arming while main is stalled is precisely how
-        // one hiccup is converted into a freeze. The tap thread needs no
-        // check here — this code runs on it, so it is provably alive.
+        // With a listen-only tap this is caution rather than necessity —
+        // re-arming cannot freeze anything now. But a disable while main
+        // is stalled means the app cannot service a hold anyway, so there
+        // is nothing to gain by hurrying, and the discipline is kept
+        // until the disables are explained.
         let mainSilence = StallWatchdog.shared.mainThreadSilence
         if mainSilence >= 2 {
             if !loggedProofOfLifeWait {
                 loggedProofOfLifeWait = true
                 SaylineLog.log(String(format:
-                    "not re-enabling the tap while the main thread is stalled (%.1fs) — "
-                    + "re-arming a tap we cannot service is what freezes the keyboard", mainSilence))
+                    "not re-enabling the tap while the main thread is stalled (%.1fs)", mainSilence))
             }
             return
         }
@@ -396,67 +391,41 @@ final class HotkeyManager {
         guard now.timeIntervalSince(lastTapReenable) >= backoff else { return }
         lastTapReenable = now
         tapNeedsReenable = false
-        CGEvent.tapEnable(tap: eventTap, enable: true)
+        permanentTap.enable()
         SaylineLog.log(String(format: "event tap re-enabled after %.0fs — %@; %@",
-                              backoff, StallWatchdog.shared.snapshot, tapHealth))
+                              backoff, StallWatchdog.shared.snapshot, permanentTap.health))
+    }
+
+    // MARK: - Gesture logic
+
+    private func requestAgentMode() {
+        guard !agentModeAlreadyRequestedThisHold else { return }
+        agentModeAlreadyRequestedThisHold = true
+        SaylineLog.log("agent mode requested")
+        onAgentModeRequested?()
     }
 
     private func handle(event: CGEvent, type: CGEventType) -> Unmanaged<CGEvent>? {
         switch type {
         case .flagsChanged:
             handleFlagsChanged(event: event)
-            return Unmanaged.passUnretained(event)
         case .keyDown:
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             if keyCode == Self.escapeKeyCode {
                 onEscapePressed?()
-                return Unmanaged.passUnretained(event) // pass through, always
+            } else if isHotkeyActive, keyCode == Self.agentModeKeyCode, holdTap == nil {
+                // Fallback for a hold whose active tap failed to install:
+                // Space cannot be swallowed, but agent mode must still
+                // work. When the hold tap exists it both swallows and
+                // fires the request, and this branch stays out of the way.
+                requestAgentMode()
             }
-            if isHotkeyActive && keyCode == Self.agentModeKeyCode {
-                if !agentModeAlreadyRequestedThisHold {
-                    agentModeAlreadyRequestedThisHold = true
-                    SaylineLog.log("agent mode requested")
-                    onAgentModeRequested?()
-                }
-                return nil // swallow Space while dictating so it isn't typed
-            }
-            return Unmanaged.passUnretained(event)
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            // macOS silently disables an active tap when it decides the
-            // callback isn't keeping up. Re-enabling is right; re-enabling
-            // *immediately, every time* is what froze a keyboard.
-            //
-            // Observed 2026-08-11: a Keychain password dialog appeared, the
-            // user's keyboard stopped accepting input while the mouse kept
-            // working, and this line logged every ~20s. A password field
-            // turns on Secure Input Mode, which stops delivering keystrokes
-            // to taps; the system then times ours out, we re-enable, and it
-            // times out again. Each cycle re-evaluates the input path, and
-            // the dialog never receives the keystrokes it is waiting for.
-            // The user could not type the password that would have ended
-            // the whole thing.
-            //
-            // The mouse still worked because the tap's mask is keyboard
-            // only — flagsChanged and keyDown — which is exactly the shape
-            // of the symptom reported.
-            //
-            // So: mark it and let the thread loop decide, rather than
-            // fighting the window server from inside the callback.
-            //
-            // Both threads' states go on this line, plus what the callback
-            // has actually been costing. Earlier versions logged the main
-            // thread alone and concluded from "main ok" that the refusal
-            // came from outside the process — a conclusion the measurement
-            // could not support, because the tap thread was never watched.
-            // Read the tap figures first now: they are the ones macOS acts
-            // on.
-            SaylineLog.log("event tap was disabled by the system (\(type.rawValue)) — "
-                           + StallWatchdog.shared.snapshot + "; " + tapHealth)
-            noteDisable()
-            return Unmanaged.passUnretained(event)
         default:
-            return Unmanaged.passUnretained(event)
+            break
         }
+        // Listen-only: the system ignores this return value. It exists
+        // only to satisfy the EventTap handler signature.
+        return Unmanaged.passUnretained(event)
     }
 
     private func handleFlagsChanged(event: CGEvent) {
@@ -480,10 +449,12 @@ final class HotkeyManager {
             isHotkeyActive = true
             agentModeAlreadyRequestedThisHold = false
             workModeAlreadyRequestedThisHold = false
+            installHoldTap()
             SaylineLog.log("hotkey DOWN")
             onHotkeyDown?()
         } else if !isPressed && isHotkeyActive {
             isHotkeyActive = false
+            removeHoldTap()
             SaylineLog.log("hotkey UP")
             onHotkeyUp?()
         }

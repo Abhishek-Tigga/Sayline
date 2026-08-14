@@ -805,10 +805,15 @@ Retires Fable's kill-list #3. Rebuilding no longer costs permissions, a
 keychain dialog, or a re-entered API key — which was the single largest
 tax on this project's own testing loop.
 
-## DEFERRED · Listen-only tap surgery — the actual freeze fix (Fable, 2026-08-14)
+## BUILT · Listen-only tap surgery — the actual freeze fix (Fable, 2026-08-14)
 
-**Status: not built. Instrumentation was built instead** (2026-08-14, user's
-call). This entry exists so the fix is not re-derived from scratch.
+**Status: built 2026-08-14, claimed-fixed — Opus to verify** (see
+`review/LEDGER.md`, "FREEZE FIX · Two-tap split landed"). Permanent tap
+is `.listenOnly`; a hold-scoped `.defaultTap` swallows Space and dies
+with the hold; `EventTap.swift` holds the shared tap plumbing;
+`Sayline --selftest-hotkey` asserts the gesture path and the
+no-leftover-tap invariant with synthetic events. The design reasoning
+below is unchanged and still the reference.
 
 **The premise that changed.** Every earlier freeze conclusion rested on
 `main ok 0.0s` logged beside a tap disable. That measured the wrong thread:

@@ -6758,3 +6758,81 @@ meaning anything.
 **Still open from the batch, as Fable recorded:** the main merge and
 branch deletions (user at the wheel), and the deferred waiver-section
 move.
+
+---
+
+## FREEZE FIX · Two-tap split landed (Fable, 2026-08-14) — claimed-fixed, Opus to verify
+
+The listen-only tap surgery from the BACKLOG design entry is built. Per
+the role swap, I mark my own work claimed-fixed; promotion to VERIFIED is
+Opus's, and only after running something.
+
+**What changed.**
+
+- `Sources/Sayline/EventTap.swift` (new): one CGEventTap and its
+  bookkeeping — creation on the current thread's run loop, health
+  accounting (moved verbatim from HotkeyManager), enable/disable,
+  teardown with port invalidation. Both taps are this class; the
+  dangerous variant is one visible constructor argument.
+- `Sources/Sayline/HotkeyManager.swift`: the permanent tap is now
+  `.listenOnly` — nothing ever waits on it, so the keyboard cannot
+  freeze because of it, however slow the callback. A hold-scoped
+  `.defaultTap` (keyDown mask only) is created at hotkey-down and torn
+  down at hotkey-up; its only job is swallowing Space. Both taps'
+  callbacks run on the existing tap thread's run loop, so gesture state
+  still needs no locking.
+- Policy deliberately unchanged: breaker (4 disables/2 min), backoff,
+  secure-input wait, proof-of-life gate all kept as-is. Re-enabling a
+  listen-only tap is harmless, but the disables are still unexplained
+  (OPEN entry stands), so the conservative policy stays until they are.
+  Retiring the breaker is a product call for later, not part of this
+  surgery. Comments updated where the stakes changed (dead hotkey, no
+  longer dead keyboard).
+- Fallbacks, all fail-open: hold tap fails to install → agent mode still
+  fires from the listen-only tap, Space just isn't swallowed (logged);
+  hold tap disabled mid-hold → logged, no re-enable fight, it dies with
+  the hold and the next hold gets a fresh one; breaker trips → hold tap
+  torn down with it.
+- `--selftest-hotkey` (HeadlessModes): synthetic HID events through the
+  real taps. Asserts down/up callbacks, agent request exactly once per
+  hold under simulated auto-repeat (Space posted twice), work-mode flip,
+  Escape observed while idle, and the hold tap gone after each hold —
+  the "while idle, Sayline holds nothing" invariant asserted rather than
+  assumed, per the convention that a leftover is invisible to whoever
+  caused it. Two full gestures, because the once-per-hold guards only
+  prove themselves on the second.
+- CLAUDE.md: seventh verification layer added in the same commit, per
+  the add-a-suite rule.
+
+**What I ran.**
+
+- `xcodegen generate` + Debug build: green.
+- `Sayline --selftest-hotkey`: 13/13 assertions green, first run. The
+  MAIN THREAD STALLED line in its output is the watchdog correctly
+  noticing the selftest's own sleeping main thread — headless artifact,
+  not a defect.
+- Relaunched the app: startup log shows "hotkey listener started
+  listen-only", tap instrumentation live, main + tap heartbeats healthy.
+
+**What I could not verify, honestly.**
+
+- That the freeze itself is gone. The trigger was never reproducible on
+  demand; the claim is architectural (macOS does not hold delivery for
+  listen-only taps — documented behavior), not empirical. The
+  instrumentation from 2026-08-14 stays in place, so if a freeze ever
+  recurs it now cannot be our permanent tap, and the log will show
+  which tap was involved.
+- Space swallowing end to end. The selftest asserts the swallow path
+  runs (agent fired once, callback returned nil) but cannot observe
+  whether another app received the event. One live agent-mode hold —
+  hold, press Space, speak a command — is the missing check, and needs
+  a human. **Opus: this is the one to run.**
+- A real hold with the mic: the capture path is untouched
+  (AudioRecorder unmodified), but a live dictation after this change
+  confirms the down/up callbacks still drive the recorder correctly.
+
+**Verification suggestions for Opus:** run the selftest yourself
+(command in CLAUDE.md), then one live dictation and one live agent
+command (Space during hold — the space must not appear in the focused
+app). Check `~/Library/Logs/Sayline/sayline.log` for "listen-only" at
+start and no unexpected disables after both.

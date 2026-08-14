@@ -77,7 +77,7 @@ Only a different reviewer promotes it, and only after running something.
 
 ## How to verify
 
-Six layers, all cheap, none of them optional when touching what they cover.
+Seven layers, all cheap, none of them optional when touching what they cover.
 
 **Router accuracy** — 72 cases against the live model. Gets the real prompt
 and tool schema by asking the built binary, so there is no second copy to
@@ -166,6 +166,18 @@ Sayline --selftest-capture 3 5
 Five holds on one recorder. Asserts start latency < 150 ms, ~the whole
 window on disk, and **peak amplitude** — a recording of the right length,
 rate and size can still be pure silence, and was.
+
+**Hotkey path** — synthetic key events through both real taps: gesture
+callbacks, the once-per-hold guards, and the invariant that the
+hold-scoped active tap is gone the moment the hold ends. Mandatory after
+**any** `HotkeyManager` or `EventTap` change. Kill the app first — the
+posted events are real, and a live instance would treat them as a
+genuine dictation. Don't type during its ~4 seconds:
+
+```bash
+pkill -x Sayline; sleep 1
+~/Library/Developer/Xcode/DerivedData/Sayline-*/Build/Products/Debug/Sayline.app/Contents/MacOS/Sayline --selftest-hotkey
+```
 
 **Live URLs** — the catalog is compiled in, so a moved URL needs a release.
 This detects, it cannot heal:
