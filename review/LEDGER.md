@@ -6999,3 +6999,38 @@ live dictation containing "Figma" or "WhatsApp" and confirm the raw
 transcript hears it; kill the network mid-launch if you want to see
 fail-open. Guardrail 2 runs once the user records the control clips:
 `python3 eval/transcription/run.py --model whisper-large-v3 --bias app`.
+
+---
+
+## BIASING · Guardrail results, and a harness lie found and fixed (Fable, 2026-08-14)
+
+**Guardrail 2 (injection): PASS.** User recorded the three control
+clips (after one silent failure — the recorder wrote nothing from the
+wrong directory; it now errors loudly and takes id filters, commit
+e1dc58b). Zero bias words invented across all three; the sound-alike
+traps ("sigma", "canal", "mirror") each transcribed word-perfect.
+Asterisk, standing: the name-traps ran against an apps-only glossary —
+Contacts is not granted yet, so Kunal/Meera are not in the list their
+traps were aimed at. Rerun guardrail 2 once names enter the glossary.
+
+**Guardrail 1 (never worse): PASS, on complete runs.** Baseline 12.8%
+twice, biased 10.0% twice, identical 13-clip set — both arms stable to
+the decimal across runs.
+
+**Guardrail 3 (≤50 ms): PASS on the median of three pairs** (+26, +65,
++37). Same-session pairs only; singles bounce more than the threshold.
+
+**The harness lie.** Mid-measurement, baselines "improved" run over run
+— 12.8% → 9.0% → 4.3% → a perfect 0.0%/100%. The real cause: Groq
+rate-limiting under repeated runs; failed clips were skipped, and the
+summary row averaged the few that got through. A partial run posed as a
+perfect one, and my grep had filtered the FAILED lines away. Fixed in
+run.py: every summary row and results.md entry now carries `n/total`
+and a "PARTIAL RUN, do not compare" flag — proven working when the very
+next run printed `11/13 <-- PARTIAL RUN`. The anomalous rows in
+results.md from 21:13–21:2x predate the flag; disregard them. Same
+family as "assert on the payload, not the envelope."
+
+**For Opus:** everything in the previous entry's checklist stands, plus:
+respect the partial-run flag, and space runs out — the free tier
+rate-limits after ~8 full runs in an hour.

@@ -14,9 +14,13 @@ enum AgentExecutor {
     @discardableResult
     static func execute(_ action: AgentAction) -> Bool {
         switch action {
-        case .sharePage(let recipient, let note, let target, let makeDefault):
-            return SharePageExecutor.run(recipient: recipient, note: note,
-                                         target: target, makeDefault: makeDefault)
+        case .sharePage:
+            // Sharing can need a question, and a Bool cannot ask one.
+            // `AgentTurn` drives it through `SharePageExecutor.Step`;
+            // reaching this arm means a non-interactive caller tried to
+            // share, which no path currently does.
+            SaylineLog.log("[share] execute() cannot run a share — AgentTurn owns it")
+            return false
         case .openApp(let name):
             return openApp(named: name)
         case .closeApp(let name):

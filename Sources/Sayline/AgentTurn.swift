@@ -106,6 +106,10 @@ final class AgentTurnRunner {
         case .closeCurrentTab:
             return closeCurrentTab()
 
+        case .sharePage(let recipient, let note, let target, let makeDefault):
+            return runShare(SharePageExecutor.run(recipient: recipient, note: note,
+                                                  target: target, makeDefault: makeDefault))
+
         case .emptyTrash:
             return confirmEmptyTrash()
 
@@ -405,4 +409,58 @@ final class AgentTurnRunner {
         }
         return .asking
     }
+
+    // MARK: - Share the current page
+
+    /// Drives `SharePageExecutor.Step` until it stops asking.
+    ///
+    /// Recursive on purpose: an answer can produce another question — two
+    /// Priyas, then a missing country code — and each is a separate
+    /// question with its own timeout rather than a wizard the user cannot
+    /// leave. Every path out of a question that is not an answer does
+    /// nothing at all, which is decision 5's rule and the reason a wrong
+    /// recipient cannot be reached by waiting.
+    private func runShare(_ step: SharePageExecutor.Step) -> ActionOutcome {
+        switch step {
+        case .opened:
+            return .done
+
+        case .failed(let message):
+            // An empty message means the user declined or said nothing.
+            // Saying "couldn't do that" to someone who chose silence is
+            // noise, so silence gets silence.
+            guard !message.isEmpty else {
+                indicator.flashMessage("Nothing shared", duration: 2.0)
+                return .reported
+            }
+            indicator.flashMessage(message, duration: 3.5)
+            return .reported
+
+        case .ask(let question, let detail, let choices, let resume):
+            let quick = choices.map { QuickChoice(label: $0, spoken: $0) }
+            indicator.askFollowUp(
+                FollowUpRequest(
+                    question: question,
+                    detail: detail,
+                    kind: .value(hint: "Hold to answer"),
+                    quickChoices: quick
+                )
+            ) { [weak self] answer in
+                guard let self else { return }
+                let spoken: String?
+                switch answer {
+                case .spoken(let said): spoken = said
+                // A quick-choice button resolves as confirmed/declined;
+                // map them back to the words they were labelled with, so
+                // the continuation sees one kind of answer.
+                case .confirmed: spoken = choices.first
+                case .declined:  spoken = choices.count > 1 ? choices[1] : nil
+                case .timedOut:  spoken = nil
+                }
+                _ = self.runShare(resume(spoken))
+            }
+            return .asking
+        }
+    }
+
 }

@@ -279,18 +279,27 @@ def main():
         sys.exit("\nnothing scored — nothing written")
 
     print("\n" + "=" * 64)
-    print(f"{'model':<30}{'WER':>8}{'key terms':>12}{'median':>10}")
+    print(f"{'model':<30}{'WER':>8}{'key terms':>12}{'median':>10}{'clips':>8}")
     for r in rows:
-        print(f"{r['label']:<30}{r['wer']:>7.1f}%{r['key']:>11.0f}%{r['ms']:>9.0f}ms")
+        # n and errors in the summary, always. A run where most requests
+        # failed once produced a perfect-looking 0.0% from the few clips
+        # that got through — a partial run must never be able to pose as
+        # a complete one.
+        note = f"{r['n']}/{r['n'] + r['errors']}"
+        print(f"{r['label']:<30}{r['wer']:>7.1f}%{r['key']:>11.0f}%{r['ms']:>9.0f}ms{note:>8}"
+              + ("  <-- PARTIAL RUN, do not compare" if r["errors"] else ""))
 
     with RESULTS.open("a") as fh:
         fh.write(f"\n### Transcription bake-off — {time.strftime('%Y-%m-%d %H:%M')}\n\n")
         fh.write(f"{len(clips)} clips read from a fixed script, so ground truth is known.\n")
         fh.write("Key terms are the names, brands and figures whose loss actually costs "
                  "something — overall WER treats \"the\" and \"Designwell\" as equal.\n\n")
-        fh.write("| model | WER | key terms kept | median |\n|---|---|---|---|\n")
+        fh.write("| model | WER | key terms kept | median | clips |\n|---|---|---|---|---|\n")
         for r in rows:
-            fh.write(f"| `{r['label']}` | {r['wer']:.1f}% | {r['key']:.0f}% | {r['ms']:.0f} ms |\n")
+            note = f"{r['n']}/{r['n'] + r['errors']}"
+            if r["errors"]:
+                note += " **partial — not comparable**"
+            fh.write(f"| `{r['label']}` | {r['wer']:.1f}% | {r['key']:.0f}% | {r['ms']:.0f} ms | {note} |\n")
     print(f"\nappended to {RESULTS.relative_to(REPO)}")
 
 

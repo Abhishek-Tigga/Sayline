@@ -61,33 +61,38 @@ enum SharePageExecutor {
         set { UserDefaults.standard.set(newValue?.rawValue, forKey: Stored.defaultTarget) }
     }
 
-    /// What the caller should say to the user, when anything stops.
+    /// What one step of a share wants next.
     ///
-    /// Returned rather than presented here so the notice path stays the
-    /// one the rest of the app uses.
-    static var lastMessage: String?
+    /// Decision 5's "ambiguity is asked, not guessed" only means anything
+    /// if something actually asks. The executor returns the question and a
+    /// continuation rather than presenting it, so the asking stays in
+    /// `AgentTurn` with every other question in the app, and this file
+    /// stays testable without a window.
+    enum Step {
+        case opened
+        case failed(String)
+        /// Ask, then call `resume` with what the user said. `resume` is
+        /// pure in the same way `run` is — it returns another `Step`.
+        case ask(question: String, detail: String?, choices: [String],
+                 resume: (String?) -> Step)
+    }
 
-    @discardableResult
     static func run(recipient: ShareLink.Recipient, note: String?,
-                    target: ShareLink.Target?, makeDefault: Bool) -> Bool {
-        lastMessage = nil
-
+                    target: ShareLink.Target?, makeDefault: Bool) -> Step {
         // The URL first: without it nothing else matters, and its failure
         // messages are the most likely thing a user will meet.
         let url: URL
         switch SharePageState.take() {
         case .success(let captured): url = captured
         case .failure(let why):
-            SaylineLog.log("[share] no page to share — \(why)")
-            lastMessage = why.message
-            return false
+            SaylineLog.log("[share] no page to share")
+            return .failed(why.message)
         }
 
         let message = ShareLink.message(note: note, url: url)
 
         // Decision 7: an explicit spoken target always beats the stored
         // default, and "always" writes the default before it is used.
-        var chosen = target ?? defaultTarget
         if makeDefault, let target {
             defaultTarget = target
             SaylineLog.log("[share] default target set to \(target.rawValue)")
@@ -96,112 +101,202 @@ enum SharePageExecutor {
         switch recipient {
         case .named(let spoken):
             // Decision 6: a name can only be reached on WhatsApp, so no
-            // question is asked and AirDrop is not offered.
+            // target question is asked and AirDrop is not offered.
             SaylineLog.log("[share] resolving contact for a named send")
             return sendToNamed(spoken: spoken, message: message)
 
         case .selfTarget, .unnamed:
-            if chosen == nil {
-                // Decision 7's first-time question. Asking is handled by
-                // the caller through FollowUp; with no answer yet, the
-                // honest thing is to say so rather than pick one.
-                SaylineLog.log("[share] no target chosen and no default — asking")
-                lastMessage = "WhatsApp or AirDrop?"
-                return false
+            guard let chosen = target ?? defaultTarget else {
+                return askTarget(url: url, message: message)
             }
-            if chosen == .airdrop { return airDrop(url: url) }
-            guard let number = selfNumber, !number.isEmpty else {
-                SaylineLog.log("[share] self send with no stored number")
-                lastMessage = "What's your WhatsApp number? Say it once and I'll remember."
-                return false
+            return deliverToSelf(target: chosen, url: url, message: message)
+        }
+    }
+
+    // MARK: - Self and unnamed
+
+    /// Decision 7's first-time question, and the one place "always" can be
+    /// spoken as part of the answer.
+    private static func askTarget(url: URL, message: String) -> Step {
+        SaylineLog.log("[share] no target chosen and no default — asking")
+        return .ask(question: "WhatsApp or AirDrop?",
+                    detail: nil,
+                    choices: ["WhatsApp", "AirDrop"]) { spoken in
+            guard let said = spoken?.lowercased() else {
+                // Silence chooses nothing. Decision 5's rule, applied to
+                // the target question too: a timeout does nothing at all.
+                return .failed("")
             }
-            return openWhatsApp(number: number, message: message, who: "yourself")
+            let target: ShareLink.Target
+            if said.contains("airdrop") || said.contains("air drop") {
+                target = .airdrop
+            } else if said.contains("whatsapp") || said.contains("whats app") {
+                target = .whatsapp
+            } else {
+                return .failed("Didn't catch that — WhatsApp or AirDrop?")
+            }
+            // "WhatsApp, always" sets the standing choice in the same
+            // breath; without "always" the answer is for this send only.
+            if said.contains("always") {
+                defaultTarget = target
+                SaylineLog.log("[share] default target set to \(target.rawValue) by voice")
+            }
+            return deliverToSelf(target: target, url: url, message: message)
+        }
+    }
+
+    private static func deliverToSelf(target: ShareLink.Target,
+                                      url: URL, message: String) -> Step {
+        if target == .airdrop { return airDrop(url: url) }
+        guard let number = selfNumber, !number.isEmpty else {
+            return askSelfNumber(message: message)
+        }
+        return openWhatsApp(number: number, message: message, who: "yourself")
+    }
+
+    /// Decision 10 — asked once, stored locally, editable later.
+    private static func askSelfNumber(message: String) -> Step {
+        SaylineLog.log("[share] self send with no stored number — asking once")
+        return .ask(question: "What's your WhatsApp number?",
+                    detail: "Asked once, then remembered",
+                    choices: []) { spoken in
+            guard let spoken else { return .failed("") }
+            let digits = ShareLink.normalize(spoken.filter { $0.isNumber || $0 == "+" })
+            guard ShareLink.hasCountryCode(digits) else {
+                return .failed("That needs a country code, like +91.")
+            }
+            selfNumber = digits
+            SaylineLog.log("[share] stored the self number")
+            return openWhatsApp(number: digits, message: message, who: "yourself")
         }
     }
 
     // MARK: - Named sends
 
-    private static func sendToNamed(spoken: String, message: String) -> Bool {
-        let store = CNContactStore()
+    private static func sendToNamed(spoken: String, message: String) -> Step {
         guard CNContactStore.authorizationStatus(for: .contacts) != .denied else {
-            lastMessage = "Sayline needs Contacts to find \(spoken). Allow it in System Settings > Privacy & Security > Contacts."
-            return false
+            return .failed("Sayline needs Contacts to find \(spoken). Allow it in System Settings > Privacy & Security > Contacts.")
         }
 
-        var candidates: [ShareLink.Candidate] = []
-        let keys = [CNContactGivenNameKey, CNContactFamilyNameKey,
-                    CNContactPhoneNumbersKey] as [CNKeyDescriptor]
+        let candidates: [ShareLink.Candidate]
         do {
-            try store.enumerateContacts(with: CNContactFetchRequest(keysToFetch: keys)) { c, _ in
-                let name = [c.givenName, c.familyName]
-                    .filter { !$0.isEmpty }.joined(separator: " ")
-                guard !name.isEmpty, !c.phoneNumbers.isEmpty else { return }
-                candidates.append(ShareLink.Candidate(
-                    name: name,
-                    numbers: c.phoneNumbers.map {
-                        ($0.label ?? "", $0.value.stringValue)
-                    }))
-            }
+            candidates = try readContacts()
         } catch {
             SaylineLog.log("[share] Contacts read failed: \(error.localizedDescription)")
-            lastMessage = "Couldn't read Contacts. Allow Sayline in System Settings > Privacy & Security > Contacts."
-            return false
+            return .failed("Couldn't read Contacts. Allow Sayline in System Settings > Privacy & Security > Contacts.")
         }
 
+        return resolve(spoken: spoken, candidates: candidates, message: message)
+    }
+
+    private static func resolve(spoken: String, candidates: [ShareLink.Candidate],
+                                message: String) -> Step {
         switch ShareLink.resolve(spoken: spoken, in: candidates) {
         case .resolved(let name, let number):
             SaylineLog.log("[share] resolved to \(name)")
             return openWhatsApp(number: number, message: message, who: name)
 
         case .ambiguous(let name, let options):
-            // Decision 5: ask, never guess. Timeout does nothing.
-            SaylineLog.log("[share] ambiguous recipient for \(name): \(options.count) options")
-            lastMessage = "\(options.prefix(2).joined(separator: " or "))?"
-            return false
+            // Decision 5: ask, never guess. A wrong recipient is the worst
+            // outcome this feature can produce, and silence picks nobody.
+            SaylineLog.log("[share] ambiguous recipient: \(options.count) options")
+            return .ask(question: "Which \(name)?",
+                        detail: options.prefix(2).joined(separator: " or "),
+                        choices: Array(options.prefix(2))) { answer in
+                guard let answer else { return .failed("") }
+                // Re-resolve against the narrowed answer rather than
+                // indexing the option list: the user may say a surname,
+                // and the same matching rule should decide both times.
+                let narrowed = candidates.filter {
+                    ShareLink.matches(spoken: answer, name: $0.name)
+                        || $0.numbers.contains { $0.number == answer }
+                }
+                guard narrowed.count == 1 else {
+                    return .failed("Still not sure which \(name) — nothing sent.")
+                }
+                return resolve(spoken: narrowed[0].name, candidates: narrowed,
+                               message: message)
+            }
 
-        case .needsCountryCode(let name, _):
-            SaylineLog.log("[share] \(name) has no country code")
-            lastMessage = "What's \(name)'s country code?"
-            return false
+        case .needsCountryCode(let name, let number):
+            SaylineLog.log("[share] \(name) has no country code — asking once")
+            return .ask(question: "What's \(name)'s country code?",
+                        detail: "Asked once for \(name)",
+                        choices: ["+91", "+1", "+44"]) { answer in
+                guard let answer else { return .failed("") }
+                let code = "+" + answer.filter { $0.isNumber }
+                guard code.count >= 2 else { return .failed("That isn't a country code.") }
+                let full = code + number
+                rememberCountryCode(code, for: name)
+                return openWhatsApp(number: full, message: message, who: name)
+            }
 
         case .notFound(let heard):
-            // The failure names what was heard, so a mishearing is
-            // obvious rather than mysterious.
+            // Names what was heard, so a mishearing is obvious rather
+            // than mysterious.
             SaylineLog.log("[share] no contact matched what was heard")
-            lastMessage = "No contact called \"\(heard)\"."
-            return false
+            return .failed("No contact called \"\(heard)\".")
         }
+    }
+
+    private static func readContacts() throws -> [ShareLink.Candidate] {
+        var candidates: [ShareLink.Candidate] = []
+        let keys = [CNContactGivenNameKey, CNContactFamilyNameKey,
+                    CNContactPhoneNumbersKey] as [CNKeyDescriptor]
+        try CNContactStore().enumerateContacts(
+            with: CNContactFetchRequest(keysToFetch: keys)
+        ) { contact, _ in
+            let name = [contact.givenName, contact.familyName]
+                .filter { !$0.isEmpty }.joined(separator: " ")
+            guard !name.isEmpty, !contact.phoneNumbers.isEmpty else { return }
+            candidates.append(ShareLink.Candidate(
+                name: name,
+                numbers: contact.phoneNumbers.map { ($0.label ?? "", $0.value.stringValue) }))
+        }
+        return candidates
+    }
+
+    /// Per-contact, because the failure table says asked once and then
+    /// remembered — for that contact, not globally.
+    private static func rememberCountryCode(_ code: String, for name: String) {
+        var stored = UserDefaults.standard.dictionary(forKey: "sharePageCountryCodes")
+            as? [String: String] ?? [:]
+        stored[name] = code
+        UserDefaults.standard.set(stored, forKey: "sharePageCountryCodes")
+    }
+
+    static func storedCountryCode(for name: String) -> String? {
+        (UserDefaults.standard.dictionary(forKey: "sharePageCountryCodes")
+            as? [String: String])?[name]
     }
 
     // MARK: - Delivery
 
     /// Decision 12: the scheme first, `wa.me` when the app is absent.
-    private static func openWhatsApp(number: String?, message: String, who: String) -> Bool {
+    private static func openWhatsApp(number: String?, message: String, who: String) -> Step {
         if let scheme = ShareLink.whatsappURL(number: number, message: message),
            NSWorkspace.shared.urlForApplication(toOpen: scheme) != nil {
             SaylineLog.log("[share] opening WhatsApp prefilled for \(who) — not sent")
             NSWorkspace.shared.open(scheme)
-            return true
+            return .opened
         }
         if let web = ShareLink.waMeURL(number: number, message: message) {
             SaylineLog.log("[share] WhatsApp app absent, falling back to wa.me for \(who)")
             NSWorkspace.shared.open(web)
-            return true
+            return .opened
         }
-        lastMessage = "Couldn't open WhatsApp."
-        return false
+        return .failed("Couldn't open WhatsApp.")
     }
 
     /// Decision 6: opens the picker. A cancelled picker does nothing and
     /// retries nothing — there is no "did they send it" to observe, and
-    /// inventing one would be the auto-send failure in another costume.
-    private static func airDrop(url: URL) -> Bool {
+    /// inventing one would be auto-send in another costume.
+    private static func airDrop(url: URL) -> Step {
         guard let service = NSSharingService(named: .sendViaAirDrop) else {
-            lastMessage = "AirDrop isn't available on this Mac."
-            return false
+            return .failed("AirDrop isn't available on this Mac.")
         }
         SaylineLog.log("[share] opening the AirDrop picker")
         service.perform(withItems: [url])
-        return true
+        return .opened
     }
 }

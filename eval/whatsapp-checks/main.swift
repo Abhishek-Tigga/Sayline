@@ -103,5 +103,40 @@ for raw in ["http://localhost:3000/x", "file:///Users/a/b.pdf", "https://x.com/#
           ShareLink.message(note: nil, url: u) == raw)
 }
 
+
+// The narrowing an ambiguity answer performs. `resolve` is where a wrong
+// recipient would come from, so the second pass is tested the same way
+// the first is: by the matching rule, not by list position.
+print("\nnarrowing after a disambiguation answer")
+let bothPriyas = [priyaS, priyaM]
+eq("answering with a surname narrows to one",
+   ShareLink.resolve(spoken: "Sharma", in: bothPriyas),
+   .resolved(name: "Priya Sharma", number: "+919876543210"))
+eq("answering with the full name narrows to one",
+   ShareLink.resolve(spoken: "Priya Mehta", in: bothPriyas),
+   .resolved(name: "Priya Mehta", number: "+919123456789"))
+eq("answering with the ambiguous first name again stays ambiguous",
+   ShareLink.resolve(spoken: "Priya", in: bothPriyas),
+   .ambiguous(name: "Priya", options: ["Priya Sharma", "Priya Mehta"]))
+check("an answer naming nobody narrows to nobody",
+      bothPriyas.filter { ShareLink.matches(spoken: "Sneha", name: $0.name) }.isEmpty)
+
+// The country-code answer, which is concatenated onto a local number.
+print("\ncountry code answers")
+eq("a spoken +91 makes a dialable number",
+   ShareLink.normalize("+91" + "9876543210"), "+919876543210")
+check("the result now passes the country-code test",
+      ShareLink.hasCountryCode(ShareLink.normalize("+91" + "9876543210")))
+check("a bare 91 without the plus does not",
+      !ShareLink.hasCountryCode(ShareLink.normalize("91" + "9876543210")))
+
+// The self-number answer path strips speech punctuation before storing.
+print("\nself number answers")
+eq("spoken digits with spaces normalize",
+   ShareLink.normalize("+91 98765 43210".filter { $0.isNumber || $0 == "+" }),
+   "+919876543210")
+check("a number spoken without a country code is refused",
+      !ShareLink.hasCountryCode(ShareLink.normalize("9876543210")))
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

@@ -297,3 +297,84 @@ Key terms are the names, brands and figures whose loss actually costs something 
 | model | WER | key terms kept | median |
 |---|---|---|---|
 | `whisper-large-v3 (current)` | 16.6% | 61% | 345 ms |
+
+### Transcription bake-off — 2026-08-14 21:08
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current) + bias (app)` | 10.0% | 67% | 382 ms |
+
+### Transcription bake-off — 2026-08-14 21:12
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 12.8% | 61% | 317 ms |
+
+### Transcription bake-off — 2026-08-14 21:13
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current) + bias (app)` | 10.0% | 67% | 350 ms |
+
+### Transcription bake-off — 2026-08-14 21:13
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 4.3% | 73% | 313 ms |
+
+### Transcription bake-off — 2026-08-14 21:13
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 9.0% | 67% | 311 ms |
+
+### Transcription bake-off — 2026-08-14 21:14
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 0.0% | 100% | 303 ms |
+
+### Transcription bake-off — 2026-08-14 21:15
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current) + bias (app)` | 10.0% | 67% | 373 ms |
+
+### Transcription bake-off — 2026-08-14 21:15
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 12.8% | 61% | 325 ms |
+
+### Transcription bake-off — 2026-08-14 21:16
+
+13 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median | clips |
+|---|---|---|---|---|
+| `whisper-large-v3 (current) + bias (app)` | 6.5% | 75% | 363 ms | 11/13 **partial — not comparable** |
