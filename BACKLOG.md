@@ -769,6 +769,14 @@ and [CHANGELOG.md](CHANGELOG.md).
   Watch for it recurring; if it does, check logs for that specific run
   before guessing at a fix.
 
+## Housekeeping · Ask Opus to verify Fable's two claimed-fixed batches (2026-08-14)
+
+Waiting until Opus finishes the WhatsApp share build. Then point it at
+the ledger entries "FREEZE FIX · Two-tap split landed" and "BIASING ·
+Vocabulary biasing landed" (+ its guardrail addendum) — each ends with
+a verification checklist. Per the standing rule, only Opus can promote
+them from claimed-fixed to VERIFIED.
+
 ## Housekeeping · Delete the `ui-speech-back` branch (2026-08-14)
 
 Merged into `main` (fast-forward, same commit) and kept only because
