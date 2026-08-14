@@ -256,3 +256,21 @@ attempt.
 | model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
 |---|---|---|---|---|---|---|
 | `gpt-4.1-mini` | 2/10 | 1/21 | 1 | 100% | 0% | 1026 ms |
+
+### Transcription bake-off — 2026-08-14 20:20
+
+10 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current)` | 16.6% | 61% | 309 ms |
+
+### Transcription bake-off — 2026-08-14 20:21
+
+10 clips read from a fixed script, so ground truth is known.
+Key terms are the names, brands and figures whose loss actually costs something — overall WER treats "the" and "Designwell" as equal.
+
+| model | WER | key terms kept | median |
+|---|---|---|---|
+| `whisper-large-v3 (current) + bias` | 11.9% | 70% | 345 ms |

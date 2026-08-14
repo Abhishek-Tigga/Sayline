@@ -115,7 +115,25 @@ def wer(reference, hypothesis):
     return grid[len(ref)][len(hyp)] / len(ref) * 100
 
 
-def transcribe(provider, model, key, clip):
+# What a per-user bias list would hold, assembled the way production
+# would assemble it — contact names, installed apps/brands, and the tech
+# terms this user's dictation history is full of. Deliberately NOT
+# derived from KEY_TERMS or the scripts: feeding the answer key to the
+# model would measure the harness's honesty, not the feature. The
+# overlap with the key terms is the feature working as intended — these
+# words are in the user's world, which is why they are in both places.
+#
+# What this measures is therefore the UPPER BOUND of biasing: the win
+# when the list-builder found the right words. Whether the production
+# list-builder finds them is a separate question for the design.
+SIMULATED_BIAS = (
+    "Meera, Karan, Priya, Arjun, Sneha, Rohan, Rohit, Ankit, Divya, "
+    "Kunal, Designwell, Sayline, Xcode, Swift, GitHub, OAuth, Postgres, "
+    "Redis, API, staging, lakh, crore, rupees"
+)
+
+
+def transcribe(provider, model, key, clip, bias=None):
     """multipart/form-data by hand — no SDK, same as every other eval here."""
     import urllib.request, uuid
     boundary = f"----sayline{uuid.uuid4().hex}"
@@ -126,7 +144,12 @@ def transcribe(provider, model, key, clip):
     # Devanagari and Urdu script — "आस्क अर्जुन टू लूप इन स्नेहा" is
     # "Ask Arjun to loop in Sneha" transliterated. That scored 209% WER
     # and would have condemned the model for a setting I never sent.
-    for field, value in (("model", model), ("response_format", "text"), ("language", "en")):
+    fields = [("model", model), ("response_format", "text"), ("language", "en")]
+    if bias:
+        # Whisper's `prompt` biases decoding toward the vocabulary in it
+        # (~224-token budget). This is the entire mechanism under test.
+        fields.append(("prompt", bias))
+    for field, value in fields:
         parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"\r\n\r\n{value}\r\n".encode())
     parts.append(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
@@ -149,6 +172,8 @@ def transcribe(provider, model, key, clip):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model")
+    ap.add_argument("--bias", action="store_true",
+                    help="send the simulated per-user vocabulary list as the Whisper prompt")
     args = ap.parse_args()
 
     script = {line["id"]: line["text"] for line in json.loads(SCRIPT.read_text())}
@@ -166,13 +191,16 @@ def main():
     for label, provider, model in CANDIDATES:
         if args.model and args.model != model:
             continue
+        if args.bias:
+            label += " + bias"
         print(f"\n=== {label} ===")
         wers, latencies, hits, total_terms, errors = [], [], 0, 0, 0
         for clip_id, clip in clips.items():
             if clip_id not in script:
                 continue
             try:
-                heard, ms = transcribe(provider, model, keys[provider], clip)
+                heard, ms = transcribe(provider, model, keys[provider], clip,
+                                       bias=SIMULATED_BIAS if args.bias else None)
             except Exception as exc:
                 print(f"  {clip_id}: FAILED — {str(exc)[:90]}")
                 errors += 1
