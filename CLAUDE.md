@@ -65,6 +65,7 @@ code, the rejected alternatives are not.
 | `eval/README.md` | What the router metrics mean, and the rules for changing the test set |
 | `review/LEDGER.md` | What has been claimed, what has been independently checked, what is still open |
 | `DESIGN-work-mode.md` | Work mode's eight decisions with their rejected alternatives |
+| `DESIGN-whatsapp-share.md` | Share-the-current-page: twelve decisions, confirmed 2026-08-14. **Not built** |
 | `DICTATION-HISTORY.md` | **Read first when dictation, the mic or the hotkey breaks.** Every past failure, its cause, and what was working just before |
 
 If something looks wrong, check these first. Several apparent mistakes are
