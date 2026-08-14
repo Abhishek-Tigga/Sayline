@@ -4998,3 +4998,163 @@ and `BACKLOG.md` carries the generated-target fix.
 
 Not verified by me and cannot be: the taste scorer checks stated rules, not
 whether the user would send the text. Round 2 is still the arbiter.
+
+---
+
+## WORK MODE · Ceiling ruling (Fable, 2026-08-14)
+
+Answering `review/FABLE-PROMPT-ceiling.md`. The evidence is decisive and
+the two independent lines agree, so this is short.
+
+### Ruling: option 1 — a fixed +2-word tolerance, Slack and email alike
+(email keeps its +12 shell allowance on top). Reasons, in order of
+weight:
+1. **The rule rejects the target.** Four of the fifteen user-accepted
+   ideals violate the ceiling. A guard that flags text the user
+   approved is mis-specified by definition — the same verdict as
+   `timeLost`, arriving by the same route.
+2. **The violations are grammatical completion, and the register
+   mandates them.** made-13's entire crime is the word "It". Speech is
+   elliptical; the spec says email may close the ellipsis; closing it
+   costs a roughly constant number of function words. A constant cost
+   gets a constant tolerance — that is also why fixed beats the 10%
+   option, which shrinks to one word exactly where the repairs happen
+   (short Slack lines).
+3. **The prompt contradicts the ceiling mechanically** — its own worked
+   example ("70 percent" for "70%") costs +1. Two rules fighting over
+   one word is how retries get manufactured; Phase A existed to end
+   that class.
+4. **+2 keeps the guard honest at the boundary**: made-11's +5 ("is
+   maybe" → "will take maybe") stays flagged, and should — that is
+   prose-ification, not grammar, and the retry message handles it.
+Option 4 (exempt grammatical completion structurally) was considered
+and is rejected: an all-added-words-are-function-words diff exists in
+principle, but work mode reorders text, word-diff alignment on
+reordered text is unreliable, and +2 buys the same outcome with one
+integer. The suite case changes from "one word longer still is
+padding" to its successor, pinning the new decision with this reason:
+**two words is grammar, three is padding.**
+
+### Consequence rulings
+1. **Re-run the few-shot arm under the new ceiling — the rejection is
+   unsound as evidence**, since every extra failure was the class this
+   ruling reclassifies. But pre-commit the bar before running: few-shots
+   must beat bare by ≥15 points on the sendable proxy to justify +59%
+   input tokens and their latency; a tie or small win closes Phase B's
+   fourth criterion as "bare prompt, few-shots rejected on cost". Run
+   it on the full 31 + ideals, not the 13-case slice — the thin-basis
+   concern raised is valid and this is its fix.
+2. **Recalibrate the taste scorer after the tolerance lands.** It
+   currently scores 11/15 against the ideals themselves; post-ruling it
+   should approach 15/15, and any residual is scorer error to fix
+   before it judges another model. Standing rule, promoted from the
+   gate ruling's re-score habit: **the fifteen ideals are the permanent
+   calibration set. Any change to the guard, ceiling, or scorer
+   re-scores them first, expecting 15/15; a shortfall is instrument
+   error until proven otherwise.** Three decisions this week flipped on
+   instrument bugs (the stale verifier, the scale-word bug costing
+   4.1-mini its first rejection, and this ceiling); the pattern has
+   earned a rule.
+
+### Endorsements, so they are on record
+The model switch to gpt-4.1-mini is sound on the corrected numbers
+(10%/100% rescue/0% fallback at par latency), and the Groq arm was run
+as specified — 55% broke under the new prompt, so speed did not save
+it; the exclusion is now earned by measurement rather than inherited
+from a contaminated one. The harness refusing to report on 16/31
+partial data is the right reflex and worth keeping. The scale-word and
+list-marker guard bugs found by scoring the ideals are exactly why the
+calibration-set rule above exists.
+
+---
+
+### WORK MODE · Ceiling ruling implemented; calibration found four more false positives
+2026-08-14 · Opus · `claimed-fixed`
+
+Implementing the ruling was five minutes. Obeying the standing rule that
+came with it was the valuable part.
+
+**The tolerance.** `FactGuard.grammarTolerance = 2`, added to the ceiling
+in every context and stacking with `emailShellAllowance` rather than
+replacing it. The suite case `"one word longer still is padding"` is
+retired and replaced by six that pin the successor decision, including
+made-13's "It" and made-11's +5 prose-ification on the other side of the
+line. **Two words is grammar, three is padding** is quoted in the code.
+
+**Calibration is now `taste_score.py --calibrate`,** a real command rather
+than a file reconstructed by hand each time. It scores all 19 variants and
+takes the best per case: where the user accepted two wordings, demanding
+the first measures the order they were written in.
+
+**First run came back 10/15, and four of the five were instrument error** —
+exactly as the standing rule predicts. Every one flagged a rewrite the user
+personally accepted:
+
+1. **Unit adjacency.** "Two MORE weeks" put a modifier between number and
+   unit, so the spoken form pinned no unit while the written "another two
+   weeks" pinned one. E1 was charged with inventing a unit its own
+   transcript contains. Window widened to two tokens.
+2. **`"half"` mapped to the number 1.** "I don't want to half commit"
+   pinned a quantity that is not in the sentence, so E2 dropping the phrase
+   lost a number nobody said. Removed from `quantityWords`; it is not a
+   count, and this is the bare-`"one"` failure wearing another word.
+3. **Negation by paraphrase.** "not Wednesday night" → "rather than
+   Wednesday night" keeps the meaning exactly and loses the marker, which
+   read as a reversed statement. `negationPhrases` now counts "rather
+   than", "instead of", "as opposed" on both sides, so the swap is neutral.
+   T4.
+4. **The retraction marker counted as a negation.** The "no" in "wait no
+   hold on" is the speaker changing their mind. The existing waivers could
+   not reach it because they work on fact positions and this is a count.
+   `countNegations` now skips indices covered by a retraction phrase. This
+   was S2 — the cluster that has been open since the gate ruling.
+
+Seven new suite cases, each with its boundary.
+
+**One residual, argued rather than shrugged at.** N3 stays failing and is
+recorded in `KNOWN_RESIDUALS` with the reason: the ideal writes "₹45,000"
+for a transcript naming no currency, and making it pass means allowing a
+rewrite to introduce a currency symbol — a protection that catches real
+errors. The "forty seven five" → 47,500 shorthand in the same sentence is
+moot, because fixing it leaves the ₹ flagging. Here the guard is right and
+the ideal is the outlier. `--calibrate` exits non-zero on any *unexplained*
+failure, so this does not become a place to hide regressions.
+
+**Consequence 1 — few-shots re-run, and rejected on the pre-committed bar.**
+The bar was written down before the run: ≥15 points on the sendable proxy.
+
+```
+gpt-4.1-mini        taste (13)   31 transcripts   guard        median(31)
+bare                  100%           90%          10/100/0      1071ms
++3 few-shots           92%           90%          10/100/0      1153ms
+```
+
+Eight points behind, tied on the broader base, 82 ms slower, +59% input
+tokens. **Phase B criterion 4 closes as "bare prompt, few-shots rejected on
+cost."** The earlier rejection was unsound for the reason Fable gave; this
+one is not, and it is the same verdict. `run.py --shots` exists now so the
+arm is reproducible on the full 31 rather than the 13-case slice.
+
+**Consequence 2 — recalibrated, and it found a fifth instrument bug on the
+way.** The verifier never accepted a context, so `FactGuard.verify` always
+ran as `.general` and **no email case in any scoring run had ever received
+the +12 shell allowance.** `taste_score.py` had papered over it with its
+own Python ceiling — two ceilings disagreeing by twelve words on exactly
+the cases the allowance exists for. The verifier now takes `context` and
+the Python copy is deleted. This is the fourth second-copy-of-one-truth
+failure in this file's history and the first one that was not a string.
+
+Ran:
+- 7/7 suites green, `factguard-checks` +13 cases this session
+- `taste_score.py --calibrate` → 14/15 clean, 1 argued residual, exit 0
+- `run.py --model gpt-4.1-mini` bare and `--shots`, full 31 both
+- `taste_run.py` both arms, scored
+
+Net effect of the ruling on shipping config: the taste scripts went from
+84% sendable to **100%**, and the guard's remaining violations on the 31
+dropped to two, one of which is made-11's genuine +5.
+
+Not verified by me. The calibration set is now the instrument that judges
+the instrument, and it is ours; an independent look at whether
+`grammarTolerance` should have been 2 rather than 3 would be worth having,
+since made-11 sits at +5 and nothing sits at +3 or +4.

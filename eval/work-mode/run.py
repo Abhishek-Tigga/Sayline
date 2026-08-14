@@ -70,6 +70,12 @@ def _load_prompt(context="workPrompt"):
 SYSTEM = _load_prompt()
 
 
+# Few-shot examples, empty unless --shots. Module-level so `rewrite` keeps
+# one message-building path: an arm that assembles its payload differently
+# from the arm it is compared against is not a comparison.
+EXAMPLES = []
+
+
 def rewrite(model, url, key, raw, pinned, correction=None):
     """Constraints in the system message, transcript alone in the user one.
 
@@ -82,8 +88,8 @@ def rewrite(model, url, key, raw, pinned, correction=None):
     a "do not echo this" instruction unnecessary.
     """
     system = SYSTEM if not pinned else f"{SYSTEM}\n{pinned}"
-    messages = [{"role": "system", "content": system},
-                {"role": "user", "content": raw}]
+    messages = ([{"role": "system", "content": system}] + EXAMPLES
+                + [{"role": "user", "content": raw}])
     if correction:
         messages.append({"role": "assistant", "content": correction["previous"]})
         messages.append({"role": "user", "content":
@@ -130,7 +136,18 @@ def main():
     # in the recommendation rather than in an exclusion.
     ap.add_argument("--delay", type=float, default=0.0,
                     help="seconds to wait between calls, for rate-limited tiers")
+    # Fable's consequence ruling, 2026-08-14: the first few-shot rejection
+    # was unsound because every extra failure was `longer-than-speech`, the
+    # class the ceiling ruling reclassified. Re-run on the full 31.
+    ap.add_argument("--shots", action="store_true",
+                    help="prepend the few-shot examples from the ideals")
     args = ap.parse_args()
+
+    if args.shots:
+        import taste_run
+        globals()["EXAMPLES"] = taste_run.shots()
+        print(f"few-shot arm: {len(EXAMPLES)//2} examples, "
+              f"~{sum(len(m['content']) for m in EXAMPLES)//4} extra tokens")
 
     cases = json.loads(TRANSCRIPTS.read_text())
     print(f"{len(cases)} transcripts "

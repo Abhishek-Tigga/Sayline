@@ -2,79 +2,79 @@
  {
   "id": "T1",
   "raw": "so I saw your comment on the ticket and um, look, I get the reasoning but I don't think caching is the fix here, like the numbers are wrong BEFORE they hit the cache, I checked yesterday, so caching would just make wrong numbers faster, um can we look at the aggregation query first, that's my bet",
-  "ms": 1499.337208,
+  "ms": 1350.8958329999998,
   "rewrite": "I saw your comment on the ticket. I get the reasoning but I don't think caching is the fix here. The numbers are wrong before they hit the cache. I checked yesterday, so caching would just make wrong numbers faster.\n\nCan we look at the aggregation query first? That's my bet."
  },
  {
   "id": "T2",
   "raw": "quick status on the payments migration, so we're basically done with the read path, um the write path is trickier than we thought because of the retry logic, honestly I'd say seventy percent overall, and I don't want to promise Friday, Monday is realistic",
-  "ms": 1417.4257080000002,
+  "ms": 2841.450792,
   "rewrite": "Quick status on the payments migration: we're basically done with the read path. The write path is trickier than we thought because of the retry logic. I'd say seventy percent overall, and I don't want to promise Friday. Monday is realistic."
  },
  {
   "id": "T3",
   "raw": "hey um sorry to ping you on this again but I'm blocked on the API keys thing, I know you're slammed, whenever you get like ten minutes today could you approve the request, it's the last thing between us and the staging deploy",
-  "ms": 1237.7765000000002,
+  "ms": 2601.10375,
   "rewrite": "Sorry to ping you again, but I'm blocked on the API keys. I know you're slammed. Whenever you get ten minutes today, could you approve the request? It's the last thing between us and the staging deploy."
  },
  {
   "id": "T4",
   "raw": "so heads up, um the vendor sandbox went down this morning and their support says forty eight hours, which honestly kills our Thursday demo, I think we either fake the vendor responses for the demo or we push it, I'd rather fake it, wanted you to know now not Wednesday night",
-  "ms": 1361.1910000000007,
-  "rewrite": "Heads up, the vendor sandbox went down this morning and their support says forty eight hours. This kills our Thursday demo. I think we either fake the vendor responses for the demo or push it. I'd rather fake it. Wanted you to know now, not Wednesday night."
+  "ms": 4307.3803339999995,
+  "rewrite": "Heads up, the vendor sandbox went down this morning and their support says forty eight hours, which kills our Thursday demo. I think we either fake the vendor responses for the demo or push it. I'd rather fake it. Wanted you to know now, not Wednesday night."
  },
  {
   "id": "E2",
   "raw": "hi thanks for thinking of us for the webinar, um honestly this quarter is just not possible, we're heads down on a launch, I don't want to half commit and then flake, maybe ping us again in the summer",
-  "ms": 1330.717334,
-  "rewrite": "Hi,\n\nThanks for thinking of us for the webinar. Honestly, this quarter is not possible. We're heads down on a launch, and I don't want to half commit and then flake.\n\nMaybe ping us again in the summer.\n\nBest,  \nAbhishek"
+  "ms": 1195.1322500000003,
+  "rewrite": "Hi,\n\nThanks for thinking of us for the webinar. Honestly, this quarter is just not possible. We're heads down on a launch, and I don't want to half commit and then flake.\n\nMaybe ping us again in the summer.\n\nBest,  \nAbhishek"
  },
  {
   "id": "E3",
   "raw": "hi just floating this back up, um I sent the invoice details two weeks back and I know things get buried, we'd really like to close this out before month end, let me know if anything's missing from our side",
-  "ms": 1388.7314169999997,
-  "rewrite": "Hi,\n\nJust floating this back up. I sent the invoice details two weeks ago and I know things get buried. We'd really like to close this out before month end. Let me know if anything's missing from our side.\n\nBest,  \nAbhishek"
+  "ms": 33864.019625,
+  "rewrite": "Hi,\n\nJust floating this back up. I sent the invoice details two weeks back and I know things get buried. We'd really like to close this out before month end. Let me know if anything's missing from our side.\n\nBest,  \nAbhishek"
  },
  {
   "id": "E4",
   "raw": "hi so the weekly update, um three things really, the launch prep is on track, QA finishes Wednesday and we're go for Tuesday, second thing the hiring loop, we did four onsites, two strong yes candidates, I'll send the debrief separately, and third, the thing I'm worried about, the vendor contract renewal is stuck with legal and if it slips past Friday it starts blocking the roadmap work, that one needs your help",
-  "ms": 1714.0302500000005,
-  "rewrite": "Hi,\n\nThe weekly update has three points. The launch prep is on track, QA finishes Wednesday, and we're go for Tuesday. On the hiring loop, we did four onsites with two strong yes candidates. I'll send the debrief separately.\n\nThe thing I'm worried about is the vendor contract renewal. It's stuck with legal, and if it slips past Friday, it will start blocking the roadmap work. That one needs your help.\n\nBest,  \nAbhishek"
+  "ms": 1899.5012500000003,
+  "rewrite": "Hi,\n\nThe weekly update has three things. First, the launch prep is on track. QA finishes Wednesday and we're go for Tuesday. Second, the hiring loop: we did four onsites and have two strong yes candidates. I'll send the debrief separately. Third, the vendor contract renewal is stuck with legal. If it slips past Friday, it will start blocking the roadmap work. That one needs your help.\n\nBest,  \nAbhishek"
  },
  {
   "id": "N3",
   "raw": "hi quick correction on my last mail, um I said the invoice was forty five thousand, it's actually forty seven five, my mistake, the PO number stays the same, nothing else changes",
-  "ms": 1234.6757499999992,
-  "rewrite": "Hi,\n\nQuick correction on my last mail. I said the invoice was forty-five thousand, but it's actually forty-seven five. The PO number stays the same, nothing else changes.\n\nBest,  \nAbhishek"
+  "ms": 1350.5061250000026,
+  "rewrite": "Hi,\n\nQuick correction on my last mail. I said the invoice was forty-five thousand, but it's actually forty-seven five. My mistake. The PO number stays the same, nothing else changes.\n\nBest,  \nAbhishek"
  },
  {
   "id": "N4",
   "raw": "just want to say um the way Sneha handled that outage call yesterday was really something, she kept everyone calm, had the rollback ready before anyone asked, honestly we got lucky she was on call, worth a shoutout in the all hands I think",
-  "ms": 1105.4928749999995,
-  "rewrite": "Sneha handled the outage call yesterday really well. She kept everyone calm and had the rollback ready before anyone asked. We got lucky she was on call. She deserves a shoutout in the all hands."
+  "ms": 1259.0169169999967,
+  "rewrite": "Sneha handled the outage call yesterday really well. She kept everyone calm and had the rollback ready before anyone asked. We got lucky she was on the call. She deserves a shoutout in the all hands."
  },
  {
   "id": "S1",
   "raw": "okay decisions from the design review, three things, one we're going with the tabbed layout, two dark mode ships in the same release not after, three the settings page moves to v2, that's it",
-  "ms": 1088.3547500000006,
+  "ms": 1136.1615419999964,
   "rewrite": "Decisions from the design review are three things:\n\n- We're going with the tabbed layout.\n- Dark mode ships in the same release, not after.\n- The settings page moves to v2."
  },
  {
   "id": "S2",
   "raw": "can we move the retro to Thursday, wait no hold on, Thursday is the town hall, okay Friday, let's do Friday afternoon, um after three works best",
-  "ms": 1053.3245000000004,
-  "rewrite": "Can we move the retro to Thursday? No, Thursday is the town hall. Okay, let's do Friday afternoon. After three works best."
+  "ms": 1173.682625000005,
+  "rewrite": "Can we move the retro to Thursday? Wait, no, Thursday is the town hall. Okay, Friday afternoon works best, after three."
  },
  {
   "id": "S3",
   "raw": "hi so I looked at the proposal, um most of it works for us, the only sticking point is the support SLA, four hours feels tight for our team size, would eight hours be acceptable on your side, that's really the only open thing",
-  "ms": 1438.1302079999987,
+  "ms": 1305.6461250000027,
   "rewrite": "Hi,\n\nI looked at the proposal. Most of it works for us. The only sticking point is the support SLA. Four hours feels tight for our team size. Would eight hours be acceptable on your side? That's really the only open thing.\n\nBest,  \nAbhishek"
  },
  {
   "id": "I1",
   "raw": "hey um can we prepone the client call to eleven, the afternoon slot clashes with the town hall, and also please do share the deck before, whoever has the latest version kindly do the needful",
-  "ms": 1094.6049590000016,
+  "ms": 1119.675166999997,
   "rewrite": "Can we prepone the client call to eleven? The afternoon slot clashes with the town hall. Also, please share the deck before. Whoever has the latest version, kindly do the needful."
  }
 ]

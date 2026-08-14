@@ -522,8 +522,31 @@ func tooLong(_ raw: String, _ rewrite: String, _ context: AppContext = .general)
 let twentySix = Array(repeating: "word", count: 26).joined(separator: " ")
 check("equal length is not padding — the S2 refusal",
       !tooLong(twentySix, twentySix))
-check("one word longer still is padding",
-      tooLong(twentySix, twentySix + " extra"))
+// Successor to "one word longer still is padding", which pinned the
+// pre-tolerance decision. Replaced on Fable's ruling of 2026-08-14 after
+// four of the fifteen user-accepted rewrites broke the old rule by one or
+// two words, every one of them closing a grammatical ellipsis.
+//
+// TWO WORDS IS GRAMMAR, THREE IS PADDING. That sentence is the decision;
+// these three cases are it in code.
+check("one word longer is grammar, not padding",
+      !tooLong(twentySix, twentySix + " extra"))
+check("two words longer is still grammar",
+      !tooLong(twentySix, twentySix + " extra words"))
+check("three words longer is padding",
+      tooLong(twentySix, twentySix + " three extra words"))
+// The case that made the ruling: made-13's whole violation was "It".
+check("closing a spoken ellipsis is not padding",
+      !tooLong("feels like a lot of meetings for not much",
+               "It feels like a lot of meetings for not much."))
+// The boundary the tolerance must NOT buy: prose-ification, made-11's +5.
+check("but prose-ification is still caught",
+      tooLong("quick update on the pilot, the front end is maybe two more days",
+              "Quick update on the pilot. The front end will most likely take "
+              + "maybe two more days than we had originally planned."))
+// The tolerance stacks on the shell allowance rather than replacing it.
+check("email gets the shell allowance and the tolerance",
+      !tooLong(twentySix, "Hi Priya, " + twentySix + " it will. Best, Abhishek", .email))
 check("an email shell may add words",
       !tooLong(twentySix, "Hi Priya, " + twentySix + " Best, Abhishek", .email))
 check("but the shell allowance is not a blank cheque",
@@ -615,6 +638,40 @@ check("line-leading digit markers are not invented numbers",
         .isEmpty)
 check("but a digit mid-sentence is still a fact",
       kinds("we have three things", "We have 7 things.").contains("invented-number"))
+
+// The four false-positive classes found by running the ideals through the
+// live rules after Fable's ceiling ruling, 2026-08-14. Every one of them
+// flagged a rewrite the user had personally accepted. This is the standing
+// calibration rule earning its keep on the first run.
+print("\nfalse positives the accepted rewrites exposed")
+
+check("a unit survives a modifier between it and its number",
+      !kinds("we found a data issue that needs maybe two more weeks",
+             "The data issue needs another two weeks.").contains("invented-unit"))
+check("but a unit with no quantity anywhere near it is still not pinned",
+      !kinds("it took weeks", "It took ages.").contains("unit"))
+
+check("\"half\" in \"half commit\" is not the number one",
+      kinds("I don't want to half commit and then flake",
+            "I don't want to commit and then drop out.").isEmpty)
+
+check("\"rather than\" carries a negation that \"not\" set up",
+      !kinds("wanted you to know now not Wednesday night",
+             "Wanted to flag this now rather than Wednesday night.")
+        .contains("negation"))
+check("and \"instead of\" does too",
+      !kinds("we should ship Friday not Monday",
+             "We should ship Friday instead of Monday.").contains("negation"))
+// The boundary: a negation that simply vanishes is still a reversal.
+check("a negation that is not replaced is still lost",
+      kinds("I don't think we should ship this", "We should ship this.")
+        .contains("negation"))
+
+check("the \"no\" in \"wait no hold on\" is a retraction, not a negation",
+      !kinds("can we move the retro to Thursday, wait no hold on, Thursday is "
+             + "the town hall, okay Friday, after three works best",
+             "Can we move the retro to Friday afternoon? After 3 works best.")
+        .contains("negation"))
 
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)

@@ -230,6 +230,19 @@ enum FactGuard {
     /// will refuse good rewrites for the sake of arithmetic.
     static let emailShellAllowance = 12
 
+    /// Words a rewrite may add to close the ellipsis in speech.
+    ///
+    /// Dictation drops the words writing needs — "feels like a lot of
+    /// meetings" becomes "It feels like a lot of meetings", and that "It"
+    /// was a guard violation until Fable's ruling of 2026-08-14. Applies
+    /// in every context, and adds to `emailShellAllowance` rather than
+    /// replacing it.
+    ///
+    /// Two words is grammar. Three is padding. See the ruling in
+    /// `review/LEDGER.md` for why this is a constant and not a
+    /// percentage.
+    static let grammarTolerance = 2
+
     static func verify(raw facts: FactSet, rewrite: String,
                        context: AppContext = .general) -> [Violation] {
         let words = tokenize(rewrite)
@@ -570,9 +583,37 @@ enum FactGuard {
         // every compliant email would violate the ceiling, and the
         // decapitation this change exists to stop would come back wearing
         // a different hat.
+        // **Amended again 2026-08-14** — Fable's ruling on
+        // `review/FABLE-PROMPT-ceiling.md`. A fixed +2-word tolerance, on
+        // top of the email allowance rather than instead of it.
+        //
+        // Two independent lines of evidence agreed. Four of the fifteen
+        // rewrites the user accepted broke the ceiling, and a guard that
+        // flags text the user approved is mis-specified by definition.
+        // And after the scale-word fix, EVERY remaining violation across
+        // the 31 transcripts on both candidate models was this one class
+        // — all three of them a spoken fragment becoming a grammatical
+        // sentence. made-13's entire violation was the word "It".
+        //
+        // Speech is elliptical and writing is not. Closing that ellipsis
+        // costs a roughly constant number of function words, which is why
+        // the tolerance is a constant and not the 10% alternative — a
+        // percentage shrinks to one word exactly on the short Slack lines
+        // where the repairs happen.
+        //
+        // The prompt had also been contradicting the ceiling
+        // mechanically: its own worked example, "70 percent" for "70%",
+        // costs a word the ceiling then charged for. Two rules fighting
+        // over one word is how retries get manufactured.
+        //
+        // Two, specifically, and not three: made-11's +5 ("is maybe" →
+        // "will take maybe") stays flagged, because that is
+        // prose-ification rather than grammar. **Two words is grammar,
+        // three is padding.**
         let spokenWords = tokenize(raw).count
         let writtenWords = tokenize(rewrite).count
-        let ceiling = spokenWords + (context == .email ? emailShellAllowance : 0)
+        let ceiling = spokenWords + grammarTolerance
+            + (context == .email ? emailShellAllowance : 0)
         if writtenWords > ceiling {
             violations.append(.longerThanSpeech(said: spokenWords, wrote: writtenWords))
         }
@@ -672,9 +713,15 @@ enum FactGuard {
         var found: Set<String> = []
         for (index, word) in words.enumerated()
         where unitWords.contains(word) && scaleWords[word] == nil {
-            let before = index > 0 ? words[index - 1] : ""
-            let after = index + 1 < words.count ? words[index + 1] : ""
-            let isQuantified = [before, after].contains { token in
+            // Two tokens each way, not one. "Two MORE weeks" puts a
+            // modifier between the number and its unit, so the spoken form
+            // pinned no unit while the written "another two weeks" pinned
+            // one — and the accepted rewrite of E1 was charged with
+            // inventing a unit its own transcript contains.
+            let lower = max(0, index - 2)
+            let upper = min(words.count, index + 3)
+            let neighbours = Array(words[lower..<index]) + Array(words[(index + 1)..<upper])
+            let isQuantified = neighbours.contains { token in
                 Int(token) != nil || spokenUnits[token] != nil
                     || spokenTens[token] != nil || quantityWords[token] != nil
                     // "two hundred megs" — the token touching "megs" is the
@@ -852,14 +899,51 @@ enum FactGuard {
     ]
 
     private static func countNegations(in words: [String]) -> Int {
+        let retracted = retractionSpans(in: words)
         var count = 0
         for (index, word) in words.enumerated() where negationMarkers.contains(word) {
+            // The "no" in "wait no hold on" is the speaker changing their
+            // mind, not a negation the rewrite has to carry. This was S2's
+            // entire violation, in the accepted rewrite and on the eval
+            // set both — the retraction waivers could not reach it because
+            // they work on fact positions and this is a count.
+            if retracted.contains(index) { continue }
             let window = words[max(0, index - 3)..<index]
             if window.contains(where: conditionalMarkers.contains) { continue }
             count += 1
         }
+        // A negation can survive as a different construction. "Wanted you
+        // to know now, not Wednesday" rewritten as "rather than Wednesday"
+        // keeps the meaning exactly and loses the marker, which read as a
+        // reversed statement — T4, in the wording the user accepted.
+        for (index, word) in words.enumerated() where negationPhraseHeads.contains(word) {
+            guard index + 1 < words.count else { continue }
+            if negationPhrases.contains([word, words[index + 1]]) { count += 1 }
+        }
         return count
     }
+
+    /// Every index covered by a retraction phrase, not just where one starts.
+    private static func retractionSpans(in words: [String]) -> Set<Int> {
+        var covered: Set<Int> = []
+        for start in retractionMarkerIndices(in: words) {
+            for phrase in retractionPhrases where start + phrase.count <= words.count {
+                if Array(words[start..<(start + phrase.count)]) == phrase {
+                    covered.formUnion(start..<(start + phrase.count))
+                }
+            }
+        }
+        return covered
+    }
+
+    /// Two-word constructions that negate without a negation word.
+    ///
+    /// Counted on both sides, so swapping one for "not" in either
+    /// direction is neutral rather than a lost negation.
+    private static let negationPhrases: Set<[String]> = [
+        ["rather", "than"], ["instead", "of"], ["as", "opposed"],
+    ]
+    private static let negationPhraseHeads: Set<String> = ["rather", "instead", "as"]
 
     private static let conditionalMarkers: Set<String> = [
         "if", "unless", "whether", "until", "otherwise", "in case",
@@ -1230,9 +1314,16 @@ enum FactGuard {
     /// options" as "2 options" would report an invented 2. Mapped on both
     /// sides, so the two spellings of one quantity compare equal — the
     /// same reason "fifteen" and 15 do.
+    ///
+    /// "half" was here mapping to 1 and is deliberately gone. It is not a
+    /// count, and "I don't want to half commit and then flake" pinned the
+    /// number 1 on a phrase containing no quantity at all — so the
+    /// accepted rewrite of E2, which drops the phrase, was charged with
+    /// losing a number nobody said. Same failure as the bare "one", which
+    /// this table's neighbour already guards against.
     private static let quantityWords: [String: Int] = [
         "both": 2, "pair": 2, "couple": 2, "dozen": 12, "twice": 2,
-        "half": 1, "single": 1, "once": 1, "thrice": 3,
+        "single": 1, "once": 1, "thrice": 3,
     ]
 
     /// Ordinals small enough to be list markers in ordinary speech.

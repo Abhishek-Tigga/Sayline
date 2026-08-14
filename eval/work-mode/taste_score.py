@@ -28,9 +28,15 @@ VERIFIER = HERE / "verifier" / "verify"
 SCRIPTS = json.loads((HERE / "taste-scripts.json").read_text())
 IDEALS = json.loads((HERE / "ideals.json").read_text())
 
-# The +12 email-shell allowance, same constant as `AppContext`. A greeting
-# and a sign-off are structure the speaker did not dictate but does want.
-EMAIL_ALLOWANCE = 12
+# There is deliberately no ceiling constant here.
+#
+# This file used to carry `EMAIL_ALLOWANCE = 12` and do its own length
+# arithmetic, because the verifier ignored context and so never gave email
+# its shell allowance. Two ceilings that disagreed by twelve words, on
+# precisely the cases the allowance exists for. The verifier now takes a
+# context and `longer-than-speech` is the single answer — including
+# Fable's +2 grammar tolerance, which this file would otherwise have had
+# to learn about separately.
 
 # Openers the user kept in their own ideals. Presence of any anchor in the
 # rewrite's opening is the check; the rewrite may word it differently.
@@ -99,9 +105,14 @@ def words(t):
     return len(re.findall(r"\S+", t))
 
 
-def verify_many(pairs):
-    """One verifier process for the batch — the compiled guard, not a copy."""
-    stdin = "\n".join(json.dumps({"raw": r, "rewrite": w}) for r, w in pairs)
+def verify_many(triples):
+    """One verifier process for the batch — the compiled guard, not a copy.
+
+    Context travels with each pair so the email shell allowance actually
+    applies. It did not until 2026-08-14; see the note in the verifier.
+    """
+    stdin = "\n".join(json.dumps({"raw": r, "rewrite": w, "context": c})
+                      for r, w, c in triples)
     proc = subprocess.run([str(VERIFIER)], input=stdin + "\n",
                           capture_output=True, text=True, timeout=180)
     if proc.returncode != 0:
@@ -124,10 +135,6 @@ def score_one(case, rewrite, violations):
     if violations:
         kinds = sorted({v["kind"] if isinstance(v, dict) else v for v in violations})
         fatal.append("guard:" + ",".join(kinds))
-
-    ceiling = words(raw) + (EMAIL_ALLOWANCE if email else 0)
-    if words(rewrite) > ceiling:
-        fatal.append(f"length:{words(rewrite)}>{ceiling}")
 
     if "—" in rewrite or "--" in rewrite:
         fatal.append("em-dash")
@@ -184,11 +191,83 @@ def score_one(case, rewrite, violations):
     return fatal, soft
 
 
+def calibrate():
+    """Score the fifteen ideals against the live rules. Expect 15/15.
+
+    Fable's standing rule, 2026-08-14: the ideals are the permanent
+    calibration set, any change to the guard, ceiling or scorer re-scores
+    them first, and **a shortfall is instrument error until proven
+    otherwise**. Three decisions in one week turned on instrument bugs —
+    a stale verifier binary, the scale-word bug that cost gpt-4.1-mini its
+    first rejection, and the ceiling itself.
+
+    Where the user accepted two wordings, either passing is a pass. They
+    approved both; a scorer that demands the first is measuring the order
+    they were written in.
+    """
+    # Residuals proven NOT to be instrument error. Each needs an argument
+    # for why the guard is right and the ideal is the outlier, not a
+    # shrug — the standing rule's default is that we are wrong.
+    #
+    # N3: the ideal writes "₹45,000" for a transcript that says "forty
+    # five thousand" and names no currency. Making it pass means letting
+    # a rewrite introduce a currency symbol, which is a protection that
+    # catches real errors ("45 thousand" arriving as "$45,000"). The
+    # "forty seven five" → 47,500 shorthand in the same sentence is moot:
+    # fix it and the ₹ still flags. The guard is right here.
+    KNOWN_RESIDUALS = {"N3": "invented ₹; see the note in taste_score.py"}
+
+    ideals = json.loads((HERE / "ideals-normalized.json").read_text())
+    by_id = {c["id"]: c for c in SCRIPTS}
+    variants = [(cid, i, text) for cid, texts in ideals.items()
+                for i, text in enumerate(texts)]
+    violations = verify_many([
+        (by_id[cid]["raw"], text,
+         "email" if by_id[cid]["channel"] == "Email" else "general")
+        for cid, _, text in variants])
+
+    best = {}
+    for (cid, i, text), v in zip(variants, violations):
+        fatal, soft = score_one(by_id[cid], text, v)
+        if cid not in best or len(fatal) < len(best[cid][1]):
+            best[cid] = (i, fatal, soft)
+
+    print(f"\n  CALIBRATION — the {len(best)} ideals against the live rules\n")
+    clean, unexplained = 0, []
+    for cid in ideals:
+        i, fatal, soft = best[cid]
+        tag = f"v{i+1}" if len(ideals[cid]) > 1 else "  "
+        clean += not fatal
+        mark = "PASS" if not fatal else ("KNOWN" if cid in KNOWN_RESIDUALS else "FAIL")
+        if fatal and cid not in KNOWN_RESIDUALS:
+            unexplained.append(cid)
+        note = "; ".join(fatal) or "clean"
+        if mark == "KNOWN":
+            note += f"   <- {KNOWN_RESIDUALS[cid]}"
+        print(f"  {mark:<5} {cid:<4} {tag}  {note}")
+
+    print(f"\n  {clean}/{len(best)} clean, "
+          f"{len(KNOWN_RESIDUALS)} known residual"
+          f"{'s' if len(KNOWN_RESIDUALS) != 1 else ''}")
+    if unexplained:
+        print(f"\n  {', '.join(unexplained)} is INSTRUMENT ERROR until proven "
+              f"otherwise.\n  See the standing rule in review/LEDGER.md. Do not "
+              f"judge a model until\n  this is resolved or argued into "
+              f"KNOWN_RESIDUALS with a reason.")
+    print()
+    return 1 if unexplained else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scored", help="rewrites JSON to score")
+    ap.add_argument("--calibrate", action="store_true",
+                    help="score the ideals themselves; expect all clean")
     ap.add_argument("--label", default="")
     a = ap.parse_args()
+
+    if a.calibrate:
+        return calibrate()
 
     rows = json.loads(pathlib.Path(a.scored).read_text())
     by_id = {r["id"]: r for r in rows}
@@ -196,7 +275,10 @@ def main():
     if not cases:
         sys.exit("no taste-script ids in that file — is it the 31-transcript run?")
 
-    violations = verify_many([(c["raw"], by_id[c["id"]]["rewrite"]) for c in cases])
+    violations = verify_many([
+        (c["raw"], by_id[c["id"]]["rewrite"],
+         "email" if c["channel"] == "Email" else "general")
+        for c in cases])
 
     clean, results = 0, []
     for c, v in zip(cases, violations):
@@ -215,17 +297,18 @@ def main():
     softs = sum(len(s) for _, _, s in results)
     ms = [by_id[c["id"]].get("ms") for c in cases if by_id[c["id"]].get("ms")]
 
-    # Reported separately because the ceiling is under dispute: four of the
-    # fifteen rewrites the user accepted exceed it, each by one or two
-    # words. Until that is settled, a model comparison dominated by the
-    # ceiling would be comparing models on a rule the target itself fails.
+    # Kept after the ceiling ruling as a diagnostic, not a dispute. Fable
+    # settled it on 2026-08-14 with a +2 grammar tolerance, and the guard
+    # now owns the arithmetic. This line stays because "the only thing
+    # wrong is length" is worth seeing at a glance — it was the signal
+    # that got the ceiling looked at in the first place.
     ceilingless = sum(
         1 for _, f, _ in results
-        if not [x for x in f if not x.startswith(("length:", "guard:longer-than-speech"))]
+        if not [x for x in f if x != "guard:longer-than-speech"]
     )
     print(f"\n  sendable unedited : {clean}/{len(cases)}  ({100*clean//len(cases)}%)")
     print(f"  ...ignoring ceiling: {ceilingless}/{len(cases)}  "
-          f"({100*ceilingless//len(cases)}%)   [ceiling is disputed, see LEDGER]")
+          f"({100*ceilingless//len(cases)}%)")
     print(f"  soft flags        : {softs}")
     if ms:
         print(f"  median latency    : {statistics.median(ms):.0f} ms")
