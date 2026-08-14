@@ -8,8 +8,26 @@ import Foundation
 struct Line: Decodable { let id: String; let text: String }
 
 let root = FileManager.default.currentDirectoryPath + "/eval/transcription"
-let lines = try! JSONDecoder().decode(
+guard FileManager.default.fileExists(atPath: root + "/script.json") else {
+    print("Run this from the repo root — no eval/transcription/script.json under "
+          + FileManager.default.currentDirectoryPath)
+    exit(1)
+}
+let allLines = try! JSONDecoder().decode(
     [Line].self, from: Data(contentsOf: URL(fileURLWithPath: root + "/script.json")))
+
+// Optional id filters, so three new lines don't cost re-reading ten old
+// ones: `record control` matches every id starting with "control";
+// `record names-1 units` matches exactly those.
+let filters = Array(CommandLine.arguments.dropFirst())
+let lines = filters.isEmpty ? allLines : allLines.filter { line in
+    filters.contains { line.id == $0 || line.id.hasPrefix($0) }
+}
+guard !lines.isEmpty else {
+    print("No script lines match \(filters) — ids are: "
+          + allLines.map(\.id).joined(separator: ", "))
+    exit(1)
+}
 
 let engine = AVAudioEngine()
 let input = engine.inputNode
