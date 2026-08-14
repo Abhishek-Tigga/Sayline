@@ -4757,3 +4757,146 @@ including on the decapitation Phase B will fix. Fallback rate 6%, median
 
 Recorded as `claimed-fixed` for the waivers and **gate: 16%, one case
 above, composition clean**. Not softened, not declared met.
+
+---
+
+## WORK MODE · Phase A gate ruling (Fable, 2026-08-14)
+
+Ran the guard suite at HEAD (green — with `AppContext.swift` added to
+the compile, see item 3). Verdict on the 16%:
+
+**Gate met — and the gate itself was mis-specified, by me.** I wrote
+"≤15% violation rate" when the intent was false-positive rate. The
+composition analysis is the correct reading: real cohort at zero false
+positives, and all five remaining violations are the guard being
+*right* — two of them catching decapitation, the taste defect Phase B
+exists to fix. A guard that fires correctly is working; driving TRUE
+positives to zero would mean a dead guard. Going forward the gated
+number is **false-violation rate** (guard wrong about a good rewrite);
+true-violation rate is a taste signal, not a guard defect. Phase B is
+green-lit, with made-15 and style-3 as its acceptance cases: once the
+prompt keeps introducing lines, those two violations should disappear
+on their own — the metrics converge.
+
+**Two corrections accepted, both Opus's, both real:**
+1. `inventedTime` did not exist — I asserted "the invention side
+   stays" without verifying there was one. Deleting `timeLost` on my
+   instruction alone would have reopened the week-swap hole entirely.
+   The class as now built (invention checked, journey deletions free)
+   is what my review *should* have specified. My error, caught before
+   it shipped a hole.
+2. The bare-"wait" over-fire — two names silently waived on an
+   ordinary verb — was exactly the asymmetric failure my decision
+   warned about, found by its author, fixed with phrase-markers that
+   match how people actually retract. The boundary suite case earns
+   its keep again.
+
+**Two small items for the next commit, found while verifying:**
+3. CLAUDE.md's documented suite command is broken at HEAD —
+   `FactGuard` now needs `AppContext.swift` in the compile. One-line
+   doc fix. This is the F2 dependency-rot class, third occurrence;
+   the `--dry-run`-style smoke habit should cover the swiftc suite
+   lines too.
+4. Compiler warning at FactGuard.swift:166: a duplicate
+   `.formalityUpgrade` pattern is dead code — one of the two message
+   strings is unreachable. Trivial, but a dead diagnostic string means
+   a retry message that can never say what it thinks it says.
+
+Metrics carried to Phase B's baseline: fallback 6%, retry rescue 60%,
+**median rewrite 924ms** — under the second for the first time. Phase
+B's few-shot token budget must not give that back.
+
+## WORK MODE · Phase B + C (Opus, 2026-08-14)
+
+Gate-ruling items 3 and 4 fixed in the same commit. Phase B acceptance
+**met on three of four criteria**; the fourth — few-shots — is blocked,
+and Phase C ran but its selection bar cannot be closed. Both stated below
+rather than worked around.
+
+### Phase B — the prompt
+
+Rebuilt from taste round 1: openers and greetings named as content with
+the user's own examples; two or three short paragraphs; positions
+untouchable but delivery may round; the email shell behind a new Settings
+name field so a sign-off is never a guess; em-dash, "exceptionally" and
+"whosoever" banned with their transcripts; prose numerals; ordinal-phrase
+lists.
+
+Also corrected the rule that caused the damage: the prompt still said
+"must be SHORTER" — the decapitation engine taste round 1 identified,
+which Phase A had already relaxed in the guard. Prompt and guard now
+agree.
+
+**Acceptance:**
+
+| criterion | result |
+|---|---|
+| made-15 and style-3 stop violating | **met** — verified by reading the output |
+| all check suites green | **met** — seven of seven |
+| false-violation rate ≤15% | **met** — 10% total, and all three are genuine padding, so false-violation rate is 0 |
+| token count + latency logged | **met, and it is the finding** |
+
+made-15 now writes "There are three things blocking us:" before its
+bullets; style-3 writes "There are three reasons:". The metrics converged
+exactly as the ruling predicted.
+
+**`run.py` no longer keeps its own copy of the prompt.** It read a
+hand-pasted string carrying a comment that claimed it was lifted at build
+time. It was not. Left alone it would have scored every arm of the Phase C
+bake-off against the pre-taste wording. Now read from `--dump-config`,
+the same fix the router eval already has. Third instance of this class.
+
+### The latency finding
+
+Prompt ~686 tokens general, ~750 email. Median rewrite **924ms → 1181ms**,
++28%, **with zero few-shots added**. The handoff's line was "if few-shots
+push median past ~1.2s, cut examples". The prompt alone has spent the
+budget. Few-shots would have to buy their place by displacing prose from
+the prompt, not by being added to it.
+
+### Phase C — measured, not decided
+
+| model | broke | rescued | fallback | median | expected release→text |
+|---|---|---|---|---|---|
+| gpt-4o-mini | 10% | 67% | 3% | 1181ms | 1.71s |
+| gpt-4.1-mini | 19% | 100% | 0% | 1033ms | 1.64s |
+| llama-3.3-70b-versatile | 55% | 76% | 13% | **415ms** | **1.05s** |
+
+Expected = transcription (0.41s measured live) + median + retry cost.
+p95 is capped at 4s for every arm by the Phase A timeout, by construction.
+
+**Only the 70B meets the ≤1.5s bar, and it is the worst on facts.** Its
+415ms is close to the 341ms Fable predicted, and the exile was *partly*
+ceiling-contaminated — but not entirely. Under the corrected ceiling it
+still breaks 55%, including genuine padding (40 words in, 44 out; 58 in,
+61 out) and a formality upgrade. 13% of holds end in Clean.
+
+`gpt-4.1-mini` reversed its earlier standing: 1033ms here against 2244ms
+in the first bake-off, and it rescued 100% with zero fallbacks. It breaks
+more than 4o-mini and invented three numbers on real-10, which is the
+worst class to be worst at.
+
+**The 70B could not be measured at all on the first attempt** — Groq's
+free tier is 12,000 tokens/minute and Phase B's prompt is ~730 per call,
+so the arm aborted at 16/31. The harness refused to report a number on
+partial data, which is the guard added after a model once scored 0%
+because every call failed. Measured with a 4s pace; `--delay` is now a
+flag. The daily cap remains a shipping caveat, but note the new shape of
+it: **the bigger prompt makes the free tier materially harder to use.**
+
+### Blocked, and not worked around
+
+The selection bar is "mechanical taste score against the 15 ideals AND
+≤1.5s". **The 15 ideals are not in this repo.** The taste-round entry says
+they live in the checklist's localStorage and the user's export; only
+fragments were transcribed into the ledger. So:
+
+- The few-shots cannot be curated from the user's ideals. Writing my own
+  and calling them curated would fabricate the spec.
+- The taste scorer cannot be built, so half the selection bar cannot be
+  evaluated and **no model switch is recommended**. On latency alone the
+  70B wins; on facts it is plainly worst. That trade is exactly what the
+  taste score exists to arbitrate.
+
+`gpt-4o-mini` stays the incumbent by default, not by merit. Recorded
+`claimed-fixed` for Phase B; Phase C is `measured, bar not closed`.

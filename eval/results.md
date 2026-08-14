@@ -183,3 +183,20 @@ attempt.
 | model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
 |---|---|---|---|---|---|---|
 | `gpt-4o-mini` | 1/10 | 2/21 | 0 | 67% | 3% | 1201 ms |
+
+### Work mode model bake-off — 2026-08-14 12:02
+
+31 transcripts, temperature 0, scored by FactGuard.
+
+| model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
+|---|---|---|---|---|---|---|
+| `gpt-4o-mini` | 1/10 | 2/21 | 0 | 67% | 3% | 1181 ms |
+| `gpt-4.1-mini` | 3/10 | 3/21 | 1 | 100% | 0% | 1033 ms |
+
+### Work mode model bake-off — 2026-08-14 12:05
+
+31 transcripts, temperature 0, scored by FactGuard.
+
+| model | real 10 | invented 15 | inventions | retry rescued | fallback | median |
+|---|---|---|---|---|---|---|
+| `llama-3.3-70b-versatile` | 4/10 | 13/21 | 2 | 76% | 13% | 415 ms |

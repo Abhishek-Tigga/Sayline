@@ -122,6 +122,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model")
     ap.add_argument("--dry-run", action="store_true")
+    # Groq's free tier is 12,000 tokens per minute. Phase B's prompt is
+    # ~730 tokens per call, so an unpaced run trips the limit around call
+    # 16 and the arm aborts — which is not a verdict on the model, it is a
+    # verdict on the tier. Pacing lets the arm be measured at all; the
+    # daily cap remains a real operational caveat for shipping, and belongs
+    # in the recommendation rather than in an exclusion.
+    ap.add_argument("--delay", type=float, default=0.0,
+                    help="seconds to wait between calls, for rate-limited tiers")
     args = ap.parse_args()
 
     cases = json.loads(TRANSCRIPTS.read_text())
@@ -153,6 +161,7 @@ def main():
         # transcripts came from the user.
         saved = globals().setdefault("_saved", [])
         for case in cases:
+            if args.delay: time.sleep(args.delay)
             try:
                 out, ms = rewrite(model, url, keys[provider], case["raw"], pinned_block(case["raw"]))
             except Exception as exc:
