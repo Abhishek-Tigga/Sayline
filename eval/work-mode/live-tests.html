@@ -1,0 +1,468 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayline — work mode live test sheet</title>
+<style>
+  :root { --bg:#f4f2ee; --ink:#1a1a1a; --muted:#6d6862; --line:#dcd6cc; --card:#fff;
+          --accent:#8a6a3d; --pass:#2f7a4f; --fail:#b3402f; --block:#8a7b3d; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17;
+            --accent:#d0a86a; --pass:#6bbd8c; --fail:#e0806f; --block:#d4c07a; }
+  }
+  :root[data-theme="dark"]  { --bg:#141310; --ink:#eceae6; --muted:#948d84; --line:#2f2c27; --card:#1c1a17; --accent:#d0a86a; --pass:#6bbd8c; --fail:#e0806f; --block:#d4c07a; }
+  :root[data-theme="light"] { --bg:#f4f2ee; --ink:#1a1a1a; --muted:#6d6862; --line:#dcd6cc; --card:#fff; --accent:#8a6a3d; --pass:#2f7a4f; --fail:#b3402f; --block:#8a7b3d; }
+
+  body { margin:0; padding:32px 20px 90px; background:var(--bg); color:var(--ink);
+         font:15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width:860px; margin:0 auto; display:flex; flex-direction:column; gap:22px; }
+  h1 { font-size:22px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  h2 { font-size:12px; margin:26px 0 2px; font-weight:700; letter-spacing:.1em;
+       text-transform:uppercase; color:var(--accent); }
+  p  { margin:0; color:var(--muted); font-size:13.5px; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px;
+         background:color-mix(in srgb, var(--muted) 15%, transparent); padding:1px 5px; border-radius:4px; }
+
+  .intro { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
+  .intro ul { margin:8px 0 0; padding-left:20px; color:var(--muted); font-size:13.5px; }
+  .intro li { margin-bottom:4px; }
+
+  .test { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:16px 18px; display:flex; flex-direction:column; gap:10px; }
+  .test.done { border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .id { font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent);
+        letter-spacing:.04em; }
+  .title { font-size:14.5px; font-weight:600; flex:1 1 220px; }
+  .tag { font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+         padding:2px 7px; border-radius:5px; border:1px solid var(--line); color:var(--muted); }
+  .tag.expectfail { color:var(--fail); border-color:color-mix(in srgb, var(--fail) 45%, var(--line)); }
+  .tag.blocking { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); }
+
+  .say { background:color-mix(in srgb, var(--accent) 9%, transparent);
+         border-left:3px solid var(--accent); padding:9px 12px; border-radius:0 7px 7px 0;
+         font-size:14px; }
+  .say b { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--accent);
+           display:block; margin-bottom:2px; font-weight:700; }
+  .rows { display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:13px; }
+  .rows dt { color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em;
+             padding-top:3px; font-weight:600; }
+  .rows dd { margin:0; }
+  .challenge { color:var(--muted); font-size:12.5px; font-style:italic;
+               border-top:1px dashed var(--line); padding-top:9px; }
+  .challenge b { font-style:normal; color:var(--ink); }
+
+  .verdict { display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+  .verdict button { font:inherit; font-size:12.5px; font-weight:600; padding:5px 14px;
+                    border-radius:7px; border:1px solid var(--line); background:transparent;
+                    color:var(--muted); cursor:pointer; }
+  .verdict button:hover { border-color:var(--accent); }
+  .verdict button[aria-pressed="true"][data-v="pass"]  { background:var(--pass);  border-color:var(--pass);  color:#fff; }
+  .verdict button[aria-pressed="true"][data-v="fail"]  { background:var(--fail);  border-color:var(--fail);  color:#fff; }
+  .verdict button[aria-pressed="true"][data-v="block"] { background:var(--block); border-color:var(--block); color:#231a18; }
+  .verdict button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  textarea { width:100%; box-sizing:border-box; min-height:52px; resize:vertical; padding:8px 10px;
+             border-radius:7px; border:1px solid var(--line); background:var(--bg); color:var(--ink);
+             font:13px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+  textarea::placeholder { color:var(--muted); }
+
+  .bar { position:fixed; left:0; right:0; bottom:0; background:var(--card);
+         border-top:1px solid var(--line); padding:11px 20px; display:flex; gap:12px;
+         align-items:center; justify-content:center; flex-wrap:wrap; z-index:5; }
+  .bar .count { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .bar button { font:inherit; font-size:13px; padding:6px 15px; border-radius:8px;
+                border:1px solid var(--line); background:var(--bg); color:var(--ink); cursor:pointer; }
+  .bar button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .bar button:hover { border-color:var(--accent); }
+</style>
+
+<div class="wrap">
+
+  <div>
+    <h1>Work mode — live test sheet</h1>
+    <p>Hold the chord for work mode on every case unless the row says
+       otherwise. Judge what lands <b>in the text field</b>, not what the log
+       says happened.</p>
+  </div>
+
+  <div class="intro">
+    <b style="font-size:13px">These tests are written to try to break what was built.</b>
+    <ul>
+      <li>Every case names <b>the assumption it is attacking</b>. If a test
+          passes, that assumption survived a real attempt on it — which is
+          worth more than a test written to agree.</li>
+      <li>C1 is marked <span class="tag expectfail">expect fail</span>. It is
+          known-broken and unfixed, recorded in the ledger as OPEN FOR FABLE.
+          It is here so the sheet cannot look clean by leaving it out — a
+          test suite that omits the known failure is a rubber stamp.</li>
+      <li>Sections C and D matter most. C hunts for things the guard
+          <b>lets through</b>; D hunts for good rewrites it <b>blocks</b>.
+          Both are harder to see than a guard doing its job, and both are
+          where the design is most likely wrong.</li>
+      <li>Where a case expects an exact sentence, being close is a fail.
+          Write what actually appeared in the remarks — the wording is the
+          evidence.</li>
+    </ul>
+  </div>
+
+  <div id="tests"></div>
+</div>
+
+<div class="bar">
+  <span class="count" id="count"></span>
+  <button id="copy" class="primary">Copy results for the ledger</button>
+  <button id="download">Download JSON</button>
+  <button id="reset">Clear all</button>
+</div>
+
+<script>
+(() => {
+  const TESTS = [
+  { section: "A · The one that has never run" },
+  {
+    id: "A1", tag: "blocking",
+    title: "Work rewrite unreachable → Clean's output, not raw",
+    say: "So I was thinking, um, we should probably just push the whole launch to next month, honestly.",
+    setup: "Settings → clear the OpenAI key, keep the Groq key. Then work-mode hold.",
+    expect: "Tidied text lands (fillers gone). Flash reads “Used the tidied version — the rewrite didn't come back”. Log shows [work] work unavailable → clean.",
+    challenge: "That the network-failure path works at all. It is committed and has NEVER executed. If raw text lands instead — “um”, “honestly” intact — the fix is wrong and this is a lost dictation.",
+  },
+  {
+    id: "A2",
+    title: "Both services unreachable → raw, labelled honestly",
+    say: "Push the launch to next month.",
+    setup: "Clear BOTH the OpenAI and Groq keys. Work-mode hold.",
+    expect: "Either nothing inserts with a clear error, or raw text inserts. Log must NOT claim “clean”.",
+    challenge: "That the honest-label fix holds. producedBy used to say “clean” on every failure path, including ones that inserted raw. If the log says clean here, it is lying again.",
+  },
+  {
+    id: "A3",
+    title: "Recovery — does it heal without a restart?",
+    say: "Push the launch to next month.",
+    setup: "Re-enter the OpenAI key. Work-mode hold, no relaunch.",
+    expect: "Work rewrite runs normally.",
+    challenge: "That APIKeyProvider's cache is invalidated on save. If this needs a restart, every key change silently breaks work mode until the app is relaunched.",
+  },
+
+  { section: "B · The guard's rules — does it catch what it claims to?" },
+  {
+    id: "B1",
+    title: "A number must survive",
+    say: "We need about twenty five more licences before the end of the quarter.",
+    expect: "“twenty five” or “25” still present. Never 20, 30, or dropped.",
+    challenge: "That numbers written as WORDS are pinned, not just digits. The guard's extraction may only see digits.",
+  },
+  {
+    id: "B2",
+    title: "A weekday must survive",
+    say: "Let's move the review to Thursday because Wednesday is packed.",
+    expect: "Both Thursday and Wednesday present, and not swapped.",
+    challenge: "That two days in one sentence are both pinned and kept in the right roles. Keeping both but swapping them would still pass a naive check.",
+  },
+  {
+    id: "B3",
+    title: "A negation must not flip",
+    say: "I don't think we should ship this before the audit.",
+    expect: "Still negative. “I don't think we should ship” — never “we should ship”.",
+    challenge: "The negation rule on a sentence where dropping one word reverses the meaning entirely.",
+  },
+  {
+    id: "B4",
+    title: "A double negative must not be “simplified”",
+    say: "I don't disagree with the approach, I just don't like the timing.",
+    expect: "Meaning preserved. “I don't disagree” must NOT become “I agree” — they are not the same thing.",
+    challenge: "Whether the negation count is a count or an understanding. Two negations became one positive would keep a naive parity check happy while changing what was said.",
+  },
+  {
+    id: "B5",
+    title: "A question must stay a question",
+    say: "Do you think we can get this done before Friday, or should I ask for more time?",
+    expect: "Still a question. Not answered, not turned into a statement.",
+    challenge: "question-lost, on a two-part question where answering half of it is the tempting failure.",
+  },
+  {
+    id: "B6",
+    title: "A name must not be invented",
+    say: "Someone from the finance team said the numbers were off.",
+    expect: "No name appears. Not “Sarah”, not “John”, no team member named.",
+    challenge: "invented-name, where the sentence has a person-shaped hole the model may want to fill.",
+  },
+  {
+    id: "B7",
+    title: "A commitment must not be invented",
+    say: "I might be able to look at the deck at some point this week.",
+    expect: "Still hedged. Never “I will review the deck this week”.",
+    challenge: "invented-commitment. Turning a maybe into a promise is the most damaging invention in a work message and the easiest to make sound like tidying.",
+  },
+  {
+    id: "B8",
+    title: "Bluntness must not be softened",
+    say: "That plan is a mess and I don't agree with any of it.",
+    expect: "Still blunt. Not “I have some concerns”, not “I'm not fully aligned”.",
+    challenge: "The formality rule on genuinely rude input. Softening is what a helpful assistant wants to do, and the whole point is that it must not.",
+  },
+
+  { section: "C · Does the guard let things through? (false negatives)" },
+  {
+    id: "C1", tag: "expectfail",
+    title: "Rhetorical question → invented claim",
+    say: "Let's move it to Friday morning, say eleven-ish. Doesn't that work for you, or is Friday bad?",
+    expect: "Should stay a question. KNOWN TO FAIL — it invents a self-contradictory claim and the guard passes it, because the invented sentence carries no number or date.",
+    challenge: "The guard's core assumption: that inventions are catchable because they carry facts. This one carries none. Recorded in the ledger as OPEN FOR FABLE and deliberately unfixed. Record exactly what it produces.",
+  },
+  {
+    id: "C2",
+    title: "Invented causation",
+    say: "The build is broken. The release is late.",
+    expect: "Two separate statements. Must NOT become “the release is late because the build is broken”.",
+    challenge: "Whether the guard sees invented CAUSATION at all. It has rules for numbers, days and names — “because” is not a fact, so nothing pins it, and it changes the meaning completely.",
+  },
+  {
+    id: "C3",
+    title: "Softening that is not on the list",
+    say: "This is wrong and we need to redo it.",
+    expect: "Still says wrong and redo.",
+    challenge: "That the formality rule is a LIST of phrases rather than an understanding. If “wrong” becomes “not quite right” — a phrase nobody thought to add to the list — the mechanism is a blocklist pretending to be a rule.",
+  },
+  {
+    id: "C4",
+    title: "Pronoun swap changes who said it",
+    say: "He said the deadline moved, but she thinks it's fine.",
+    expect: "He and she preserved in their roles.",
+    challenge: "Whether attribution is protected at all. Pronouns are not names, so invented-name will not fire — yet swapping them reassigns the statement to a different person.",
+  },
+  {
+    id: "C5",
+    title: "A hedge disappearing",
+    say: "It'll probably take roughly three days, give or take.",
+    expect: "“probably” and “roughly” survive. Not “it will take three days”.",
+    challenge: "The prompt says meaningful hedges stay, but no guard rule enforces it. Dropping a hedge keeps the number intact, so the guard sees nothing wrong while the sentence became a commitment.",
+  },
+
+  { section: "D · Does the guard block good rewrites? (false positives)" },
+  {
+    id: "D1",
+    title: "Already tight — nothing to cut",
+    say: "Push it to Tuesday.",
+    expect: "Text lands unchanged or near-unchanged, no fallback flash.",
+    challenge: "Fable's central critique. Under ten words the ceiling is the word count itself, so a rewrite cannot be longer OR equal-plus-tidied. If this falls back to Clean, the rule manufactured an impossible task.",
+  },
+  {
+    id: "D2",
+    title: "Tight and just over ten words",
+    say: "Please push the client review to Tuesday and tell the design team.",
+    expect: "A clean rewrite, no fallback.",
+    challenge: "The exact boundary the ceiling changes at. Above nine words the rewrite must be STRICTLY shorter — on an already-tight sentence there may be no legal answer, and the fallback would be the rule's fault rather than the model's.",
+  },
+  {
+    id: "D3",
+    title: "Ordinals used as list markers",
+    say: "There are three reasons this is late. First, the API changed. Second, we lost a week to hiring. Third, the spec moved twice.",
+    expect: "Bulleted, WITH the introducing line kept, and “three” and “twice” intact.",
+    challenge: "A bug this project has hit TWICE — first/second/third pinned as numbers, and “second” pinned as a time unit. If it falls back, the guard is fighting the prompt again on the same input class.",
+  },
+  {
+    id: "D4",
+    title: "“Second” meaning time, in the same breath as an ordinal",
+    say: "Give me a second. First thing tomorrow I'll send the second draft.",
+    expect: "No fallback. “second” as time and “second draft” both survive.",
+    challenge: "The exact ambiguity that broke this twice. Fable's rule was to pin a unit only when adjacent to a number; this sentence has both readings a few words apart.",
+  },
+  {
+    id: "D5",
+    title: "Legitimate expansion of a contraction",
+    say: "We can't ship Friday, it's gonna slip.",
+    expect: "Reasonable output. “gonna” → “going to” is fine; “can't” → “cannot” should NOT count as a formality upgrade.",
+    challenge: "Whether the formality list is too eager. “do not” and “let us” were added to it after real output — so the list may now block ordinary contraction handling.",
+  },
+
+  { section: "E · Consistency — the newest finding" },
+  {
+    id: "E1",
+    title: "Same sentence, three holds",
+    say: "See, the way things work here is you have to work harder, but more than that you have to work smarter — smarter more than harder. Use everything available, whether that's your manager, your colleagues, or the tools.",
+    setup: "Do this THREE times in a row, work mode each time. Paste all three outputs in the remarks.",
+    expect: "Three outputs that preserve roughly the same amount.",
+    challenge: "The variance found in real use: two near-identical holds gave one near-verbatim result and one compressed to half. Suspected cause is that a guard rejection plus retry re-anchors the model — meaning fidelity depends on accidentally tripping the guard. If the three differ widely, that is confirmed.",
+  },
+  {
+    id: "E2",
+    title: "Does the retry really anchor?",
+    say: "Move the sync to Wednesday at four, and tell Priya it's her call whether we keep it weekly.",
+    setup: "Repeat until the log shows “retry rescued”. Compare that output against a run with no retry.",
+    expect: "Note whether the rescued output preserves MORE of your wording than a clean first pass.",
+    challenge: "My own hypothesis, directly. If rescued outputs are not more faithful, my explanation for E1 is wrong and should be struck from the ledger rather than left standing.",
+  },
+
+  { section: "F · Register and context" },
+  {
+    id: "F1",
+    title: "Email keeps a greeting",
+    say: "Hi Sam, just wanted to check whether the invoice went out last week.",
+    setup: "Cursor in an email client.",
+    expect: "Greeting survives, complete sentences.",
+    challenge: "That the register switch does only the two things it claims — greeting and sentence completeness — and does not also make the tone more formal.",
+  },
+  {
+    id: "F2",
+    title: "Chat drops the greeting",
+    say: "Hey, quick one, did the invoice go out last week?",
+    setup: "Cursor in Slack or Messages.",
+    expect: "Greeting dropped, fragments fine, still a question.",
+    challenge: "The same switch in the other direction, with a question attached so two rules interact.",
+  },
+  {
+    id: "F3",
+    title: "Work mode on an agent-shaped sentence",
+    say: "Remind me to call the bank at four.",
+    setup: "Work-mode hold, NOT agent mode.",
+    expect: "Inserted as text, unchanged in meaning. No reminder created.",
+    challenge: "That work mode never routes to an action. A chord misread as agent mode would create a real reminder from a sentence meant as text.",
+  },
+
+  { section: "G · Degenerate input" },
+  {
+    id: "G1",
+    title: "One word",
+    say: "Yes.",
+    expect: "“Yes.” lands. No rewrite, no fallback flash, nothing invented.",
+    challenge: "The ceiling at its smallest. One word cannot be shortened, so if the rule is wrong this is where it is most obviously wrong.",
+  },
+  {
+    id: "G2",
+    title: "Pure filler",
+    say: "Um, so, yeah, I mean, you know, like, anyway.",
+    expect: "Something sane — empty, or a short honest remainder. Not an invented sentence.",
+    challenge: "What happens when there is no content to preserve. A model asked to rewrite nothing may write something, and there are no facts for the guard to protect.",
+  },
+  {
+    id: "G3",
+    title: "Self-correction mid-sentence",
+    say: "Let's do it on Monday — no wait, Tuesday, Monday's the bank holiday.",
+    expect: "Lands on Tuesday. Monday may appear as the correction, but the instruction must be Tuesday.",
+    challenge: "Both days are pinned, so the guard is satisfied either way. Only understanding tells them apart — this is a case where the guard cannot help and the prompt is on its own.",
+  },
+  {
+    id: "G4",
+    title: "Long dictation",
+    say: "Speak for 60–90 seconds continuously about anything real.",
+    expect: "Sensible rewrite. Note the wait, and whether anything from the start was dropped.",
+    challenge: "That the ~1s budget holds at length, and that the ceiling behaves when the input is large. All bake-off transcripts were short.",
+  },
+];
+
+  const KEY = "sayline-workmode-tests-v1";
+  const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const host = document.getElementById("tests");
+
+  TESTS.forEach(t => {
+    if (t.section) {
+      const h = document.createElement("h2");
+      h.textContent = t.section;
+      host.appendChild(h);
+      return;
+    }
+    const card = document.createElement("div");
+    card.className = "test";
+
+    const head = document.createElement("div");
+    head.className = "head";
+    head.innerHTML = `<span class="id">${t.id}</span><span class="title">${t.title}</span>` +
+      (t.tag === "expectfail" ? `<span class="tag expectfail">expect fail</span>` : "") +
+      (t.tag === "blocking" ? `<span class="tag blocking">blocking</span>` : "");
+
+    const say = document.createElement("div");
+    say.className = "say";
+    say.innerHTML = `<b>say this</b>${t.say}`;
+
+    const rows = document.createElement("dl");
+    rows.className = "rows";
+    if (t.setup) rows.innerHTML += `<dt>setup</dt><dd>${t.setup}</dd>`;
+    rows.innerHTML += `<dt>expect</dt><dd>${t.expect}</dd>`;
+
+    const ch = document.createElement("div");
+    ch.className = "challenge";
+    ch.innerHTML = `<b>What this attacks:</b> ${t.challenge}`;
+
+    const verdict = document.createElement("div");
+    verdict.className = "verdict";
+    [["pass","Pass"], ["fail","Fail"], ["block","Blocked"]].forEach(([v, text]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.v = v; b.textContent = text;
+      b.setAttribute("aria-pressed", String(saved[t.id]?.verdict === v));
+      b.addEventListener("click", () => {
+        const now = saved[t.id]?.verdict === v ? null : v;   // click again to clear
+        saved[t.id] = { ...(saved[t.id] || {}), verdict: now };
+        [...verdict.children].forEach(c =>
+          c.setAttribute("aria-pressed", String(c.dataset.v === now)));
+        persist();
+      });
+      verdict.appendChild(b);
+    });
+
+    const notes = document.createElement("textarea");
+    notes.placeholder = "What actually appeared, word for word. Anything surprising.";
+    notes.value = saved[t.id]?.notes || "";
+    notes.addEventListener("input", () => {
+      saved[t.id] = { ...(saved[t.id] || {}), notes: notes.value };
+      persist();
+    });
+
+    card.append(head, say, rows, ch, verdict, notes);
+    host.appendChild(card);
+    card.dataset.id = t.id;
+  });
+
+  function persist() {
+    localStorage.setItem(KEY, JSON.stringify(saved));
+    render();
+  }
+
+  function render() {
+    const cases = TESTS.filter(t => !t.section);
+    const counts = { pass:0, fail:0, block:0 };
+    cases.forEach(t => {
+      const v = saved[t.id]?.verdict;
+      if (v) counts[v]++;
+      const card = host.querySelector(`[data-id="${t.id}"]`);
+      if (card) card.classList.toggle("done", !!v);
+    });
+    const done = counts.pass + counts.fail + counts.block;
+    document.getElementById("count").textContent =
+      `${done} of ${cases.length} judged · ${counts.pass} pass · ${counts.fail} fail · ${counts.block} blocked`;
+  }
+
+  function asMarkdown() {
+    const lines = ["## Work mode live test run — " + new Date().toISOString().slice(0, 16).replace("T", " "), ""];
+    let section = "";
+    TESTS.forEach(t => {
+      if (t.section) { section = t.section; lines.push("", "### " + section, ""); return; }
+      const r = saved[t.id] || {};
+      const v = r.verdict ? r.verdict.toUpperCase() : "not run";
+      lines.push(`- **${t.id} ${t.title}** — ${v}`);
+      lines.push(`  - said: "${t.say}"`);
+      lines.push(`  - expected: ${t.expect}`);
+      if (r.notes) lines.push(`  - observed: ${r.notes.replace(/\n/g, " ")}`);
+    });
+    return lines.join("\n");
+  }
+
+  document.getElementById("copy").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(asMarkdown());
+    const b = document.getElementById("copy");
+    b.textContent = "Copied — paste into the ledger";
+    setTimeout(() => (b.textContent = "Copy results for the ledger"), 2200);
+  });
+  document.getElementById("download").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "workmode-test-run.json";
+    a.click();
+  });
+  document.getElementById("reset").addEventListener("click", () => {
+    if (!confirm("Clear every verdict and note?")) return;
+    localStorage.removeItem(KEY);
+    location.reload();
+  });
+
+  render();
+})();
+</script>
