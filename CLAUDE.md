@@ -131,7 +131,19 @@ swiftc -o /tmp/chk Sources/Sayline/Meeting.swift Sources/Sayline/MeetingLink.swi
 swiftc -o /tmp/chk Sources/Sayline/CalendarScope.swift eval/scope-checks/main.swift && /tmp/chk
 swiftc -o /tmp/chk Sources/Sayline/FactGuard.swift Sources/Sayline/AppContext.swift \
   eval/factguard-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/SpeechPatterns.swift \
+  eval/speech-pattern-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/TranscriptCleanupValidator.swift Sources/Sayline/SpeechPatterns.swift \
+  Sources/Sayline/FactGuard.swift Sources/Sayline/AppContext.swift \
+  eval/cleanup-checks/main.swift && /tmp/chk
+swiftc -o /tmp/chk Sources/Sayline/MediaControl.swift Sources/Sayline/NowPlaying.swift \
+  Sources/Sayline/SaylineLog.swift eval/media-checks/main.swift && /tmp/chk
 ```
+
+Three of those lines were missing from this file until 2026-08-14 —
+five suites existed that no fresh session would have run, found in the
+full review. When you ADD a suite, its line lands here in the same
+commit, or it does not exist.
 
 The fast path answers some commands without calling the model at all, so
 the router eval cannot see it — `fastroute-checks` is the only thing that
@@ -264,3 +276,20 @@ The user is a PM with an EE background, learning to code hands-on. Keep
 replies short and plain: small words, short paragraphs, jargon explained
 inline. Still teach — they want to understand the why, not just get the
 result.
+
+## Harness lessons that cost a session each
+
+- **Stateful model sessions poison batches.** Apple's
+  `LanguageModelSession` appends every call to its transcript; one
+  session reused across a batch measures accumulated context, not the
+  model — it produced 24/31 confident "context window exceeded"
+  failures that looked exactly like a model limit. One session per
+  utterance, matching how production treats each dictation. Every
+  HTTP harness here is stateless so the class never appeared before;
+  any future stateful API gets the same rule.
+- **Model-eval runners, so nobody re-finds them:**
+  `eval/work-mode/run.py` and `taste_run.py`, `eval/clean-mode/run.py`,
+  `eval/foundation-model/run.py` (both arms, closes recorded),
+  `eval/fm-checks/run.py`, `eval/transcription/run.py`. All read the
+  production prompt from the built binary via `--dump-config` — build
+  first, always.
