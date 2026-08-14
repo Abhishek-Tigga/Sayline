@@ -402,11 +402,11 @@ final class AudioRecorder {
         }
 
         framesWritten = 0
-        // Temporary diagnostics for the zero-frame bug of 2026-08-12, where
-        // every recording produced frames: 0 while an independent
-        // AVAudioEngine in another process captured 48000 in three seconds
-        // on the same device. The question these answer is the one the log
-        // could not: does the tap fire at all, and if so with what?
+        // Permanent diagnostics, kept deliberately (2026-08-14 review):
+        // born hunting the 2026-08-12 zero-frame bug, they answer the one
+        // question the log otherwise cannot — does the tap fire at all,
+        // and with what — and the capture path has broken six ways in a
+        // day before. One log line per hold is cheap insurance.
         tapCallbacks = 0
         firstBufferLogged = false
         // The number the whole plan turns on: how long after the key went

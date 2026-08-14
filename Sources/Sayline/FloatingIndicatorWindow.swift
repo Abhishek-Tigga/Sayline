@@ -21,33 +21,13 @@ import SwiftUI
 /// exact AppKit cause wasn't pinned down). A freshly constructed panel
 /// can't carry forward whatever internal ordering state got corrupted,
 /// so this sidesteps the bug class instead of chasing the root cause.
-/// Temporary instrumentation (2026-08-09) for a suspected window leak.
-///
-/// `hide()` calls `orderOut(_:)` and drops our reference, but never
-/// `close()`, and the panel sets `isReleasedWhenClosed = false`. If AppKit
-/// is still holding these, every dictation leaves behind a live panel — and
-/// each one keeps running three `TimelineView(.animation)` loops (redrawing
-/// every display frame, 60–120fps) plus a Liquid Glass material that
-/// continuously samples the screen behind it. 22 of those accumulated in
-/// one 7-minute session, which is a plausible cause of the system-wide
-/// freezes, since a bogged-down graphics system would also explain why the
-/// event tap gets cut while the app is otherwise idle.
-///
-/// Counting creates against deallocs settles it. Equal counts means windows
-/// are fine and the freeze is elsewhere; zero deallocs confirms the leak.
-private final class IndicatorPanel: NSPanel {
-    private static var liveCount = 0
-
-    static func noteCreated() {
-        liveCount += 1
-        SaylineLog.log("[panel-leak-probe] created — \(liveCount) alive")
-    }
-
-    deinit {
-        IndicatorPanel.liveCount -= 1
-        SaylineLog.log("[panel-leak-probe] deallocated — \(IndicatorPanel.liveCount) alive")
-    }
-}
+/// The leak probe that used to live here (2026-08-09) is gone: it
+/// counted creates against deallocs for a suspected panel leak, the
+/// counts came back equal (14 created, 14 deallocated), the theory was
+/// disproven, and the freeze was later root-caused to the audio
+/// engine's main-thread deadlock — see DICTATION-HISTORY.md. Removed
+/// 2026-08-14 in the dead-code sweep.
+private final class IndicatorPanel: NSPanel {}
 
 final class FloatingIndicatorWindow {
     private var panel: NSPanel?
@@ -444,7 +424,6 @@ final class FloatingIndicatorWindow {
             backing: .buffered,
             defer: false
         )
-        IndicatorPanel.noteCreated()
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // NOT forced to .darkAqua any more. Removed 2026-08-14 on the
@@ -475,7 +454,11 @@ final class FloatingIndicatorWindow {
         // normal app windows but below the Dock, which let a
         // non-auto-hidden Dock visually cover the pill.
         panel.level = .statusBar
-        panel.hasShadow = false // temporarily disabled to test a reported lighter-than-black edge on all 4 sides
+        // Permanent, not temporary: the window-level shadow drew a faint
+        // lighter-than-black edge on all four sides of the transparent
+        // panel, and the pill draws its own drop shadow in SwiftUI
+        // (surfaceBackground), so the panel's would double it anyway.
+        panel.hasShadow = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false

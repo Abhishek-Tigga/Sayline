@@ -129,8 +129,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let localTranscriber = WhisperKitTranscriber()
     private let cleaner = TranscriptCleaner()
     private let workCleaner = WorkModeCleaner()
-    /// Scaffolding; see `--preview-pill` in applicationDidFinishLaunching.
-    private let pillPreview = PillPreviewWindowController()
     private let agentRouter = AgentRouter()
     private let indicatorWindow = FloatingIndicatorWindow()
     private lazy var settingsWindowController = SettingsWindowController(appDelegate: self)
@@ -196,13 +194,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         SaylineLog.startSession()
         guard Self.claimSingleInstance() else { return }
         StallWatchdog.shared.start()
-        // Scaffolding for judging the new pill before it is wired into the
-        // live indicator. Costs a normal launch one array lookup; delete
-        // this and PillPreviewWindowController once the pill ships.
-        if CommandLine.arguments.contains("--preview-pill") {
-            pillPreview.show()
-            SaylineLog.log("pill preview window opened (--preview-pill)")
-        }
         #if DEBUG
         // SAYLINE_TEST_STALL=3 blocks main for 3s shortly after launch, so
         // the watchdog can be seen firing rather than assumed to work.
