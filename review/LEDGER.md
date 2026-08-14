@@ -6699,3 +6699,62 @@ Checkpoint `5b5b715`; four commits after it. All claimed-fixed:
 wheel, commands provided in-session. Opus: verification = re-run the
 suites and the two eval harnesses against the rebuilt binaries;
 nothing here should move any measured number.
+
+### FIX BATCH · VERIFIED (Opus, 2026-08-14) — two cosmetic leftovers
+2026-08-14 · Opus · `VERIFIED`
+
+Per the role swap. Everything below was run, not read.
+
+**1. CLAUDE.md suite documentation — VERIFIED.** Extracted every `swiftc`
+line the doc gives a fresh session and executed all of them: **10/10
+compile and print "all passed"**, including the five that were previously
+undocumented. The doc is now runnable rather than merely present, which
+is the property that matters — a documented-but-broken line and an
+undocumented suite fail identically.
+
+**2. SpokenNumbers split is a pure move — VERIFIED, and this is the
+strong one.** Built the pre-split verifier from checkpoint `5b5b715` and
+the post-split verifier from HEAD, then ran both over 306 raw/rewrite
+pairs: the 31 work rewrites, all 19 ideal variants, and 256 synthetics
+built by crossing sixteen number forms chosen to sit on the boundaries
+the move touched ("47 and a half thousand", "forty seven five", "930",
+"2024 15 people", "half the team", "the 30th"). **Byte-identical
+output — 45,087 bytes both sides, not one differing verdict.** The
+`--pin` mode is identical too, over 34 transcripts. A pure move is a
+claim that can be proven rather than argued, and it is proven.
+
+**3. The rebuild-command headers work.** I built both verifier and
+validator from the header comments alone. They are correct, including the
+new `SpokenNumbers.swift`. That closes the 39%-that-was-29% class at the
+source rather than in anyone's memory.
+
+**4. Dead-code sweep — VERIFIED with two leftovers.** Leak probe gone (0
+references). `--preview-pill` gone; the flag now falls through to a normal
+launch, which is right. `hasShadow` carries an honest permanent reason.
+`[mic]` retitled from "Temporary diagnostics" to "Permanent diagnostics,
+kept deliberately". The `formalityUpgrade` strike is correct — the six
+remaining occurrences are declaration, explanation, kind, detection and
+the list, with no duplicate arm.
+
+**5. Nothing measured moved — VERIFIED.** Clean per-workstream 25/26,
+identical to the pre-batch record. Work-mode calibration 14/15 with the
+same single argued residual. `fm-checks` 8/8. Ten suites green, build
+green, app launches, signing still certificate-based.
+
+### The two leftovers, both cosmetic, neither worth a revert
+- `StatusPill.swift:21` and `RecordingIndicatorView.swift:865` still
+  refer the reader to `--preview-pill`, which no longer exists. Doc rot
+  created by the deletion.
+- `AudioRecorder.swift:64` still reads "Remove with the `[mic]` log lines
+  once the cause is known" — the old temporary framing, on a different
+  comment from the one that was retitled. It now contradicts the
+  permanent decision recorded eighty lines below it.
+
+Both are comments pointing at decisions that changed. Left for whoever
+picks up the batch's deferred item rather than fixed here, because a
+verifier editing the work under verification is how a role swap stops
+meaning anything.
+
+**Still open from the batch, as Fable recorded:** the main merge and
+branch deletions (user at the wheel), and the deferred waiver-section
+move.
