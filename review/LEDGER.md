@@ -7257,3 +7257,55 @@ as a bug — likely fixed or made loggable by f3ea0f6's own logging.
 end-to-end with nothing logged in between — second sighting of the
 silent-slow-routing class parked in BACKLOG.md; the [e2e] stopwatch
 now at least records the totals.
+
+---
+
+## GUARD · Glossary words leaking into typed gibberish — two more layers (Fable, 2026-08-15) — claimed-fixed
+
+**The report:** garbled glossary words inside gibberish dictations that
+TYPED — 13:27 "NAR-Lex Kajraa … Hedesh Gupta … Gugge Gugge Gugge"
+(8.5 s, peak 0.33 — real-length, real-loudness background noise),
+15:36 "TANAYAARAN RZP". All three existing guards correctly passed
+them: garbled names are not exact echoes, "Gugge ×3" was the exempt
+single-word run, and the audio was far too loud for the filler filter.
+
+**Landed:**
+1. **Decoder confidence plumbing.** `verbose_json` on every cloud
+   transcription; per-segment `avg_logprob` / `no_speech_prob` /
+   `compression_ratio` logged as `[conf]` each turn and gated at both
+   choke points with Whisper's own fallback thresholds, all-segments-
+   junk only, fail open.
+   **Honest negative result, measured before shipping:** Groq's
+   whisper-large-v3-turbo reports HEALTHY stats on pure hallucination —
+   the silence probe's invented "Thank you." scored no_speech 0.00 /
+   logprob −0.45, and a generated babble clip that reproduced a
+   glossary echo ("Glossary, Figma, WhatsApp") scored no_speech 0.00 /
+   logprob −0.53. The gate will therefore rarely fire on this
+   provider; it ships as instrumentation that builds the evidence for
+   real thresholds, not as the fix. Recorded so nobody re-derives the
+   disappointment.
+2. **Made-up-word triples.** A ≥4-letter word outside
+   /usr/share/dict/words repeated 3× consecutively is the decoder
+   stuttering, at any loudness — catches the 13:27 leak's exact shape.
+   Dictionary injected; no dictionary means the rule stays disarmed
+   (fail open). "no no no" stays speech.
+3. **Reproduction recipe that works:** 4 s of low-pass random noise
+   with 3 Hz amplitude modulation + the glossary prompt reproduced a
+   textbook echo live (already caught by the echo guard). Kept in this
+   entry, not as a clip — the output is probabilistic.
+
+Suite: hallucination-checks 21/21 (leak transcripts verbatim as
+fixtures; confidence cases synthetic). Build green, app relaunched.
+
+**Still uncatchable, honestly:** short non-repeating gibberish
+("TANAYAARAN RZP", "Bocağla Hibah Hi") — no structural signature
+separates it from a real name dictation, Groq's confidence numbers are
+blind, and eating real speech is the worse failure. The remaining
+lever is upstream: these all come from unintended holds picking up
+background audio. If leaks continue, the next design conversation is
+about the *hold* (e.g. minimum speech-energy duration), not the
+transcript.
+
+**For Opus:** suite line unchanged in CLAUDE.md (same two files);
+verify with the suite plus one real dictation containing a legit
+non-word ("prepone stays prepone").

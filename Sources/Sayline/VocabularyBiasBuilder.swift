@@ -32,6 +32,14 @@ enum VocabularyBiasBuilder {
         return entries
     }
 
+    /// Dictionary membership, for the hallucination guard's made-up-word
+    /// rule. An unreadable dictionary answers "yes" to everything, which
+    /// disarms that rule rather than arming it against all words — the
+    /// fail-open direction.
+    static func isKnownWord(_ word: String) -> Bool {
+        knownWords.isEmpty ? true : knownWords.contains(word.lowercased())
+    }
+
     /// `/usr/share/dict/words`, ~235k lowercase entries, shipped with
     /// every Mac. Chosen over NSSpellChecker deliberately: it needs no
     /// AppKit, so `--dump-config` builds the same list headless that

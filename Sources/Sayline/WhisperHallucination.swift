@@ -54,14 +54,15 @@ enum WhisperHallucination {
 
     /// True when this looks like something Whisper made up rather than
     /// something the user said.
-    static func isLikelyHallucinated(_ transcript: String, audioPeak: Float) -> Bool {
+    static func isLikelyHallucinated(_ transcript: String, audioPeak: Float,
+                                     isKnownWord: (String) -> Bool = { _ in true }) -> Bool {
         // Checked before the loudness gate, deliberately: the repetition
         // loop ("Tate Seri Bajol, Tate Seri Bajol, Tate Seri Bajol" —
         // live, 2026-08-14, routed to a YouTube search) arrives from
         // audio of any loudness, and even if the hold contained real
         // speech, a looping transcript is certainly not what was said.
         // Discarding it visibly beats typing or executing it.
-        if hasRepetitionLoop(transcript) { return true }
+        if hasRepetitionLoop(transcript, isKnownWord: isKnownWord) { return true }
 
         // Loud enough to be real speech — believe the transcript whatever
         // it says. This is what protects a genuine "thank you".
@@ -81,6 +82,39 @@ enum WhisperHallucination {
             || phrases.contains(transcript.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
     }
 
+    /// Whisper's own per-segment confidence, from `verbose_json`.
+    ///
+    /// Requested since 2026-08-15, when 8.5 s of background noise at
+    /// peak 0.33 transcribed as gibberish threaded with garbled
+    /// glossary names ("Hedesh Gupta", "RZP") and typed itself into a
+    /// document. Every structural guard passed it: not an exact echo,
+    /// no 3× multi-word loop, too loud for the filler filter. The
+    /// decoder, meanwhile, knew — these three numbers are what Whisper
+    /// itself uses to reject its own output; we had just never asked.
+    struct DecodeStats {
+        let avgLogprob: Double
+        let noSpeechProb: Double
+        let compressionRatio: Double
+
+        /// Whisper's own decode-fallback rules, verbatim: a segment is
+        /// junk when the decoder both doubts speech was present AND had
+        /// low confidence in what it wrote, or when the text compresses
+        /// like a repetition loop.
+        var isJunk: Bool {
+            (noSpeechProb > 0.6 && avgLogprob < -1.0) || compressionRatio > 2.4
+        }
+    }
+
+    /// True when EVERY segment is junk — the whole transcript is the
+    /// decoder guessing. Deliberately all-or-nothing: a real dictation
+    /// with one weak segment (a trailing breath) must survive, so
+    /// partial junk passes and stays a known residual. Empty stats
+    /// accept — fail open when the API didn't send them.
+    static func isLowConfidence(_ stats: [DecodeStats]) -> Bool {
+        guard !stats.isEmpty else { return false }
+        return stats.allSatisfy(\.isJunk)
+    }
+
     /// The decoder stuck in a loop: one multi-word phrase, immediately
     /// repeated three or more times. A known Whisper failure shape.
     ///
@@ -91,11 +125,30 @@ enum WhisperHallucination {
     /// because the discard is visible ("Didn't catch that"), while a
     /// looping transcript typed into a document — or executed as an
     /// agent command — is not.
-    static func hasRepetitionLoop(_ transcript: String) -> Bool {
+    static func hasRepetitionLoop(_ transcript: String,
+                                  isKnownWord: (String) -> Bool = { _ in true }) -> Bool {
         let words = transcript.lowercased()
             .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
             .map(String.init)
         guard words.count >= 6 else { return false }
+
+        // A single *made-up* word repeated three times ("Gugge Gugge
+        // Gugge" — live 2026-08-15, typed into a document inside a
+        // gibberish dictation). Real speech triples real words — "no no
+        // no" stays exempt because "no" is in the dictionary; a word in
+        // neither the dictionary nor anywhere else, thrice in a row, is
+        // the decoder stuttering. Length ≥ 4 keeps interjections
+        // ("na na na") out of reach. Callers without a dictionary keep
+        // the old behavior — the default closure knows every word.
+        if words.count >= 3 {
+            for i in 0...(words.count - 3) {
+                let w = words[i]
+                if w.count >= 4, words[i + 1] == w, words[i + 2] == w,
+                   !isKnownWord(w) {
+                    return true
+                }
+            }
+        }
 
         for size in 2...5 where size * 3 <= words.count {
             for start in 0...(words.count - size * 3) {

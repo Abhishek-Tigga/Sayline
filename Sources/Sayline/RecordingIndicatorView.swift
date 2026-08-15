@@ -509,22 +509,6 @@ private struct NoticeBox: View {
     }
 }
 
-private struct SaylineMarker: View {
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(PillStyle.foreground)
-                .frame(width: 4, height: 4)
-            Text("SAYLINE")
-                .font(.system(size: 10, weight: .semibold))
-                .kerning(0.6)
-                .foregroundStyle(PillStyle.foreground)
-        }
-        .opacity(0.5)
-        .padding(.bottom, 6)
-    }
-}
-
 // MARK: - Calendar setup
 
 /// The one-time card that teaches the two manual steps.
@@ -544,7 +528,6 @@ private struct SetupBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SaylineMarker()
             Text(card.title)
                 .font(.system(size: SpeechBackBox.fontSize, weight: .semibold))
                 .foregroundStyle(PillStyle.foreground)
@@ -644,10 +627,13 @@ private struct AccountRow: View {
 /// The question box. Shares the speech box's geometry deliberately — this
 /// is the same surface saying something, not a new component.
 ///
-/// What distinguishes it is the "Sayline" marker. Without it the question
-/// is indistinguishable from the transcript being read back, and that is
-/// the one ambiguity that must not exist here: someone would answer a
-/// question they thought was their own words echoed at them.
+/// It used to carry a "SAYLINE" marker, on the argument that a question
+/// is otherwise indistinguishable from the transcript being read back.
+/// Removed on the user's call, 2026-08-14, after seeing it live: in
+/// practice the question mark, the "Hold to answer" hint and the answer
+/// buttons all say "this is a question" already, and the marker read as
+/// chrome. If a question is ever mistaken for an echo, this is the
+/// reasoning that was traded away.
 private struct FollowUpBox: View {
     let request: FollowUpRequest
     let startedAt: Date
@@ -663,7 +649,6 @@ private struct FollowUpBox: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SaylineMarker()
             Text(request.question)
                 .font(.system(size: SpeechBackBox.fontSize))
                 .foregroundStyle(PillStyle.foreground)

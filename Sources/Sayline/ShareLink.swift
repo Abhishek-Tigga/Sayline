@@ -133,6 +133,40 @@ enum ShareLink {
         return false
     }
 
+    /// Calling codes for the regions this app has users in, plus the
+    /// common ones. Deliberately small: an unknown region returns nil and
+    /// the caller asks, which is the behaviour that was always correct
+    /// when we could not be sure.
+    private static let callingCodes: [String: String] = [
+        "IN": "+91", "US": "+1", "CA": "+1", "GB": "+44", "AU": "+61",
+        "NZ": "+64", "SG": "+65", "AE": "+971", "DE": "+49", "FR": "+33",
+        "ES": "+34", "IT": "+39", "NL": "+31", "IE": "+353", "ZA": "+27",
+        "JP": "+81", "BR": "+55", "MX": "+52",
+    ]
+
+    /// Completes a local number using the Mac's own region.
+    ///
+    /// Only ever applied to the user's OWN number, read from their own
+    /// me-card on their own machine. A contact's local number still asks,
+    /// because their region is a guess and a wrong country code reaches a
+    /// stranger. For the user's own card the region is not a guess, and
+    /// decision 4 means the chat opens prefilled either way.
+    ///
+    /// Returns nil when the region is unknown, so the ask survives as the
+    /// fallback rather than a wrong number being invented.
+    static func withLocalCountryCode(_ number: String,
+                                     regionCode: String? = Locale.current.region?.identifier)
+    -> String? {
+        let digits = normalize(number)
+        if hasCountryCode(digits) { return digits }
+        guard let regionCode, let code = callingCodes[regionCode.uppercased()] else { return nil }
+        // Indian and UK local numbers are often written with a leading 0
+        // that the international form drops.
+        let local = digits.hasPrefix("0") ? String(digits.dropFirst()) : digits
+        guard local.count >= 7 else { return nil }
+        return code + local
+    }
+
     // MARK: - Message and URL construction
 
     /// Note on one line, URL on its own.

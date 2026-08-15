@@ -42,6 +42,47 @@ check(!WhisperHallucination.isLikelyHallucinated(
         "the deploy went fine no errors", audioPeak: 0.01),
       "quiet but substantive speech survives")
 
+// MARK: Made-up word triples (live leak, 2026-08-15, typed into a document)
+let smallDict: Set<String> = ["no", "very", "good", "i", "said", "move", "the",
+                              "meeting", "to", "thursday", "ask", "about"]
+let knows: (String) -> Bool = { smallDict.contains($0) }
+
+check(WhisperHallucination.hasRepetitionLoop(
+        "NAR-Lex Kajraa Likki Hedesh Gupta Hiver Likki Hedesh Gugge Gugge Gugge Bungge",
+        isKnownWord: knows),
+      "the live typed-gibberish leak trips (made-up word tripled)")
+check(!WhisperHallucination.hasRepetitionLoop("no no no no no no", isKnownWord: knows),
+      "a real word tripled is still speech")
+check(!WhisperHallucination.hasRepetitionLoop(
+        "ask Hirdesh about Razorpay and the meeting", isKnownWord: knows),
+      "unknown words without repetition are names, not junk")
+check(!WhisperHallucination.hasRepetitionLoop(
+        "Gugge Gugge Gugge Bungge Hidesh Gugge"),
+      "no dictionary supplied -> the made-up-word rule stays disarmed")
+
+// MARK: Decoder confidence (verbose_json segments)
+typealias Stats = WhisperHallucination.DecodeStats
+let junkSilence = Stats(avgLogprob: -1.4, noSpeechProb: 0.9, compressionRatio: 1.2)
+let junkLoop = Stats(avgLogprob: -0.4, noSpeechProb: 0.1, compressionRatio: 3.1)
+let good = Stats(avgLogprob: -0.25, noSpeechProb: 0.02, compressionRatio: 1.5)
+let weakTail = Stats(avgLogprob: -1.2, noSpeechProb: 0.7, compressionRatio: 1.3)
+
+check(WhisperHallucination.isLowConfidence([junkSilence]),
+      "doubted-speech + low confidence discards")
+check(WhisperHallucination.isLowConfidence([junkLoop]),
+      "loop-grade compression discards")
+check(WhisperHallucination.isLowConfidence([junkSilence, junkLoop]),
+      "all segments junk discards")
+check(!WhisperHallucination.isLowConfidence([good, weakTail]),
+      "one solid segment saves the transcript — all-or-nothing by design")
+check(!WhisperHallucination.isLowConfidence([good]),
+      "an ordinary confident segment passes")
+check(!WhisperHallucination.isLowConfidence([]),
+      "no stats -> accept, the guard fails open")
+check(!WhisperHallucination.isLowConfidence(
+        [Stats(avgLogprob: -1.4, noSpeechProb: 0.2, compressionRatio: 1.2)]),
+      "low confidence alone (clear speech present) is not junk — quiet mumbling stays")
+
 print(failures == 0 ? "PASS — hallucination guards hold"
                     : "FAIL — \(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

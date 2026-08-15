@@ -25,6 +25,13 @@ final class GroqTranscriber: Transcriber {
     private let endpoint = URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!
     private let model = "whisper-large-v3-turbo"
 
+    /// Confidence for the most recent transcription, for the choke-point
+    /// guards. Same pattern as `AudioRecorder.lastRecordingPeak`: the
+    /// caller that awaited `transcribe` reads it immediately after, on
+    /// the same task — no concurrent holds exist, one hold at a time is
+    /// the app's whole model.
+    private(set) var lastStats: [WhisperHallucination.DecodeStats]?
+
     func transcribe(fileURL: URL) async throws -> String {
         guard let apiKey = APIKeyProvider.groqAPIKey else {
             throw TranscriptionError.missingAPIKey
@@ -49,8 +56,34 @@ final class GroqTranscriber: Transcriber {
             throw TranscriptionError.apiError(message)
         }
 
-        struct TranscriptionResponse: Decodable { let text: String }
+        // Segments are optional at every level, deliberately: if the API
+        // stops sending them the transcript still flows and the guard
+        // fails open — a missing number must never cost a dictation.
+        struct Segment: Decodable {
+            let avg_logprob: Double?
+            let no_speech_prob: Double?
+            let compression_ratio: Double?
+        }
+        struct TranscriptionResponse: Decodable {
+            let text: String
+            let segments: [Segment]?
+        }
         let decoded = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
+
+        let stats = (decoded.segments ?? []).compactMap { s -> WhisperHallucination.DecodeStats? in
+            guard let logprob = s.avg_logprob, let noSpeech = s.no_speech_prob,
+                  let compression = s.compression_ratio else { return nil }
+            return .init(avgLogprob: logprob, noSpeechProb: noSpeech,
+                        compressionRatio: compression)
+        }
+        lastStats = stats.isEmpty ? nil : stats
+        if let worst = stats.min(by: { $0.avgLogprob < $1.avgLogprob }) {
+            SaylineLog.log(String(format:
+                "[conf] %d segment(s), worst: logprob %.2f no_speech %.2f compression %.2f",
+                stats.count, worst.avgLogprob, worst.noSpeechProb, worst.compressionRatio))
+        } else {
+            SaylineLog.log("[conf] no segment stats in response — confidence guard inactive this turn")
+        }
         return decoded.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -64,6 +97,10 @@ final class GroqTranscriber: Transcriber {
         }
 
         appendField(name: "model", value: model)
+        // Segment confidence rides along — see the decode below. The
+        // plain format returns text alone, which is how gibberish got
+        // typed with the decoder's own doubts thrown away unread.
+        appendField(name: "response_format", value: "verbose_json")
         // Pinned rather than left to auto-detect — Whisper models can
         // hallucinate garbled/wrong-language output specifically when
         // language auto-detection misfires on short or ambiguous audio.

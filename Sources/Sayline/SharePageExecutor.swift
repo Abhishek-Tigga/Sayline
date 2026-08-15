@@ -173,11 +173,30 @@ enum SharePageExecutor {
         }
         let mobiles = me.phoneNumbers.filter { ShareLink.isMobile($0.label ?? "") }
         let ordered = mobiles.isEmpty ? me.phoneNumbers : mobiles
+
+        // Already international — use it as written.
         for entry in ordered {
             let digits = ShareLink.normalize(entry.value.stringValue)
             if ShareLink.hasCountryCode(digits) { return digits }
         }
-        SaylineLog.log("[share] me-card has no number with a country code")
+
+        // Stored the way people actually store their own number: locally,
+        // with no "+". Live on 2026-08-14 this hit the ask every time and
+        // the user reasonably read it as the me-card being ignored. The
+        // Mac's region completes it, and only for the user's own card —
+        // see `withLocalCountryCode`.
+        for entry in ordered {
+            if let completed = ShareLink.withLocalCountryCode(entry.value.stringValue) {
+                SaylineLog.log("[share] me-card number completed with this Mac's region code")
+                return completed
+            }
+        }
+
+        // Shape only, never the digits: enough to diagnose the next
+        // failure without putting a phone number in a log meant to be
+        // handed over.
+        SaylineLog.log("[share] me-card has \(me.phoneNumbers.count) number(s), "
+            + "none usable and the region gave no calling code")
         return nil
     }
 

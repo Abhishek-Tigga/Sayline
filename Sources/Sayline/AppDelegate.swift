@@ -583,7 +583,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 let rawText = try await activeTranscriber.transcribe(fileURL: url)
                 SaylineLog.log("raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
 
-                if WhisperHallucination.isLikelyHallucinated(rawText, audioPeak: audioRecorder.lastRecordingPeak) {
+                if WhisperHallucination.isLikelyHallucinated(rawText, audioPeak: audioRecorder.lastRecordingPeak,
+                                                          isKnownWord: VocabularyBiasBuilder.isKnownWord) {
                     SaylineLog.log("discarded \"\(rawText)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
                     await MainActor.run {
                         self.isTranscribing = false
@@ -597,6 +598,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 if VocabularyBias.looksLikeEcho(transcript: rawText,
                                                 entries: VocabularyBiasBuilder.currentEntries) {
                     SaylineLog.log("[bias] discarded a glossary echo — Whisper read the hint list back instead of transcribing")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
+                        self.indicatorWindow.flashMessage("Didn't catch that")
+                    }
+                    return
+                }
+                // The decoder's own verdict, checked last: gibberish that
+                // is neither an echo nor a loop (2026-08-15, "NAR-Lex
+                // Kajraa…" typed into a document) still reads as junk in
+                // every segment's confidence.
+                if let stats = (self.activeTranscriber as? GroqTranscriber)?.lastStats,
+                   WhisperHallucination.isLowConfidence(stats) {
+                    SaylineLog.log("[conf] discarded — every segment reads as decoder guessing")
                     await MainActor.run {
                         self.isTranscribing = false
                         self.indicatorWindow.hide()
@@ -792,7 +807,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 let transcript = try await activeTranscriber.transcribe(fileURL: url)
                 SaylineLog.log("agent transcript -> \(transcript)")
 
-                if WhisperHallucination.isLikelyHallucinated(transcript, audioPeak: audioRecorder.lastRecordingPeak) {
+                if WhisperHallucination.isLikelyHallucinated(transcript, audioPeak: audioRecorder.lastRecordingPeak,
+                                                          isKnownWord: VocabularyBiasBuilder.isKnownWord) {
                     SaylineLog.log("discarded agent transcript \"\(transcript)\" — quiet audio (peak \(audioRecorder.lastRecordingPeak)) plus a known Whisper filler phrase")
                     await MainActor.run {
                         self.isTranscribing = false
@@ -807,6 +823,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 if VocabularyBias.looksLikeEcho(transcript: transcript,
                                                 entries: VocabularyBiasBuilder.currentEntries) {
                     SaylineLog.log("[bias] discarded an agent glossary echo — nothing routed")
+                    await MainActor.run {
+                        self.isTranscribing = false
+                        self.indicatorWindow.hide()
+                        self.indicatorWindow.flashMessage("Didn't catch that")
+                    }
+                    return
+                }
+                if let stats = (self.activeTranscriber as? GroqTranscriber)?.lastStats,
+                   WhisperHallucination.isLowConfidence(stats) {
+                    SaylineLog.log("[conf] discarded agent transcript — every segment reads as decoder guessing")
                     await MainActor.run {
                         self.isTranscribing = false
                         self.indicatorWindow.hide()

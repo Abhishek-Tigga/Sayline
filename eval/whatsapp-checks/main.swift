@@ -168,5 +168,24 @@ eq("an empty history keeps the original order",
 eq("a history mentioning nobody keeps the original order",
    VocabularyBias.rankedByHistory(names, historyText: "unrelated words"), names)
 
+
+// Live 2026-08-14: the me-card held a local number, so every self send
+// asked for a number the app already had.
+print("\ncompleting a local number from the Mac's region")
+eq("an Indian local number gains +91",
+   ShareLink.withLocalCountryCode("98765 43210", regionCode: "IN"), "+919876543210")
+eq("a leading zero is dropped, not kept",
+   ShareLink.withLocalCountryCode("098765 43210", regionCode: "IN"), "+919876543210")
+eq("a US local number gains +1",
+   ShareLink.withLocalCountryCode("(555) 010-9999", regionCode: "US"), "+15550109999")
+eq("an already-international number is returned unchanged",
+   ShareLink.withLocalCountryCode("+91 98765 43210", regionCode: "US"), "+919876543210")
+check("an unknown region completes nothing, so the ask survives",
+      ShareLink.withLocalCountryCode("98765 43210", regionCode: "ZZ") == nil)
+check("no region at all completes nothing",
+      ShareLink.withLocalCountryCode("98765 43210", regionCode: nil) == nil)
+check("something too short to be a number is refused",
+      ShareLink.withLocalCountryCode("12345", regionCode: "IN") == nil)
+
 print("\n\(bad == 0 ? "all passed" : "\(bad) FAILED")")
 exit(bad == 0 ? 0 : 1)
