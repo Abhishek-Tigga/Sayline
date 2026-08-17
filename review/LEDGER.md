@@ -7309,3 +7309,74 @@ transcript.
 **For Opus:** suite line unchanged in CLAUDE.md (same two files);
 verify with the suite plus one real dictation containing a legit
 non-word ("prepone stays prepone").
+
+---
+
+### OPEN · Whisper gibberish reached the document; the confidence guard had two reasons not to fire
+2026-08-17 · Opus · `still-broken`, not fixed — cause established, fix proposed
+
+User report: a sentence they never said was typed into a document. Not a
+cleanup mangle — the raw transcript already contained it.
+
+```
+13:09:18  raw transcript (cloud) -> ...such as whisper flow or super whisper
+          or other apps right. In order to change the design, in size each
+          setup, Hirdshahres and Sphirr-Scihidu or so in size at 2.3.2, right?
+13:09:18  [conf] 2 segment(s), worst: logprob -3.91 no_speech 0.00 compression 1.15
+```
+
+40.2 s hold, peak 1.0, 402 tap callbacks — the capture was healthy. The
+first segment is the user's real speech and is fine. The second is the
+invention, and **the decoder knew**: `avg_logprob -3.91`, against roughly
+-0.1 to -0.5 for ordinary speech.
+
+### Why it passed, and it is two independent failures
+
+**1 · The segment was never classified as junk.**
+
+```swift
+var isJunk: Bool {
+    (noSpeechProb > 0.6 && avgLogprob < -1.0) || compressionRatio > 2.4
+}
+```
+
+`no_speech 0.00` is not > 0.6, and `compression 1.15` is not > 2.4, so
+both clauses are false. The rule covers "probably was not speech AND I am
+unsure" and "this looks like a repetition loop". It has no case for
+**"speech was definitely present and I have almost no idea what the words
+were"** — which is this segment exactly, and which a `-3.91` states on its
+own. The number is logged and then unused.
+
+**2 · Even a junk verdict would not have been enough.** `isLowConfidence`
+is `stats.allSatisfy(\.isJunk)` — every segment must be junk. One good
+segment carries a bad one through. That granularity is deliberate and its
+comment says so ("a real dictation with one weak segment (a trailing
+breath) must survive"), but the case it protects has *high* `no_speech`,
+not low, so the two situations are separable and are currently conflated.
+
+### Planned fix, not yet made
+
+1. **A third junk clause: `avgLogprob < -2.5` on its own**, independent of
+   `no_speech`. Distinct from the trailing-breath case the current rule
+   protects, because a breath reads as high `no_speech` and this reads as
+   low. The threshold wants choosing against real logged data, not picked
+   — the log has the distribution and it should be read first.
+2. **The granularity is a design question and is Fable's, not mine.**
+   Dropping the junk *segment* while keeping the good ones is the fix that
+   matches this failure, but it means partial transcripts, and "we deleted
+   part of what you said" is a worse failure than "we typed something you
+   did not say" in at least some hands. The alternative — keep
+   all-or-nothing and accept that a mixed utterance passes — leaves this
+   bug open by choice. Recorded rather than decided.
+
+Suite cases to land with whichever is chosen: this segment's actual
+numbers (-3.91 / 0.00 / 1.15) must be junk; a trailing breath (high
+`no_speech`, short) must still survive; and a normal weak segment
+(-0.8 / 0.1 / 1.2) must survive.
+
+Related, already shipped and not the cause here: language is pinned to
+English so auto-detect cannot misfire, and the vocabulary glossary rides
+on the same request.
+
+Cost of leaving it: rare, but it types a plausible sentence the user never
+said into whatever has focus. The user found this one by reading it back.
