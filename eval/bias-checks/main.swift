@@ -142,6 +142,21 @@ do {
           "structural detection needs no audio signal (same case, restated)")
 }
 
+
+
+// MARK: Echo prefix stripping (live leak on real speech, 2026-08-18)
+check(VocabularyBias.strippingEchoPrefix("Glossary, Wihra, Pabir, just want to inform you")
+        == "Wihra, Pabir, just want to inform you",
+      "the literal template label is stripped off the front")
+check(VocabularyBias.strippingEchoPrefix("Glossary: Figma, WhatsApp") == "Figma, WhatsApp",
+      "colon form strips too")
+check(VocabularyBias.strippingEchoPrefix("A glossary, in general, is a list")
+        == "A glossary, in general, is a list",
+      "mid-sentence use of the word is untouched")
+check(VocabularyBias.strippingEchoPrefix("Glossary means a list of terms")
+        == "Glossary means a list of terms",
+      "opening the sentence WITH the word (no comma) is real speech and survives")
+
 print(failures == 0 ? "PASS — vocabulary bias ladder holds"
                     : "FAIL — \(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

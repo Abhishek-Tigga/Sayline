@@ -580,8 +580,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         Task {
             do {
                 defer { self.audioRecorder.discardRecording(at: url) }
-                let rawText = try await activeTranscriber.transcribe(fileURL: url)
+                var rawText = try await activeTranscriber.transcribe(fileURL: url)
                 SaylineLog.log("raw transcript (\(usingLocal ? "local" : "cloud")) -> \(rawText)")
+                let deprefixed = VocabularyBias.strippingEchoPrefix(rawText)
+                if deprefixed != rawText {
+                    SaylineLog.log("[bias] stripped a leading glossary-echo token")
+                    rawText = deprefixed
+                }
 
                 if WhisperHallucination.isLikelyHallucinated(rawText, audioPeak: audioRecorder.lastRecordingPeak,
                                                           isKnownWord: VocabularyBiasBuilder.isKnownWord) {

@@ -156,6 +156,25 @@ enum VocabularyBias {
         return longestRun >= 3
     }
 
+    /// Echo residue as a PREFIX on real speech — observed 2026-08-18:
+    /// "Glossary, Wihra, Pabir, just want to inform you…" carried the
+    /// template's own label plus garbled entries in front of a real
+    /// dictation, and Work mode then faithfully preserved the garbage
+    /// as "names". The full echo guard can't fire (the rest is real
+    /// speech), but the leading literal "Glossary," or "Glossary:" is
+    /// ours beyond doubt — nobody opens a sentence with our template
+    /// label plus a comma. Only that token is stripped; the garbled
+    /// names after it are indistinguishable from real names and stay.
+    static func strippingEchoPrefix(_ transcript: String) -> String {
+        let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowered = trimmed.lowercased()
+        guard lowered.hasPrefix("glossary,") || lowered.hasPrefix("glossary:") else {
+            return transcript
+        }
+        return String(trimmed.dropFirst("glossary,".count))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private static func tokens(of text: String) -> [String] {
         var words: [String] = []
         var word = ""
