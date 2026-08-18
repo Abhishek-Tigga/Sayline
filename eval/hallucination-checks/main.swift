@@ -83,6 +83,19 @@ check(!WhisperHallucination.isLowConfidence(
         [Stats(avgLogprob: -1.4, noSpeechProb: 0.2, compressionRatio: 1.2)]),
       "low confidence alone (clear speech present) is not junk — quiet mumbling stays")
 
+// MARK: The invented-sentence case (Opus's ledger find, 2026-08-15)
+// A 40 s dictation grew a final sentence the user never said; the
+// decoder scored it -3.91 / 0.00 / 1.15 and the old rule passed it.
+let invented = Stats(avgLogprob: -3.91, noSpeechProb: 0.00, compressionRatio: 1.15)
+check(invented.isJunk,
+      "the real invented sentence's numbers now read as junk (logprob clause)")
+check(!Stats(avgLogprob: -0.8, noSpeechProb: 0.1, compressionRatio: 1.2).isJunk,
+      "a normal weak segment survives the new clause")
+check(!Stats(avgLogprob: -2.3, noSpeechProb: 0.1, compressionRatio: 1.0).isJunk,
+      "-2.3 stays below the bar — the gap between speech and junk is empty and the threshold sits in it")
+check(!WhisperHallucination.isLowConfidence([good, invented]),
+      "mixed utterance is NOT whole-discarded — the junk segment is cut per-segment instead (GroqTranscriber)")
+
 print(failures == 0 ? "PASS — hallucination guards hold"
                     : "FAIL — \(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

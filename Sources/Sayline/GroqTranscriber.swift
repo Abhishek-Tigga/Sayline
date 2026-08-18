@@ -31,6 +31,9 @@ final class GroqTranscriber: Transcriber {
     /// the same task — no concurrent holds exist, one hold at a time is
     /// the app's whole model.
     private(set) var lastStats: [WhisperHallucination.DecodeStats]?
+    /// How many junk segments were cut from the last transcript. The
+    /// caller surfaces this — a partial transcript must never be silent.
+    private(set) var lastTrimmedSegments = 0
 
     func transcribe(fileURL: URL) async throws -> String {
         guard let apiKey = APIKeyProvider.groqAPIKey else {
@@ -60,6 +63,7 @@ final class GroqTranscriber: Transcriber {
         // stops sending them the transcript still flows and the guard
         // fails open — a missing number must never cost a dictation.
         struct Segment: Decodable {
+            let text: String?
             let avg_logprob: Double?
             let no_speech_prob: Double?
             let compression_ratio: Double?
@@ -70,7 +74,9 @@ final class GroqTranscriber: Transcriber {
         }
         let decoded = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
 
-        let stats = (decoded.segments ?? []).compactMap { s -> WhisperHallucination.DecodeStats? in
+        lastTrimmedSegments = 0
+        let segments = decoded.segments ?? []
+        let stats = segments.compactMap { s -> WhisperHallucination.DecodeStats? in
             guard let logprob = s.avg_logprob, let noSpeech = s.no_speech_prob,
                   let compression = s.compression_ratio else { return nil }
             return .init(avgLogprob: logprob, noSpeechProb: noSpeech,
@@ -83,6 +89,26 @@ final class GroqTranscriber: Transcriber {
                 stats.count, worst.avgLogprob, worst.noSpeechProb, worst.compressionRatio))
         } else {
             SaylineLog.log("[conf] no segment stats in response — confidence guard inactive this turn")
+        }
+
+        // Junk segments are cut, good ones kept — per-segment, because a
+        // real 40 s dictation once carried one invented sentence at
+        // logprob −3.91 and all-or-nothing let the good segments carry
+        // the invention through. Partial beats poisoned: typing a
+        // sentence the user never said is the worse failure, and the
+        // caller shows a visible notice whenever this trims (never a
+        // silent partial). All-junk is left intact for the caller's
+        // whole-transcript discard, so "everything was noise" stays a
+        // clean "didn't catch that" rather than an empty paste.
+        if stats.count == segments.count, !stats.isEmpty,
+           !WhisperHallucination.isLowConfidence(stats) {
+            let kept = zip(segments, stats).filter { !$0.1.isJunk }
+            if kept.count < segments.count {
+                lastTrimmedSegments = segments.count - kept.count
+                SaylineLog.log("[conf] cut \(lastTrimmedSegments) junk segment(s), kept \(kept.count) — the caller announces the trim")
+                return kept.compactMap { $0.0.text }.joined(separator: " ")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
         }
         return decoded.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

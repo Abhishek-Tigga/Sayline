@@ -905,6 +905,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         addHistoryEntry(text: text, usedLocal: usedLocal, mode: producedBy)
         TextInjector.insert(text)
         logEndToEnd(mode: producedBy, outcome: "text inserted")
+        // A partial transcript is never silent: if the decoder's junk
+        // segments were cut (see GroqTranscriber), say so — the user
+        // must know to glance at what landed.
+        if let trimmed = (activeTranscriber as? GroqTranscriber)?.lastTrimmedSegments,
+           trimmed > 0 {
+            indicatorWindow.flashMessage("Trimmed an unclear part — check the text", duration: 3.0)
+        }
     }
 
     /// One line per completed turn: what the user actually waited,

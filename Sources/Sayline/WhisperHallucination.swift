@@ -96,12 +96,23 @@ enum WhisperHallucination {
         let noSpeechProb: Double
         let compressionRatio: Double
 
-        /// Whisper's own decode-fallback rules, verbatim: a segment is
-        /// junk when the decoder both doubts speech was present AND had
-        /// low confidence in what it wrote, or when the text compresses
-        /// like a repetition loop.
+        /// Whisper's own decode-fallback rules, plus one clause of ours:
+        /// a segment is junk when the decoder both doubts speech was
+        /// present AND had low confidence in what it wrote, when the
+        /// text compresses like a repetition loop — or when confidence
+        /// alone is catastrophically low. The third clause exists
+        /// because a real 40 s dictation grew an invented final sentence
+        /// at logprob −3.91 with no_speech 0.00 (2026-08-15, found by
+        /// Opus in the log): "speech was definitely present and I have
+        /// almost no idea what the words were" satisfied neither
+        /// original clause. −2.5 was chosen against the logged
+        /// distribution, not picked: ordinary worst-segments sit at
+        /// −0.12…−0.34, the two known inventions at −3.21 and −3.91,
+        /// and nothing at all lives between −1.5 and −2.5.
         var isJunk: Bool {
-            (noSpeechProb > 0.6 && avgLogprob < -1.0) || compressionRatio > 2.4
+            (noSpeechProb > 0.6 && avgLogprob < -1.0)
+                || compressionRatio > 2.4
+                || avgLogprob < -2.5
         }
     }
 
