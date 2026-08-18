@@ -23,7 +23,13 @@ enum TranscriptionError: LocalizedError {
 /// returns the transcript text.
 final class GroqTranscriber: Transcriber {
     private let endpoint = URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!
-    private let model = "whisper-large-v3-turbo"
+    // large-v3, NOT turbo, since 2026-08-19: a 50 s dictation lost its
+    // entire ending to a turbo hallucination (glossary words woven into
+    // 'AscentGPT… versions 1.0.2, 1.5…', logprob −1.98, every guard
+    // passed) — and every transcription eval had been run against
+    // large-v3 while the app shipped turbo. The model we ship is the
+    // model we measured, from now on.
+    private let model = "whisper-large-v3"
 
     /// Confidence for the most recent transcription, for the choke-point
     /// guards. Same pattern as `AudioRecorder.lastRecordingPeak`: the
