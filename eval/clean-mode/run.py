@@ -29,6 +29,7 @@ sys.path.insert(0, str(REPO / "eval"))
 from run_eval import read_key, post_json
 
 GROQ = "https://api.groq.com/openai/v1/chat/completions"
+OPENAI = "https://api.openai.com/v1/chat/completions"
 CASES = json.loads((HERE / "transcripts.json").read_text())
 VALIDATOR = HERE / "validator" / "validate"
 
@@ -74,7 +75,13 @@ def main():
     a = ap.parse_args()
 
     system = load_prompt()
-    key = None if a.no_llm else read_key("GROQ_API_KEY", "GROQ_API_KEY")
+    # gpt-* model ids run on OpenAI — added 2026-08-18, the day Groq
+    # removed every llama chat model and its remaining shelf failed the
+    # bake-off (gpt-oss-20b on quality, qwen3.6 on latency).
+    on_openai = a.model.startswith("gpt-")
+    key = None if a.no_llm else read_key(
+        "OPENAI_API_KEY" if on_openai else "GROQ_API_KEY",
+        "OPENAI_API_KEY" if on_openai else "GROQ_API_KEY")
 
     rows, failures = [], []
     for case in CASES:
@@ -82,7 +89,7 @@ def main():
         if a.no_llm:
             rows.append({**case, "llm": raw, "ms": 0.0})
             continue
-        body, ms, err = post_json(GROQ, key, {
+        body, ms, err = post_json(OPENAI if on_openai else GROQ, key, {
             "model": a.model, "temperature": 0,
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": raw}],
@@ -105,7 +112,10 @@ def main():
     for r, v in zip(rows, validated):
         r["validated"] = v
 
-    out = pathlib.Path(a.out or HERE / f"clean-{a.model}.json")
+    # Model ids grew slashes (openai/gpt-oss-20b) and a slash in a
+    # filename is a directory — the first bake-off after the llama
+    # removal crashed HERE with its results already paid for.
+    out = pathlib.Path(a.out or HERE / f"clean-{a.model.replace('/', '-')}.json")
     out.write_text(json.dumps(rows, indent=1, ensure_ascii=False))
     print(f"{len(rows)} cases -> {out}")
     if not a.no_llm:

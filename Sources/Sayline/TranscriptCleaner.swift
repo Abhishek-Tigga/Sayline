@@ -3,8 +3,18 @@ import Foundation
 /// Runs a raw Whisper transcript through a fast Groq-hosted LLM to strip
 /// filler words and fix grammar/punctuation before it gets inserted.
 final class TranscriptCleaner {
-    private let endpoint = URL(string: "https://api.groq.com/openai/v1/chat/completions")!
-    private let model = "llama-3.1-8b-instant"
+    // Moved to OpenAI on 2026-08-18, the day Groq removed every llama
+    // chat model from its shelf mid-flight (llama-3.1-8b-instant AND
+    // the 3.3-70b fallback: `model_not_found`, live). The remaining
+    // Groq shelf failed the 19-case calibration bake-off — gpt-oss-20b
+    // deleted content in both C-controls, qwen3.6-27b ran a 3.3 s
+    // median. gpt-4.1-mini won on quality (both controls held, B1+B2
+    // policy fixes) at 1094 ms median / 1899 p90 — ~0.8 s slower than
+    // llama was, reported rather than hidden, and there is no faster
+    // good option today. Same model and key as Work mode: one
+    // provider dependency instead of two.
+    private let endpoint = URL(string: "https://api.openai.com/v1/chat/completions")!
+    private let model = "gpt-4.1-mini"
 
     /// Only allowed changes: removing filler words (um, uh, like, you
     /// know), removing false starts and repeated words, and fixing
@@ -124,7 +134,7 @@ final class TranscriptCleaner {
 
         let systemPrompt = context.promptFragment.map { "\(Self.cleanPrompt)\n\n\($0)" } ?? Self.cleanPrompt
 
-        guard let apiKey = APIKeyProvider.groqAPIKey else {
+        guard let apiKey = APIKeyProvider.openAIAPIKey else {
             throw TranscriptionError.missingAPIKey
         }
 
